@@ -1,6 +1,7 @@
 # Phase 3 — PII Detection Pass
 
-**Status: Implemented.**
+**Status: Implemented.** (Phase 2's identifier-validation layer — see
+"Validation Status" below — is wired in on top of this.)
 
 Deterministic PII detection over Phase 2's Event stream using Microsoft
 Presidio (regex + spaCy NLP-based recognizers). **No LLM is used anywhere
@@ -17,10 +18,12 @@ and never overrides what this engine decides.
 |---|---|
 | `recognizers.py` | Custom Presidio `PatternRecognizer` subclasses: `AadhaarRecognizer`, `PANRecognizer`, `IndianPhoneRecognizer` |
 | `analyzer_engine.py` | Builds the shared `AnalyzerEngine` (spaCy NLP + built-in + custom recognizers), `analyze_text()` entrypoint, `SUPPORTED_ENTITY_TYPES` allowlist |
-| `models.py` | `DetectedEvent` (wraps `Event`, never mutates it), `MatchedEntity`, `FREE_TEXT_FIELD_LABEL` |
-| `engine.py` | `detect_event()` — the per-event detection function; `detect_from_queue()` — async queue-to-queue consumer for Phase 2 → Phase 4 wiring |
+| `models.py` | `DetectedEvent` (wraps `Event`, never mutates it), `MatchedEntity` (incl. Phase 2's `validation_status`), `FREE_TEXT_FIELD_LABEL` |
+| `engine.py` | `detect_event()` — the per-event detection function (Phase 2: also resolves `validation_status` via `_resolve_validation_status`); `detect_from_queue()` — async queue-to-queue consumer for Phase 2 → Phase 4 wiring |
 | `fixtures.py` | Real/realistic sample events (pulled from actual Phase 2 output shapes) used in tests, including a hand-built `support_tickets`-style free-text event |
 | `test_detection.py` | 31 tests across 5 categories — see below |
+| `test_phase2_validation.py` | Phase 2 wiring tests: validated/failed_validation/pattern_match tagging end-to-end, unregistered-validator fallback |
+| `../validators.py` | Phase 2: `is_valid_pan`, `is_valid_aadhaar` (Verhoeff), pluggable `validator_registry` — lives at repo root, not in `detection/`, since it's a generic identifier-validation plugin layer, not Presidio-specific |
 
 ---
 
@@ -55,12 +58,42 @@ For every `Event`:
 {
   "contains_pii": true,
   "matched_entities": [
-    { "field": "phone", "entity_type": "IN_PHONE", "confidence": 0.75, "matched_text": "9876543210" }
+    {
+      "field": "phone",
+      "entity_type": "IN_PHONE",
+      "confidence": 0.75,
+      "matched_text": "9876543210",
+      "validation_status": "pattern_match"
+    }
   ]
 }
 ```
 
 `contains_pii` and `matched_entities` are **always present**, never omitted — `false` / `[]` for clean events.
+
+**`validation_status` (Phase 2, `detection/models.py`).** A separate signal
+from `confidence` (Presidio's regex/NER match score, unchanged): whether the
+org's config-declared identifier validator (`../validators.py`) has
+structurally/checksum-confirmed `matched_text`, not just pattern-matched it.
+One of:
+- `"pattern_match"` — no validator ran (org declares `validator: none`, no
+  identifier declared for this field name at all, the match came from
+  `raw_snippet` with no structured field to look up, or the org references
+  a validator name that isn't registered — see the fallback note below).
+- `"validated"` — the configured validator ran against `matched_text` and
+  passed (e.g. Verhoeff-checksum-correct Aadhaar, structurally-correct PAN).
+- `"failed_validation"` — the configured validator ran and **failed**.
+  Deliberately not collapsed into `pattern_match`: a regex-shaped string
+  that fails its checksum is a strong false-positive signal (e.g. a random
+  12-digit order ID, not a real Aadhaar number) — the rule engine and
+  evidence store can see this distinction.
+
+Resolution happens in `engine.py`'s `_resolve_validation_status`, keyed off
+the triggering `Event.tenant_id` and the match's `field` name against that
+org's `identifiers[].validator` (from `config_loader.load_org_config`). An
+org referencing an unregistered validator name (typo, or a not-yet-built
+one) never crashes detection — it logs a warning and falls back to
+`pattern_match`.
 
 **Interface note for Phase 4:** a `DetectedEvent` with `contains_pii == False` still flows through the pipeline (pass-through, tagged but untouched) — this phase does not filter anything out. Phase 4's rule engine should short-circuit immediately on `contains_pii == False`, since a clean event cannot trigger `EXPOSURE_001`, `PURPOSE_001`, or `RETENTION_001`. That short-circuit is Phase 4's responsibility, not implemented here.
 
@@ -74,8 +107,8 @@ spaCy's NER sometimes tags building/complex names inside address strings (e.g. "
 **2. Blinkit's own ID shapes (`BLK-XXXXXX`, `DP-XXXX`) are filtered out of `PERSON` results.**
 Presidio's spaCy-backed `PERSON` recognizer assigns a flat 0.85 confidence to any isolated capitalized alphanumeric token, regardless of whether it resembles a real name — verified directly (`BLK-431682` scored identically to `Priya Nair`). Since Phase 3 scans field values in isolation (needed for field attribution), it loses the sentence context that would normally disambiguate this. A narrow, explicit post-filter (`analyzer_engine.py`'s `_is_known_id_shape`) suppresses `PERSON` matches on tokens matching Blinkit's `[A-Z]{2,5}-\d+` ID convention. This is intentionally narrow — it does not attempt a general solution, and does not affect real two-word name matches (verified by regression test).
 
-**3. Aadhaar false-positive trade-off.**
-The unspaced 12-digit Aadhaar pattern (score 0.4, lower than the spaced pattern's 0.75) can in principle match any bare 12-digit numeric string with no surrounding context. Context-word boosting (`aadhaar`, `uid` nearby) raises confidence but Presidio's context mechanism does not suppress matches when no context word is present. Accepted for MVP since Phase 2's own generators never emit a colliding 12-digit shape (order IDs use `BLK-XXXXXX`, not bare digits). A production system would need Aadhaar's Verhoeff checksum validation to fully close this — out of MVP scope.
+**3. Aadhaar false-positive trade-off — now partially closed for validator-declaring orgs.**
+The unspaced 12-digit Aadhaar pattern (score 0.4, lower than the spaced pattern's 0.75) can in principle match any bare 12-digit numeric string with no surrounding context. Context-word boosting (`aadhaar`, `uid` nearby) raises confidence but Presidio's context mechanism does not suppress matches when no context word is present. `confidence` (Presidio's own score) is unaffected by this. **Phase 2 adds a second, independent signal**: for orgs whose config declares `validator: aadhaar` for a field, that field's match is separately checked against the real Verhoeff checksum and tagged `validation_status: "failed_validation"` if it's just a random 12-digit number wearing Aadhaar's shape — see "Validation Status" above and `../validators.py`. This does not change `confidence` or suppress the match; it adds a second field a downstream consumer can filter on. Orgs that don't declare a validator for a field (or declare `validator: none`) get no such signal — that field's matches stay `pattern_match`, same trade-off as before.
 
 ---
 

@@ -34,8 +34,21 @@ priority in dedup (they have a real field_name); a raw_snippet match is
 only kept if its matched_text isn't already accounted for by a
 field-sourced match.
 
-NO LLM. NO REGISTRY LOOKUPS. NO RULE EVALUATION. This module's only job
-is: given an Event, what PII is in it and where.
+NO LLM. NO RULE EVALUATION. This module's only job is: given an Event,
+what PII is in it, where, and (Phase 2) whether it's been structurally/
+checksum-confirmed.
+
+PHASE 2 ADDITION — validator wiring: for each match sourced from a
+structured field, we look up the triggering event's org config
+(config_loader.load_org_config, keyed by event.tenant_id) to see whether
+that field_name has a declared `identifiers[].validator`. If so, we run
+the matched text through validators.get_validator(...) and tag the match
+PATTERN_MATCH / VALIDATED / FAILED_VALIDATION accordingly (see
+detection/models.py). This is a config *read*, not a registry/rule-engine
+lookup — it does not consult get_registry_entry, and it never raises: a
+missing org config, an undeclared identifier, or an unregistered
+validator name all fall back to PATTERN_MATCH with a logged warning
+rather than failing detection for the event. See _resolve_validation_status.
 """
 
 from __future__ import annotations
@@ -43,17 +56,66 @@ from __future__ import annotations
 import logging
 from typing import Dict, List
 
+from config_loader import OrgConfigNotFoundError, load_org_config
 from detection.analyzer_engine import analyze_text
-from detection.models import FREE_TEXT_FIELD_LABEL, DetectedEvent, MatchedEntity
+from detection.models import (
+    FAILED_VALIDATION,
+    FREE_TEXT_FIELD_LABEL,
+    PATTERN_MATCH,
+    VALIDATED,
+    DetectedEvent,
+    MatchedEntity,
+)
 from schemas.models import Event
+from validators import get_validator
 
 logger = logging.getLogger("detection.engine")
 
 
-def _scan_fields(fields: Dict[str, str]) -> List[MatchedEntity]:
+def _resolve_validation_status(org_id: str, field_name: str, matched_text: str) -> str:
+    """
+    Phase 2: decide a match's validation_status.
+
+    - Matches with no real structured field (field_name == FREE_TEXT_FIELD_LABEL,
+      i.e. raw_snippet matches) can never map to a declared identifier by
+      field name, so they always stay PATTERN_MATCH.
+    - If the org has no config on record, or the identifier's `validator`
+      is "none"/undeclared, stays PATTERN_MATCH.
+    - If the identifier declares a validator name that isn't registered
+      (typo, or a not-yet-built validator like "apaar"), logs a warning
+      and falls back to PATTERN_MATCH — this must never crash detection.
+    - Otherwise runs the validator against matched_text: VALIDATED on
+      True, FAILED_VALIDATION on False.
+    """
+    if field_name == FREE_TEXT_FIELD_LABEL:
+        return PATTERN_MATCH
+
+    try:
+        config = load_org_config(org_id)
+    except OrgConfigNotFoundError:
+        return PATTERN_MATCH
+
+    identifier = next((i for i in config.identifiers if i.name == field_name), None)
+    if identifier is None or identifier.validator == "none":
+        return PATTERN_MATCH
+
+    validator_fn = get_validator(identifier.validator)
+    if validator_fn is None:
+        logger.warning(
+            "Org %r declares validator %r for identifier %r, but no such "
+            "validator is registered. Falling back to pattern_match confidence.",
+            org_id, identifier.validator, field_name,
+        )
+        return PATTERN_MATCH
+
+    return VALIDATED if validator_fn(matched_text) else FAILED_VALIDATION
+
+
+def _scan_fields(org_id: str, fields: Dict[str, str]) -> List[MatchedEntity]:
     """
     Runs the analyzer over each value in event.fields independently,
-    tagging each match with its real field_name.
+    tagging each match with its real field_name and (Phase 2) its
+    validation_status per _resolve_validation_status.
     """
     matches: List[MatchedEntity] = []
     for field_name, value in fields.items():
@@ -64,12 +126,14 @@ def _scan_fields(fields: Dict[str, str]) -> List[MatchedEntity]:
         for r in results:
             if r.entity_type == "PERSON":
                 has_person = True
+            matched_text = value[r.start:r.end]
             matches.append(
                 MatchedEntity(
                     field=field_name,
                     entity_type=r.entity_type,
                     confidence=r.score,
-                    matched_text=value[r.start:r.end],
+                    matched_text=matched_text,
+                    validation_status=_resolve_validation_status(org_id, field_name, matched_text),
                 )
             )
         # Fallback for structured 'name' fields when spaCy NER omits single/isolated names
@@ -81,6 +145,7 @@ def _scan_fields(fields: Dict[str, str]) -> List[MatchedEntity]:
                         entity_type="PERSON",
                         confidence=0.85,
                         matched_text=value,
+                        validation_status=_resolve_validation_status(org_id, field_name, value),
                     )
                 )
     return matches
@@ -139,7 +204,7 @@ def detect_event(event: Event) -> DetectedEvent:
     contains_pii and matched_entities are always populated (never
     omitted) — see DetectedEvent's docstring.
     """
-    field_matches = _scan_fields(event.fields)
+    field_matches = _scan_fields(event.tenant_id, event.fields)
     already_matched_texts = {_normalize_for_dedup(m.matched_text) for m in field_matches}
 
     raw_snippet_matches = _scan_raw_snippet(event.raw_snippet, already_matched_texts)

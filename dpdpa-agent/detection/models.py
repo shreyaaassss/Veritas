@@ -14,6 +14,35 @@ from pydantic import BaseModel, Field
 
 from schemas.models import Event
 
+# ---------------------------------------------------------------------------
+# Phase 2: identifier-validator confirmation status
+# ---------------------------------------------------------------------------
+#
+# Three-way, mutually exclusive label for how much a MatchedEntity's
+# matched_text has been confirmed beyond "the regex matched":
+#
+#   PATTERN_MATCH     — no validator was run (org declared validator: none,
+#                        declared no identifier for this field name at all,
+#                        or declared a validator name that isn't registered
+#                        — see detection/engine.py's fallback-with-warning
+#                        path). This is the pre-Phase-2 confidence level.
+#   VALIDATED          — a validator was run against matched_text and it
+#                        passed (e.g. Verhoeff-checksum-correct Aadhaar,
+#                        structurally-correct PAN).
+#   FAILED_VALIDATION  — a validator was run and matched_text FAILED it.
+#                        This is deliberately NOT collapsed into
+#                        PATTERN_MATCH: a regex-shaped string that fails
+#                        its checksum is a strong false-positive signal
+#                        (e.g. a random 12-digit order ID, not a real
+#                        Aadhaar number), and downstream consumers (rule
+#                        engine, evidence store) should be able to see
+#                        that distinction rather than treating it the same
+#                        as "we never checked."
+PATTERN_MATCH = "pattern_match"
+VALIDATED = "validated"
+FAILED_VALIDATION = "failed_validation"
+VALIDATION_STATUSES = frozenset({PATTERN_MATCH, VALIDATED, FAILED_VALIDATION})
+
 
 class MatchedEntity(BaseModel):
     """
@@ -32,6 +61,18 @@ class MatchedEntity(BaseModel):
     entity_type: str = Field(..., description="Presidio entity type, e.g. 'PHONE_NUMBER', 'IN_AADHAAR', 'PERSON'.")
     confidence: float = Field(..., ge=0.0, le=1.0, description="Presidio's match score, passed through unmodified.")
     matched_text: str = Field(..., description="The actual substring that matched, for audit/debug purposes.")
+    validation_status: str = Field(
+        default=PATTERN_MATCH,
+        description=(
+            "Phase 2 identifier-validator confirmation status: one of "
+            "'pattern_match', 'validated', 'failed_validation'. See the "
+            "PATTERN_MATCH/VALIDATED/FAILED_VALIDATION constants above for "
+            "what each means. Distinct from `confidence` (Presidio's regex/NER "
+            "match score) — this field reflects whether the org's configured "
+            "identifier validator (see validators.py) confirmed matched_text, "
+            "not how confident the pattern match itself was."
+        ),
+    )
 
 
 class DetectedEvent(BaseModel):

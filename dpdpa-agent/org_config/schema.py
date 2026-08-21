@@ -45,7 +45,21 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 # ---------------------------------------------------------------------------
 # Stub validator name registry
-# Phase 2 will register real implementations here.
+#
+# This is the org-config-facing ALLOWLIST of validator names an identifier
+# may declare — it gates what an uploaded config is even allowed to say,
+# independent of whether that validator is actually implemented yet.
+#
+# Phase 2 implements the real validation logic in the top-level
+# `validators.py` module (is_valid_pan, is_valid_aadhaar, and a runtime-
+# extensible validator_registry / register_validator / get_validator).
+# Adding a new name here does NOT automatically register an implementation
+# there (and vice versa) — the two are intentionally decoupled: this set
+# controls what a config may reference, validators.py controls what
+# actually runs. Detection gracefully falls back to pattern-match
+# confidence (with a logged warning) if a config-declared name has no
+# runtime implementation — see detection/engine.py's
+# _resolve_validation_status.
 # ---------------------------------------------------------------------------
 
 KNOWN_VALIDATORS = frozenset({"none", "pan", "aadhaar"})
