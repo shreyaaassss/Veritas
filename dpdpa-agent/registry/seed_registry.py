@@ -1,16 +1,20 @@
 """
-DPDPA Compliance Agent — Registry Seed Data
-=============================================
-Seed data for the four Blinkit-realistic mock tables. This is the ONLY file
-that should contain hand-authored registry rows — loader.py just assembles
-these into a RegistryStore.
+DPDPA Compliance Agent — Registry Seed Data (Phase 0 — Generalised)
+=====================================================================
+Transitional seed data for the four legacy tables. In Phase 1, this file
+will be replaced entirely by the config loader reading configs/blinkit.yaml.
+For Phase 0, it is kept so existing tests pass — the only change is that
+source_system values are now plain strings instead of SourceSystem enum values.
 
 Reference timestamp used throughout for "now" when computing seeded
 violations: 2026-08-21T00:00:00Z (matches project's current date context).
-Do not silently change this without checking every relative-date comment below.
 
 See /registry/seeded_violations.md for the auditor-facing index of every
 deliberately-seeded violation and why it exists.
+
+PHASE 1 NOTE: This file is a transitional artifact. When Phase 1 implements
+the config-driven registry loader (reading from org_config/configs/blinkit.yaml),
+this file should be deleted and replaced by the YAML-based loader.
 """
 
 from __future__ import annotations
@@ -18,9 +22,8 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 from registry.models import (
-    MARKETING_EVENTS_ALLOWED_SCOPE,
+    DEIDENTIFIED_ONLY_SCOPE,
     RegistryEntry,
-    TABLE_TO_SOURCE_SYSTEM,
 )
 
 # Fixed "now" for reproducible seed-data violation windows.
@@ -32,14 +35,10 @@ def _days_ago(n: int) -> datetime:
 
 
 # ---------------------------------------------------------------------------
-# Table 1 — customers
+# Table 1 — customers (source_system: "order-service")
 # ---------------------------------------------------------------------------
 # declared_purpose: order_fulfillment
-# Retention: 1095 days (3 years) post last order activity. Chosen because
-# Blinkit customers reasonably expect their delivery history to be usable
-# for reorders, dispute resolution, and refund windows well beyond a single
-# transaction — 3 years is a defensible ceiling that still has a real limit,
-# unlike "account lifetime" which in practice never expires anything.
+# Retention: 1095 days (3 years) post last order activity.
 CUSTOMERS_RETENTION_DAYS = 1095
 
 CUSTOMERS_ENTRIES = [
@@ -50,7 +49,7 @@ CUSTOMERS_ENTRIES = [
         consent_scope="order_fulfillment",
         retention_days=CUSTOMERS_RETENTION_DAYS,
         created_at=_days_ago(120),
-        source_system=TABLE_TO_SOURCE_SYSTEM["customers"],
+        source_system="order-service",
         table_name="customers",
     ),
     RegistryEntry(
@@ -60,7 +59,7 @@ CUSTOMERS_ENTRIES = [
         consent_scope="order_fulfillment",
         retention_days=CUSTOMERS_RETENTION_DAYS,
         created_at=_days_ago(120),
-        source_system=TABLE_TO_SOURCE_SYSTEM["customers"],
+        source_system="order-service",
         table_name="customers",
     ),
     RegistryEntry(
@@ -70,7 +69,7 @@ CUSTOMERS_ENTRIES = [
         consent_scope="order_fulfillment",
         retention_days=CUSTOMERS_RETENTION_DAYS,
         created_at=_days_ago(120),
-        source_system=TABLE_TO_SOURCE_SYSTEM["customers"],
+        source_system="order-service",
         table_name="customers",
     ),
     RegistryEntry(
@@ -80,20 +79,17 @@ CUSTOMERS_ENTRIES = [
         consent_scope="order_fulfillment",
         retention_days=CUSTOMERS_RETENTION_DAYS,
         created_at=_days_ago(120),
-        source_system=TABLE_TO_SOURCE_SYSTEM["customers"],
+        source_system="order-service",
         table_name="customers",
     ),
 ]
 
 
 # ---------------------------------------------------------------------------
-# Table 2 — delivery_partners
+# Table 2 — delivery_partners (source_system: "delivery-partner-service")
 # ---------------------------------------------------------------------------
 # declared_purpose: onboarding_kyc
-# Retention: TIGHT — 180 days post-engagement. KYC documents (Aadhaar, PAN,
-# bank details) are high-sensitivity financial/identity data; DPDPA data
-# minimization expects these purged promptly once the KYC purpose is served
-# and the partner relationship data is no longer active.
+# Retention: TIGHT — 180 days post-engagement.
 DELIVERY_PARTNERS_RETENTION_DAYS = 180
 
 DELIVERY_PARTNERS_ENTRIES = [
@@ -104,7 +100,7 @@ DELIVERY_PARTNERS_ENTRIES = [
         consent_scope="onboarding_kyc",
         retention_days=DELIVERY_PARTNERS_RETENTION_DAYS,
         created_at=_days_ago(45),
-        source_system=TABLE_TO_SOURCE_SYSTEM["delivery_partners"],
+        source_system="delivery-partner-service",
         table_name="delivery_partners",
     ),
     RegistryEntry(
@@ -114,7 +110,7 @@ DELIVERY_PARTNERS_ENTRIES = [
         consent_scope="onboarding_kyc",
         retention_days=DELIVERY_PARTNERS_RETENTION_DAYS,
         created_at=_days_ago(45),
-        source_system=TABLE_TO_SOURCE_SYSTEM["delivery_partners"],
+        source_system="delivery-partner-service",
         table_name="delivery_partners",
     ),
     RegistryEntry(
@@ -124,7 +120,7 @@ DELIVERY_PARTNERS_ENTRIES = [
         consent_scope="onboarding_kyc",
         retention_days=DELIVERY_PARTNERS_RETENTION_DAYS,
         created_at=_days_ago(45),
-        source_system=TABLE_TO_SOURCE_SYSTEM["delivery_partners"],
+        source_system="delivery-partner-service",
         table_name="delivery_partners",
     ),
     RegistryEntry(
@@ -134,18 +130,14 @@ DELIVERY_PARTNERS_ENTRIES = [
         consent_scope="onboarding_kyc",
         retention_days=DELIVERY_PARTNERS_RETENTION_DAYS,
         created_at=_days_ago(45),
-        source_system=TABLE_TO_SOURCE_SYSTEM["delivery_partners"],
+        source_system="delivery-partner-service",
         table_name="delivery_partners",
     ),
 
     # ------------------------------------------------------------------
     # >>> SEEDED VIOLATION #1 — RETENTION_001 <<<
-    # A former delivery partner ("Suresh K.", inactive) whose Aadhaar was
-    # collected 240 days ago — 60 days past the 180-day KYC retention window.
-    # This is the required Phase 1 retention-violation seed for Phase 4's
-    # rule engine to catch. is_seeded_violation=True and violation_note
-    # make this unambiguous for anyone reading the seed data or writing
-    # rule engine tests against it.
+    # A former delivery partner whose aadhaar was collected 240 days ago —
+    # 60 days past the 180-day KYC retention window.
     # ------------------------------------------------------------------
     RegistryEntry(
         field_name="aadhaar",
@@ -154,11 +146,11 @@ DELIVERY_PARTNERS_ENTRIES = [
         consent_scope="onboarding_kyc",
         retention_days=DELIVERY_PARTNERS_RETENTION_DAYS,
         created_at=_days_ago(240),  # 240 > 180 retention_days -> VIOLATION
-        source_system=TABLE_TO_SOURCE_SYSTEM["delivery_partners"],
+        source_system="delivery-partner-service",
         table_name="delivery_partners",
         is_seeded_violation=True,
         violation_note=(
-            "Inactive delivery partner's Aadhaar record is 240 days old, "
+            "Inactive delivery partner's aadhaar record is 240 days old, "
             "60 days past the 180-day KYC retention window. Should have "
             "been purged. RETENTION_001 candidate."
         ),
@@ -167,14 +159,10 @@ DELIVERY_PARTNERS_ENTRIES = [
 
 
 # ---------------------------------------------------------------------------
-# Table 3 — support_tickets
+# Table 3 — support_tickets (source_system: "support-ticketing")
 # ---------------------------------------------------------------------------
 # declared_purpose: customer_support
-# HIGHEST EXPOSURE RISK: PII "rides along" unintentionally in free-text notes
-# fields (e.g. an agent pastes a customer's phone number into a resolution
-# note). Phase 3's PII detection pass over raw_snippet matters most here,
-# since regex/NER has to find PII embedded in unstructured text rather than
-# a clean structured field.
+# HIGHEST EXPOSURE RISK: PII rides along in free-text notes fields.
 SUPPORT_TICKETS_RETENTION_DAYS = 730  # 2 years — dispute/audit trail window
 
 SUPPORT_TICKETS_ENTRIES = [
@@ -185,7 +173,7 @@ SUPPORT_TICKETS_ENTRIES = [
         consent_scope="customer_support",
         retention_days=SUPPORT_TICKETS_RETENTION_DAYS,
         created_at=_days_ago(10),
-        source_system=TABLE_TO_SOURCE_SYSTEM["support_tickets"],
+        source_system="support-ticketing",
         table_name="support_tickets",
     ),
     RegistryEntry(
@@ -195,7 +183,7 @@ SUPPORT_TICKETS_ENTRIES = [
         consent_scope="customer_support",
         retention_days=SUPPORT_TICKETS_RETENTION_DAYS,
         created_at=_days_ago(10),
-        source_system=TABLE_TO_SOURCE_SYSTEM["support_tickets"],
+        source_system="support-ticketing",
         table_name="support_tickets",
     ),
     RegistryEntry(
@@ -205,32 +193,20 @@ SUPPORT_TICKETS_ENTRIES = [
         consent_scope="customer_support",
         retention_days=SUPPORT_TICKETS_RETENTION_DAYS,
         created_at=_days_ago(10),
-        source_system=TABLE_TO_SOURCE_SYSTEM["support_tickets"],
+        source_system="support-ticketing",
         table_name="support_tickets",
     ),
-    # NOTE: 'notes' (free text) is intentionally NOT given its own clean
-    # registry entry the way structured fields are — free text is not a
-    # single declared PII field, it's an unstructured blob that MAY contain
-    # PII incidentally. Phase 3's detector must scan raw_snippet content
-    # for this table rather than relying on a fields['notes'] registry hit.
-    # This is why this table is flagged as highest exposure-risk: the
-    # registry alone cannot catch what Presidio/regex must find at
-    # detection time.
 ]
 
 
 # ---------------------------------------------------------------------------
-# Table 4 — marketing_events
+# Table 4 — marketing_events (source_system: "marketing-analytics")
 # ---------------------------------------------------------------------------
 # declared_purpose: marketing_analytics
 # STRUCTURAL INVARIANT: every entry here carries
-# consent_scope == MARKETING_EVENTS_ALLOWED_SCOPE ("deidentified_or_hashed_only").
-# This is not a per-row exception — it holds for the whole table by
-# construction. Any raw PII (unhashed name/phone/aadhaar/pan/email) observed
-# in a marketing-analytics event is automatically a PURPOSE_001 violation,
-# because no marketing_events registry entry ever permits raw identifiers.
-# Phase 4 should call RegistryEntry.forbids_raw_pii() rather than
-# re-deriving this by string-comparing purpose/scope itself.
+# consent_scope == DEIDENTIFIED_ONLY_SCOPE.
+# Any raw PII observed in a marketing-analytics event is automatically a
+# PURPOSE_001 violation. Phase 4 calls RegistryEntry.forbids_raw_pii().
 MARKETING_EVENTS_RETENTION_DAYS = 365
 
 MARKETING_EVENTS_ENTRIES = [
@@ -238,63 +214,57 @@ MARKETING_EVENTS_ENTRIES = [
         field_name="hashed_customer_id",
         pii_category="hashed_identifier",
         declared_purpose="marketing_analytics",
-        consent_scope=MARKETING_EVENTS_ALLOWED_SCOPE,
+        consent_scope=DEIDENTIFIED_ONLY_SCOPE,
         retention_days=MARKETING_EVENTS_RETENTION_DAYS,
         created_at=_days_ago(30),
-        source_system=TABLE_TO_SOURCE_SYSTEM["marketing_events"],
+        source_system="marketing-analytics",
         table_name="marketing_events",
     ),
     RegistryEntry(
         field_name="campaign_segment",
         pii_category="hashed_identifier",
         declared_purpose="marketing_analytics",
-        consent_scope=MARKETING_EVENTS_ALLOWED_SCOPE,
+        consent_scope=DEIDENTIFIED_ONLY_SCOPE,
         retention_days=MARKETING_EVENTS_RETENTION_DAYS,
         created_at=_days_ago(30),
-        source_system=TABLE_TO_SOURCE_SYSTEM["marketing_events"],
+        source_system="marketing-analytics",
         table_name="marketing_events",
     ),
     RegistryEntry(
         field_name="event_type",
         pii_category="hashed_identifier",
         declared_purpose="marketing_analytics",
-        consent_scope=MARKETING_EVENTS_ALLOWED_SCOPE,
+        consent_scope=DEIDENTIFIED_ONLY_SCOPE,
         retention_days=MARKETING_EVENTS_RETENTION_DAYS,
         created_at=_days_ago(30),
-        source_system=TABLE_TO_SOURCE_SYSTEM["marketing_events"],
+        source_system="marketing-analytics",
         table_name="marketing_events",
     ),
 
     # ------------------------------------------------------------------
     # >>> SEEDED INVARIANT-CARRIER — NOT itself a stored violation row <<<
     # This entry documents the registry-side expectation for a raw 'phone'
-    # field IF one were ever declared under marketing_analytics. It exists
-    # so Phase 4 has a concrete RegistryEntry to retrieve when Phase 2's
-    # event generator occasionally injects a raw phone/Aadhaar into a
-    # marketing event per Phase 2's spec — the lookup succeeds, returns
-    # this entry, and entry.forbids_raw_pii() is True, giving Phase 4 a
-    # clean structural reason to flag PURPOSE_001, rather than a registry
-    # miss (which would be a different, weaker signal).
+    # field if one were ever declared under marketing_analytics. It exists
+    # so Phase 4 has a concrete RegistryEntry to retrieve when the event
+    # generator injects a raw phone into a marketing event — the lookup
+    # succeeds, returns this entry, and entry.forbids_raw_pii() is True.
     # ------------------------------------------------------------------
     RegistryEntry(
         field_name="phone",
         pii_category="phone",
         declared_purpose="marketing_analytics",
-        consent_scope=MARKETING_EVENTS_ALLOWED_SCOPE,
+        consent_scope=DEIDENTIFIED_ONLY_SCOPE,
         retention_days=MARKETING_EVENTS_RETENTION_DAYS,
         created_at=_days_ago(30),
-        source_system=TABLE_TO_SOURCE_SYSTEM["marketing_events"],
+        source_system="marketing-analytics",
         table_name="marketing_events",
         is_seeded_violation=True,
         violation_note=(
             "marketing_events structurally forbids raw PII (consent_scope="
-            f"'{MARKETING_EVENTS_ALLOWED_SCOPE}'). If a raw 'phone' value "
-            "is ever observed flowing through a marketing-analytics event, "
+            f"'{DEIDENTIFIED_ONLY_SCOPE}'). If a raw 'phone' value "
+            "is observed flowing through a marketing-analytics event, "
             "this registry entry is what Phase 4 retrieves — "
-            "forbids_raw_pii() returns True, and it flags PURPOSE_001. "
-            "This entry exists so that lookup succeeds (rather than "
-            "returning None), giving Phase 4 a definitive registry-backed "
-            "reason rather than an ambiguous 'field not found' case."
+            "forbids_raw_pii() returns True, and it flags PURPOSE_001."
         ),
     ),
 ]

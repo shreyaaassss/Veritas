@@ -2,11 +2,16 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://dpdpa-agent/schemas/event_schema.json",
   "title": "DPDPAEvent",
-  "description": "A single unit of telemetry ingested from a Blinkit system source (log line or API payload). This schema is frozen after Phase 0 — do not modify without a full team review.",
+  "description": "A single unit of telemetry ingested from an organisation's source system (log line or API payload). This schema is frozen after Phase 0 — do not modify without a full team review.",
   "type": "object",
-  "required": ["event_id", "source_type", "source_system", "timestamp", "raw_snippet", "fields"],
+  "required": ["tenant_id", "event_id", "source_type", "source_system", "timestamp", "raw_snippet", "fields"],
   "additionalProperties": false,
   "properties": {
+    "tenant_id": {
+      "type": "string",
+      "description": "The organisation this event belongs to. Must match a registered org_id in the Org Config store. All downstream partitioning (registry lookups, Evidence Store, dashboard) is scoped by this value. IMMUTABLE after ingestion.",
+      "minLength": 1
+    },
     "event_id": {
       "type": "string",
       "description": "Globally unique identifier for this event. Format: UUID v4.",
@@ -19,13 +24,8 @@
     },
     "source_system": {
       "type": "string",
-      "description": "The Blinkit microservice or system that emitted this event. Used by auditors to break down violations by system.",
-      "enum": [
-        "order-service",
-        "delivery-partner-service",
-        "support-ticketing",
-        "marketing-analytics"
-      ]
+      "description": "The microservice or system that emitted this event, as defined by the org's config (source_system is a free-form string, not a fixed enum — valid values are whatever the org declares in their Org Config fields). Used by auditors to break down violations by system.",
+      "minLength": 1
     },
     "timestamp": {
       "type": "string",
@@ -39,7 +39,7 @@
     },
     "fields": {
       "type": "object",
-      "description": "Extracted key-value pairs from the raw_snippet. Keys are field names (e.g. 'aadhaar', 'phone'); values are the corresponding raw values. Open map — different source systems carry different fields.",
+      "description": "Extracted key-value pairs from the raw_snippet. Keys are field names (e.g. 'phone', 'apaar_id'); values are the corresponding raw values. Open map — different source systems carry different fields.",
       "additionalProperties": {
         "type": "string"
       }

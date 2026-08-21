@@ -106,6 +106,7 @@ from rules.sensitivity import (
     sensitivity_for_pii_category,
 )
 from schemas.models import RemediationStatus, RuleId, Severity, Verdict
+# NOTE: SourceSystem enum no longer imported — source_system is a free-form str (Phase 0).
 
 logger = logging.getLogger("rules.engine")
 
@@ -152,6 +153,7 @@ def _breach_notification_candidate(severity: Severity, pii_category: str) -> boo
 def _new_verdict(
     *,
     event_id,
+    tenant_id: str,
     rule_id: RuleId,
     severity: Severity,
     source,
@@ -165,8 +167,10 @@ def _new_verdict(
     OPEN, remediation_updated_at always initializes to None — this
     module NEVER sets these to anything else; that is Phase 6/7's job
     exclusively, per the plan.
+    Phase 0: tenant_id added — inherited from the triggering Event.
     """
     return Verdict(
+        tenant_id=tenant_id,
         verdict_id=str(uuid.uuid4()),
         event_id=str(event_id),
         rule_id=rule_id,
@@ -199,7 +203,11 @@ def _check_1_exposure(detected: DetectedEvent, match: MatchedEntity) -> Optional
     """
     event = detected.event
     is_log_exposure = event.source_type.value == "log"
-    is_marketing_exposure = event.source_system.value == "marketing-analytics"
+    # Phase 0: source_system is now a plain str — no .value needed.
+    # The marketing-analytics string comes from the org's config; this
+    # check is intentionally kept as a string comparison for now.
+    # Phase 4 generalisation will replace this with a config-driven flag.
+    is_marketing_exposure = event.source_system == "marketing-analytics"
 
     if not (is_log_exposure or is_marketing_exposure):
         return None
@@ -208,6 +216,7 @@ def _check_1_exposure(detected: DetectedEvent, match: MatchedEntity) -> Optional
 
     return _new_verdict(
         event_id=event.event_id,
+        tenant_id=event.tenant_id,
         rule_id=RuleId.EXPOSURE_001,
         severity=Severity.HIGH,
         source=event.source_type,
@@ -258,8 +267,9 @@ def _check_2_purpose(detected: DetectedEvent, match: MatchedEntity) -> Optional[
     event = detected.event
     pii_category = entity_type_to_pii_category(match.entity_type)
 
+    # Phase 0: source_system is now a plain str — no .value needed.
     entry: Optional[RegistryEntry] = get_registry_entry(
-        field_name=match.field, source_system=event.source_system.value
+        field_name=match.field, source_system=event.source_system
     )
 
     if entry is None:
@@ -269,7 +279,7 @@ def _check_2_purpose(detected: DetectedEvent, match: MatchedEntity) -> Optional[
             "Unregistered field with PII detected: field=%r source_system=%r "
             "entity_type=%r — classifying as PURPOSE_001 per documented policy "
             "(see rules/engine.py Design Decision #2).",
-            match.field, event.source_system.value, match.entity_type,
+            match.field, event.source_system, match.entity_type,
         )
         severity = _severity_for_category(pii_category, default=UNREGISTERED_FIELD_DEFAULT_SEVERITY)
         # Category-derived HIGH override: even with no registry entry, if
@@ -281,6 +291,7 @@ def _check_2_purpose(detected: DetectedEvent, match: MatchedEntity) -> Optional[
 
         return _new_verdict(
             event_id=event.event_id,
+            tenant_id=event.tenant_id,
             rule_id=RuleId.PURPOSE_001,
             severity=severity,
             source=event.source_type,
@@ -305,6 +316,7 @@ def _check_2_purpose(detected: DetectedEvent, match: MatchedEntity) -> Optional[
 
     return _new_verdict(
         event_id=event.event_id,
+        tenant_id=event.tenant_id,
         rule_id=RuleId.PURPOSE_001,
         severity=severity,
         source=event.source_type,
@@ -338,8 +350,9 @@ def _check_3_retention(detected: DetectedEvent, match: MatchedEntity) -> Optiona
     """
     event = detected.event
 
+    # Phase 0: source_system is now a plain str — no .value needed.
     entry: Optional[RegistryEntry] = get_registry_entry(
-        field_name=match.field, source_system=event.source_system.value
+        field_name=match.field, source_system=event.source_system
     )
     if entry is None:
         # Should not happen in practice — Check 2 already returned a
@@ -348,7 +361,7 @@ def _check_3_retention(detected: DetectedEvent, match: MatchedEntity) -> Optiona
         logger.warning(
             "Check 3 reached with no registry entry for field=%r source_system=%r — "
             "this should have been caught by Check 2. Skipping retention check.",
-            match.field, event.source_system.value,
+            match.field, event.source_system,
         )
         return None
 
@@ -360,6 +373,7 @@ def _check_3_retention(detected: DetectedEvent, match: MatchedEntity) -> Optiona
 
     return _new_verdict(
         event_id=event.event_id,
+        tenant_id=event.tenant_id,
         rule_id=RuleId.RETENTION_001,
         severity=severity,
         source=event.source_type,

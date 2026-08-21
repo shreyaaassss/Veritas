@@ -29,7 +29,7 @@ from ingestion.api_generator import api_generator
 from ingestion.config import IngestionConfig
 from ingestion.fixtures import STALE_DELIVERY_PARTNER
 from ingestion.log_generator import log_generator
-from schemas.models import Event, SourceSystem, SourceType
+from schemas.models import Event, SourceType
 
 
 # ---------------------------------------------------------------------------
@@ -168,7 +168,7 @@ class TestViolationRateControl:
     async def test_marketing_purpose_rate_zero_produces_no_raw_phone(self):
         """marketing purpose violation rate=0 must never leak a raw phone field."""
         events = await _run_api_generator(n=30, marketing_rate=0.0, retention_rate=0.0)
-        marketing_events = [e for e in events if e.source_system == SourceSystem.MARKETING_ANALYTICS]
+        marketing_events = [e for e in events if e.source_system == "marketing-analytics"]
         assert len(marketing_events) > 0
         for e in marketing_events:
             assert "phone" not in e.fields, "rate=0 should never leak raw phone in marketing events"
@@ -177,7 +177,7 @@ class TestViolationRateControl:
     async def test_marketing_purpose_rate_one_always_leaks_phone(self):
         """marketing purpose violation rate=1 must leak a raw phone in every marketing event."""
         events = await _run_api_generator(n=30, marketing_rate=1.0, retention_rate=0.0)
-        marketing_events = [e for e in events if e.source_system == SourceSystem.MARKETING_ANALYTICS]
+        marketing_events = [e for e in events if e.source_system == "marketing-analytics"]
         assert len(marketing_events) > 0
         for e in marketing_events:
             assert "phone" in e.fields
@@ -186,7 +186,7 @@ class TestViolationRateControl:
     async def test_retention_rate_zero_never_references_stale_partner(self):
         """retention violation rate=0 must never reference the seeded stale partner_id."""
         events = await _run_api_generator(n=30, marketing_rate=0.0, retention_rate=0.0)
-        dp_events = [e for e in events if e.source_system == SourceSystem.DELIVERY_PARTNER]
+        dp_events = [e for e in events if e.source_system == "delivery-partner-service"]
         assert len(dp_events) > 0
         stale_id = STALE_DELIVERY_PARTNER["partner_id"]
         for e in dp_events:
@@ -196,7 +196,7 @@ class TestViolationRateControl:
     async def test_retention_rate_one_always_references_stale_partner(self):
         """retention violation rate=1 must reference the seeded stale partner_id every time."""
         events = await _run_api_generator(n=30, marketing_rate=0.0, retention_rate=1.0)
-        dp_events = [e for e in events if e.source_system == SourceSystem.DELIVERY_PARTNER]
+        dp_events = [e for e in events if e.source_system == "delivery-partner-service"]
         assert len(dp_events) > 0
         stale_id = STALE_DELIVERY_PARTNER["partner_id"]
         for e in dp_events:
@@ -204,41 +204,36 @@ class TestViolationRateControl:
 
 
 # ---------------------------------------------------------------------------
-# (c) source_system / source_type never fall outside locked enums
+# (c) source_system is valid non-empty string / source_type in locked enum
 # ---------------------------------------------------------------------------
 
 class TestEnumSafety:
 
     @pytest.mark.asyncio
-    async def test_log_generator_source_systems_are_locked_enum_values(self):
+    async def test_log_generator_source_systems_are_valid_strings(self):
         events = await _run_log_generator(n=30, rate=0.3)
-        valid_values = {s.value for s in SourceSystem}
         for e in events:
-            assert e.source_system.value in valid_values
+            assert isinstance(e.source_system, str)
+            assert len(e.source_system) > 0
 
     @pytest.mark.asyncio
-    async def test_api_generator_source_systems_are_locked_enum_values(self):
+    async def test_api_generator_source_systems_are_valid_strings(self):
         events = await _run_api_generator(n=30, marketing_rate=0.3, retention_rate=0.3)
-        valid_values = {s.value for s in SourceSystem}
         for e in events:
-            assert e.source_system.value in valid_values
+            assert isinstance(e.source_system, str)
+            assert len(e.source_system) > 0
 
     @pytest.mark.asyncio
     async def test_api_generator_only_uses_marketing_and_delivery_partner(self):
-        """
-        This generator specifically alternates marketing-analytics and
-        delivery-partner-service — confirm it never drifts to emitting
-        support-ticketing or order-service (those belong to the log generator).
-        """
         events = await _run_api_generator(n=30, marketing_rate=0.3, retention_rate=0.3)
         seen = {e.source_system for e in events}
-        assert seen <= {SourceSystem.MARKETING_ANALYTICS, SourceSystem.DELIVERY_PARTNER}
+        assert seen <= {"marketing-analytics", "delivery-partner-service"}
 
     @pytest.mark.asyncio
     async def test_log_generator_only_uses_support_and_order_service(self):
         events = await _run_log_generator(n=30, rate=0.3)
         seen = {e.source_system for e in events}
-        assert seen <= {SourceSystem.SUPPORT_TICKETING, SourceSystem.ORDER_SERVICE}
+        assert seen <= {"support-ticketing", "order-service"}
 
 
 # ---------------------------------------------------------------------------
@@ -263,7 +258,7 @@ class TestPerVectorViolationsExist:
     async def test_purpose_limitation_vector_api_event_inspectable(self):
         """(b) A purpose-limitation API event with raw PII in marketing context."""
         events = await _run_api_generator(n=10, marketing_rate=1.0, retention_rate=0.0)
-        marketing_events = [e for e in events if e.source_system == SourceSystem.MARKETING_ANALYTICS]
+        marketing_events = [e for e in events if e.source_system == "marketing-analytics"]
         assert len(marketing_events) > 0
         violation = marketing_events[0]
         assert violation.source_type == SourceType.API
@@ -274,7 +269,7 @@ class TestPerVectorViolationsExist:
     async def test_retention_vector_api_event_inspectable(self):
         """(c) A retention-vector API event referencing the stale delivery-partner record."""
         events = await _run_api_generator(n=10, marketing_rate=0.0, retention_rate=1.0)
-        dp_events = [e for e in events if e.source_system == SourceSystem.DELIVERY_PARTNER]
+        dp_events = [e for e in events if e.source_system == "delivery-partner-service"]
         assert len(dp_events) > 0
         violation = dp_events[0]
         assert violation.source_type == SourceType.API

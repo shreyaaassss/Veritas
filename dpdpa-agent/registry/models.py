@@ -1,23 +1,22 @@
 """
-DPDPA Compliance Agent — Consent Registry Models
-=================================================
-Defines RegistryEntry: the ground-truth record of what data a Blinkit
+DPDPA Compliance Agent — Consent Registry Models (Phase 0 — Generalised)
+=========================================================================
+Defines RegistryEntry: the ground-truth record of what a given org's
 source_system is declared to collect, for what purpose, under what consent
 scope, and for how long.
 
+WHAT CHANGED IN PHASE 0:
+  - `SourceSystem` enum import and `TABLE_TO_SOURCE_SYSTEM` dict are REMOVED.
+    Both were Blinkit-specific. `source_system` is now a free-form `str`
+    whose valid values are org-defined (from Org Config). The loader no
+    longer needs to translate from mock table names to enum values — it
+    reads source_system directly from the org's config file.
+  - `table_name` is retained as Optional[str] for backward compatibility
+    with existing seed data, but is not required. New config-driven entries
+    do not need it.
+
 Phase 4's Rule Engine calls get_registry_entry() synchronously, per event,
 on a live stream. This module must stay fast (in-memory) and side-effect free.
-
-CONSISTENCY WITH PHASE 0:
-  - `pii_category` reuses the PII types locked in /docs/scope.md:
-        name, email, phone, aadhaar, pan, address
-    (`address` is added here because customers/delivery_partners carry it;
-    it is not a "detected PII type" for Phase 3's regex/Presidio pass in the
-    same way Aadhaar/PAN are, but it is a registry-tracked category so the
-    Rule Engine can still reason about it. See /registry/README.md.)
-  - `source_system` reuses schemas.models.SourceSystem exactly. Do NOT
-    invent new values here. See TABLE_TO_SOURCE_SYSTEM below for the mapping
-    from mock table name to the Phase 0 locked enum.
 """
 
 from __future__ import annotations
@@ -26,30 +25,6 @@ from datetime import datetime
 from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field, field_validator
-
-from schemas.models import SourceSystem
-
-
-# ---------------------------------------------------------------------------
-# Table name -> source_system mapping
-# ---------------------------------------------------------------------------
-# The four Blinkit-realistic mock tables seeded in Phase 1 do NOT share names
-# with schemas.models.SourceSystem's enum values 1:1. This mapping makes the
-# relationship explicit so Phase 2 (ingestion) and Phase 4 (rule engine) never
-# have to guess which source_system a given table's data flows through.
-#
-#   customers          -> order-service               (order_fulfillment data)
-#   delivery_partners   -> delivery-partner-service     (onboarding/KYC data)
-#   support_tickets     -> support-ticketing            (support flows)
-#   marketing_events    -> marketing-analytics          (campaign/analytics data)
-#
-# This mapping is the single source of truth — reference it, don't duplicate it.
-TABLE_TO_SOURCE_SYSTEM: Dict[str, SourceSystem] = {
-    "customers":         SourceSystem.ORDER_SERVICE,
-    "delivery_partners":  SourceSystem.DELIVERY_PARTNER,
-    "support_tickets":    SourceSystem.SUPPORT_TICKETING,
-    "marketing_events":   SourceSystem.MARKETING_ANALYTICS,
-}
 
 
 # ---------------------------------------------------------------------------
@@ -62,23 +37,26 @@ class RegistryEntry(BaseModel):
     why it was collected, what scope it may be used under, and how long it
     may legally be retained.
 
-    Designed to be trivially backed by a SQLite table later (per the locked
-    tech stack) without changing the public interface (get_registry_entry,
-    list_registry_entries) that Phase 4 depends on.
+    Designed to be trivially backed by a SQLite table later without changing
+    the public interface (get_registry_entry, list_registry_entries) that
+    Phase 4 depends on.
+
+    Phase 0: source_system is now a free-form str (org-defined).
     """
 
     field_name: str = Field(
         ...,
         min_length=1,
-        description="The data field this entry governs, e.g. 'aadhaar', 'phone', 'name'."
+        description="The data field this entry governs, e.g. 'phone', 'apaar_id'."
     )
     pii_category: str = Field(
         ...,
         min_length=1,
         description=(
-            "PII type this field belongs to. Reuses Phase 0's locked types "
-            "(name, email, phone, aadhaar, pan) plus 'address', which the "
-            "registry tracks even though Phase 3's detector treats it separately."
+            "PII type this field belongs to, e.g. 'name', 'email', 'phone', "
+            "'aadhaar', 'pan', 'address', 'student_identifier'. Free-form — "
+            "the org's config declares the category; the sensitivity module "
+            "maps categories to severity tiers."
         )
     )
     declared_purpose: str = Field(
@@ -94,9 +72,9 @@ class RegistryEntry(BaseModel):
         ...,
         min_length=1,
         description=(
-            "The consent boundary this field's use is confined to. For most "
-            "tables this mirrors declared_purpose closely; for marketing_events "
-            "it is deliberately restrictive (see MARKETING_EVENTS_ALLOWED_SCOPE)."
+            "The consent boundary this field's use is confined to. Mirrors "
+            "declared_purpose closely for most fields; deliberately restrictive "
+            "for analytics/deidentified contexts."
         )
     )
     retention_days: int = Field(
@@ -114,30 +92,28 @@ class RegistryEntry(BaseModel):
             "Used with retention_days to compute whether a record is past its window."
         )
     )
-    source_system: SourceSystem = Field(
-        ...,
-        description=(
-            "Must match schemas.models.SourceSystem exactly. See "
-            "TABLE_TO_SOURCE_SYSTEM for the mock-table-to-enum mapping."
-        )
-    )
-    table_name: str = Field(
+    source_system: str = Field(
         ...,
         min_length=1,
         description=(
-            "The mock Blinkit table this entry originates from "
-            "(customers | delivery_partners | support_tickets | marketing_events). "
-            "Kept alongside source_system for auditor-readable reporting, since "
-            "'delivery-partner-service' alone is less legible to Priya than "
-            "'delivery_partners table'."
+            "The source system this entry governs. Free-form string — value is "
+            "org-defined (from Org Config). Phase 4 looks up entries by "
+            "(field_name, source_system) — this value must match exactly what "
+            "the org's events carry in their source_system field."
+        )
+    )
+    table_name: Optional[str] = Field(
+        default=None,
+        description=(
+            "Optional: the underlying table or data store name for auditor-readable "
+            "reporting. Not required for config-driven entries."
         )
     )
     is_seeded_violation: bool = Field(
         default=False,
         description=(
             "True if this specific entry was deliberately seeded to be caught "
-            "as a violation by Phase 4's rule engine (demo/test purposes). "
-            "See /registry/seeded_violations.md for the full index."
+            "as a violation by Phase 4's rule engine (demo/test purposes)."
         )
     )
     violation_note: Optional[str] = Field(
@@ -156,11 +132,9 @@ class RegistryEntry(BaseModel):
 
     def is_past_retention(self, as_of: Optional[datetime] = None) -> bool:
         """
-        Convenience helper (not used by Phase 4 directly, but useful for tests
-        and reporting): returns True if this entry's age exceeds retention_days.
+        Returns True if this entry's age exceeds retention_days.
         Phase 4's rule engine may reimplement this logic against live event
-        timestamps rather than this registry snapshot's created_at — this
-        method operates on the registry's own created_at for registry-level checks.
+        timestamps rather than this registry snapshot's created_at.
         """
         reference = as_of or datetime.now(self.created_at.tzinfo)
         age_days = (reference - self.created_at).days
@@ -168,28 +142,23 @@ class RegistryEntry(BaseModel):
 
     def forbids_raw_pii(self) -> bool:
         """
-        Structural check Phase 4 can call directly: True if this entry's
-        consent_scope means raw PII is never allowed for this field under
-        this purpose — i.e. the marketing_events invariant.
-
-        Any RegistryEntry where declared_purpose == 'marketing_analytics'
-        and consent_scope == MARKETING_EVENTS_ALLOWED_SCOPE structurally
-        forbids raw PII. This is not a per-row exception; it holds for
-        every marketing_events entry by construction.
+        Structural check Phase 4 can call: True if this entry's consent_scope
+        means raw PII is never allowed for this field under this purpose.
+        Any entry where consent_scope == DEIDENTIFIED_ONLY_SCOPE structurally
+        forbids raw PII.
         """
-        return (
-            self.declared_purpose == "marketing_analytics"
-            and self.consent_scope == MARKETING_EVENTS_ALLOWED_SCOPE
-        )
+        return self.consent_scope == DEIDENTIFIED_ONLY_SCOPE
 
 
-# The only consent_scope value marketing_events entries may carry.
+# The consent_scope value that structurally forbids raw PII (e.g. analytics).
 # Any raw PII (name/phone/aadhaar/pan/email in cleartext) observed flowing
-# through a source_system == marketing-analytics event is, by construction,
-# a PURPOSE_001 violation — because no field governed by this scope permits
-# raw identifiers. Phase 4 keys off entry.forbids_raw_pii() rather than
-# re-deriving this string comparison itself.
-MARKETING_EVENTS_ALLOWED_SCOPE = "deidentified_or_hashed_only"
+# through a source_system whose registry entries carry this scope is a
+# PURPOSE_001 violation. Phase 4 keys off entry.forbids_raw_pii().
+DEIDENTIFIED_ONLY_SCOPE = "deidentified_or_hashed_only"
+
+# Backward-compat alias — existing code that referenced MARKETING_EVENTS_ALLOWED_SCOPE
+# can still import this name. Points to the same value.
+MARKETING_EVENTS_ALLOWED_SCOPE = DEIDENTIFIED_ONLY_SCOPE
 
 
 # ---------------------------------------------------------------------------
@@ -200,16 +169,16 @@ class RegistryStore(BaseModel):
     """
     In-memory registry store. Keyed internally by (source_system, field_name)
     for O(1) lookup. Public interface (get_registry_entry, list_registry_entries
-    module-level functions in loader.py) is what Phase 4 depends on — this
-    class's internals could be swapped for a SQLite-backed store without
-    changing that interface.
+    in loader.py) is what Phase 4 depends on.
+
+    Phase 0: source_system is now a plain str — no .value access needed.
     """
 
     entries: List[RegistryEntry] = Field(default_factory=list)
 
     def _index(self) -> Dict[tuple, RegistryEntry]:
         """Build a lookup index. Recomputed on demand — fine at MVP seed-data scale."""
-        return {(e.source_system.value, e.field_name): e for e in self.entries}
+        return {(e.source_system, e.field_name): e for e in self.entries}
 
     def get(self, field_name: str, source_system: str) -> Optional[RegistryEntry]:
         """Synchronous, in-memory lookup. Returns None (never raises) on miss."""
@@ -219,4 +188,4 @@ class RegistryStore(BaseModel):
         """Return all entries, optionally filtered by source_system."""
         if source_system is None:
             return list(self.entries)
-        return [e for e in self.entries if e.source_system.value == source_system]
+        return [e for e in self.entries if e.source_system == source_system]

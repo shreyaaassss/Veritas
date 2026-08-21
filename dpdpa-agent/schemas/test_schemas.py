@@ -1,13 +1,13 @@
 """
-Phase 0 Schema Validation Tests
-================================
+Phase 0 Schema Validation Tests (Generalised)
+==============================================
 Confirms that Event and Verdict Pydantic models:
-  1. Accept valid data correctly.
-  2. Reject invalid enum values with a ValidationError.
-  3. Document (not yet runtime-enforce) the immutability contract.
+  1. Accept valid data with tenant_id correctly.
+  2. Accept free-form source_system strings.
+  3. Reject missing tenant_id and invalid enum values.
+  4. Document the immutability contract.
 
 Run with: python -m pytest schemas/test_schemas.py -v
-Or standalone: python schemas/test_schemas.py
 """
 
 import sys
@@ -19,10 +19,9 @@ from pydantic import ValidationError
 
 from schemas.models import (
     Event,
-    RuleId,
     RemediationStatus,
+    RuleId,
     Severity,
-    SourceSystem,
     SourceType,
     Verdict,
 )
@@ -34,6 +33,7 @@ from schemas.models import (
 
 def make_valid_event(**overrides) -> dict:
     base = {
+        "tenant_id": "blinkit",
         "event_id": str(uuid.uuid4()),
         "source_type": "log",
         "source_system": "order-service",
@@ -47,6 +47,7 @@ def make_valid_event(**overrides) -> dict:
 
 def make_valid_verdict(**overrides) -> dict:
     base = {
+        "tenant_id": "blinkit",
         "verdict_id": str(uuid.uuid4()),
         "event_id": str(uuid.uuid4()),
         "rule_id": "EXPOSURE_001",
@@ -73,9 +74,10 @@ class TestEventValidation:
     def test_valid_event_instantiates(self):
         """A correctly formed event must instantiate without errors."""
         event = Event(**make_valid_event())
+        assert event.tenant_id == "blinkit"
         assert isinstance(event.event_id, uuid.UUID)
         assert event.source_type == SourceType.LOG
-        assert event.source_system == SourceSystem.ORDER_SERVICE
+        assert event.source_system == "order-service"
         assert isinstance(event.timestamp, datetime)
         assert event.fields["pan"] == "ABCDE1234F"
 
@@ -85,31 +87,24 @@ class TestEventValidation:
             event = Event(**make_valid_event(source_type=st))
             assert event.source_type == SourceType(st)
 
-    def test_valid_event_all_source_systems(self):
-        """All four source_system values must be accepted."""
+    def test_valid_event_accepts_any_source_system_string(self):
+        """Source systems are free-form strings, org-defined."""
         for ss in ["order-service", "delivery-partner-service",
-                   "support-ticketing", "marketing-analytics"]:
+                   "student_portal", "custom_erp_system"]:
             event = Event(**make_valid_event(source_system=ss))
-            assert event.source_system == SourceSystem(ss)
+            assert event.source_system == ss
 
     def test_invalid_source_type_raises(self):
-        """
-        A bad source_type value must raise ValidationError.
-        This is the core contract test — ensures the enum is strictly enforced.
-        """
+        """A bad source_type value must raise ValidationError."""
         with pytest.raises(ValidationError) as exc_info:
             Event(**make_valid_event(source_type="database"))
         errors = exc_info.value.errors()
-        assert any("source_type" in str(e) for e in errors), (
-            "ValidationError should reference source_type field"
-        )
+        assert any("source_type" in str(e) for e in errors)
 
-    def test_invalid_source_system_raises(self):
-        """A bad source_system value must raise ValidationError."""
-        with pytest.raises(ValidationError) as exc_info:
-            Event(**make_valid_event(source_system="payments-service"))
-        errors = exc_info.value.errors()
-        assert any("source_system" in str(e) for e in errors)
+    def test_empty_source_system_raises(self):
+        """Empty source_system must raise ValidationError."""
+        with pytest.raises(ValidationError):
+            Event(**make_valid_event(source_system=""))
 
     def test_empty_raw_snippet_raises(self):
         """raw_snippet must not be empty."""
@@ -123,6 +118,13 @@ class TestEventValidation:
         with pytest.raises(ValidationError):
             Event(**data)
 
+    def test_missing_tenant_id_raises(self):
+        """Missing tenant_id must raise ValidationError."""
+        data = make_valid_event()
+        del data["tenant_id"]
+        with pytest.raises(ValidationError):
+            Event(**data)
+
     def test_timestamp_iso8601_string_accepted(self):
         """ISO8601 string timestamps must be parsed into datetime objects."""
         event = Event(**make_valid_event(timestamp="2026-01-15T08:30:00+05:30"))
@@ -133,7 +135,7 @@ class TestEventValidation:
         event = Event(**make_valid_event(fields={
             "aadhaar": "1234 5678 9012",
             "phone": "9876543210",
-            "email": "priya@blinkit.com",
+            "apaar_id": "AB12345678CD",
             "name": "Priya Nair",
         }))
         assert event.fields["aadhaar"] == "1234 5678 9012"
@@ -149,6 +151,7 @@ class TestVerdictValidation:
     def test_valid_verdict_instantiates(self):
         """A correctly formed verdict must instantiate without errors."""
         verdict = Verdict(**make_valid_verdict())
+        assert verdict.tenant_id == "blinkit"
         assert isinstance(verdict.verdict_id, uuid.UUID)
         assert verdict.rule_id == RuleId.EXPOSURE_001
         assert verdict.severity == Severity.HIGH
@@ -175,16 +178,11 @@ class TestVerdictValidation:
             assert verdict.remediation_status == RemediationStatus(status)
 
     def test_invalid_rule_id_raises(self):
-        """
-        A bad rule_id value must raise ValidationError.
-        Core contract test — ensures only the three locked rules are valid.
-        """
+        """A bad rule_id value must raise ValidationError."""
         with pytest.raises(ValidationError) as exc_info:
             Verdict(**make_valid_verdict(rule_id="CONSENT_001"))
         errors = exc_info.value.errors()
-        assert any("rule_id" in str(e) for e in errors), (
-            "ValidationError should reference rule_id field"
-        )
+        assert any("rule_id" in str(e) for e in errors)
 
     def test_invalid_severity_raises(self):
         """A bad severity value must raise ValidationError."""
@@ -206,12 +204,12 @@ class TestVerdictValidation:
         assert verdict.remediation_status == RemediationStatus.OPEN
 
     def test_matched_registry_entry_accepts_none(self):
-        """matched_registry_entry may be None (Phase 1 hasn't run yet)."""
+        """matched_registry_entry may be None."""
         verdict = Verdict(**make_valid_verdict(matched_registry_entry=None))
         assert verdict.matched_registry_entry is None
 
     def test_matched_registry_entry_accepts_dict(self):
-        """matched_registry_entry must accept a dict stub from Phase 1."""
+        """matched_registry_entry must accept a dict."""
         registry_stub = {
             "entry_id": "reg-001",
             "purpose": "order_delivery",
@@ -226,13 +224,6 @@ class TestVerdictValidation:
 # ---------------------------------------------------------------------------
 
 class TestImmutabilityContract:
-    """
-    Documents (and partially validates) the immutability contract defined in
-    /docs/scope.md and the Verdict model docstring.
-
-    Full runtime enforcement (hash chain verification) is Phase 6's responsibility.
-    These tests assert the contract at the schema/documentation level.
-    """
 
     MUTABLE_FIELDS = {"remediation_status", "remediation_updated_at"}
 
@@ -240,7 +231,6 @@ class TestImmutabilityContract:
         """
         Confirms that exactly remediation_status and remediation_updated_at
         are the only fields marked MUTABLE in the Verdict model.
-        Any other field whose description contains 'MUTABLE' is a contract violation.
         """
         verdict_fields = Verdict.model_fields
 
@@ -250,17 +240,12 @@ class TestImmutabilityContract:
             if "MUTABLE" in description and "IMMUTABLE" not in description:
                 actually_mutable.add(field_name)
 
-        assert actually_mutable == self.MUTABLE_FIELDS, (
-            f"Expected only {self.MUTABLE_FIELDS} to be MUTABLE, "
-            f"but found {actually_mutable}. "
-            f"If you added a new mutable field, update this test AND docs/scope.md "
-            f"AND notify the Phase 6 owner — the hash chain must cover all immutable fields."
-        )
+        assert actually_mutable == self.MUTABLE_FIELDS
 
     def test_all_other_verdict_fields_documented_as_immutable(self):
         """
         Every Verdict field that is NOT in MUTABLE_FIELDS must have IMMUTABLE
-        in its description, confirming the contract is explicitly documented.
+        in its description.
         """
         verdict_fields = Verdict.model_fields
         immutable_fields = set(verdict_fields.keys()) - self.MUTABLE_FIELDS
@@ -271,61 +256,14 @@ class TestImmutabilityContract:
             if "IMMUTABLE" not in description:
                 missing_immutable_doc.append(field_name)
 
-        assert not missing_immutable_doc, (
-            f"Fields {missing_immutable_doc} are not documented as IMMUTABLE. "
-            f"Add 'IMMUTABLE.' to their description in models.py."
-        )
+        assert not missing_immutable_doc, f"Fields {missing_immutable_doc} are missing IMMUTABLE in doc."
 
     def test_remediation_status_can_be_updated_post_creation(self):
-        """
-        Demonstrates that remediation_status is mutable — a verdict can have
-        its status changed from OPEN to ACKNOWLEDGED without a new object.
-        This is the intended workflow for human follow-up tracking.
-        """
         verdict = Verdict(**make_valid_verdict())
         assert verdict.remediation_status == RemediationStatus.OPEN
 
-        # Simulate what the Evidence Store update endpoint will do in Phase 6
         verdict.remediation_status = RemediationStatus.ACKNOWLEDGED
         verdict.remediation_updated_at = datetime.now(timezone.utc)
 
         assert verdict.remediation_status == RemediationStatus.ACKNOWLEDGED
         assert verdict.remediation_updated_at is not None
-
-
-# ---------------------------------------------------------------------------
-# Standalone runner (no pytest)
-# ---------------------------------------------------------------------------
-
-if __name__ == "__main__":
-    print("Running Phase 0 schema validation tests...\n")
-
-    test_classes = [
-        TestEventValidation,
-        TestVerdictValidation,
-        TestImmutabilityContract,
-    ]
-
-    passed = 0
-    failed = 0
-
-    for cls in test_classes:
-        instance = cls()
-        methods = [m for m in dir(instance) if m.startswith("test_")]
-        for method_name in methods:
-            try:
-                getattr(instance, method_name)()
-                print(f"  ✅ {cls.__name__}::{method_name}")
-                passed += 1
-            except Exception as e:
-                print(f"  ❌ {cls.__name__}::{method_name}")
-                print(f"     {type(e).__name__}: {e}")
-                failed += 1
-
-    print(f"\n{'='*60}")
-    print(f"Results: {passed} passed, {failed} failed")
-
-    if failed > 0:
-        sys.exit(1)
-    else:
-        print("Phase 0 schema contracts verified. ✅")

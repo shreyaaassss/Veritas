@@ -42,7 +42,7 @@ from detection.models import DetectedEvent, MatchedEntity
 from registry.loader import _reset_cache, load_registry
 from rules.engine import evaluate_event
 from rules.fanout import VerdictFanout, stub_evidence_store_consumer, stub_llm_explainer_consumer
-from schemas.models import Event, RuleId, Severity, SourceSystem, SourceType
+from schemas.models import Event, RuleId, Severity, SourceType
 
 
 @pytest.fixture(autouse=True)
@@ -76,7 +76,7 @@ class TestSeededRetentionViolation:
         v = retention_verdicts[0]
         assert v.field == "aadhaar"
         assert v.severity == Severity.HIGH  # aadhaar is high-sensitivity
-        assert v.source_system == SourceSystem.DELIVERY_PARTNER
+        assert v.source_system == "delivery-partner-service"
         assert v.matched_registry_entry is not None
         assert v.matched_registry_entry["field_name"] == "aadhaar"
         assert v.remediation_status.value == "OPEN"
@@ -246,9 +246,10 @@ class TestUnregisteredFieldHandling:
         combo guaranteed absent from the registry.
         """
         event = Event(
+            tenant_id="blinkit",
             event_id="11111111-1111-1111-1111-111111111111",
             source_type=SourceType.API,
-            source_system=SourceSystem.ORDER_SERVICE,
+            source_system="order-service",
             timestamp="2026-08-21T00:00:00Z",
             raw_snippet='{"loyalty_tier_email": "someone@example.com"}',
             fields={"loyalty_tier_email": "someone@example.com"},
@@ -280,9 +281,10 @@ class TestUnregisteredFieldHandling:
     def test_unregistered_field_severity_uses_medium_default_for_non_high_category(self):
         """email is MEDIUM sensitivity -> unregistered email field gets MEDIUM, not the HIGH override."""
         event = Event(
+            tenant_id="blinkit",
             event_id="22222222-2222-2222-2222-222222222222",
             source_type=SourceType.API,
-            source_system=SourceSystem.ORDER_SERVICE,
+            source_system="order-service",
             timestamp="2026-08-21T00:00:00Z",
             raw_snippet='{"contact_email": "x@y.com"}',
             fields={"contact_email": "x@y.com"},
@@ -304,9 +306,10 @@ class TestUnregisteredFieldHandling:
         aadhaar/pan must still get HIGH severity, not the MEDIUM default.
         """
         event = Event(
+            tenant_id="blinkit",
             event_id="33333333-3333-3333-3333-333333333333",
             source_type=SourceType.API,
-            source_system=SourceSystem.ORDER_SERVICE,  # aadhaar not registered here
+            source_system="order-service",  # aadhaar not registered here
             timestamp="2026-08-21T00:00:00Z",
             raw_snippet='{"some_unexpected_field": "9988 7766 5544"}',
             fields={"some_unexpected_field": "9988 7766 5544"},
@@ -402,9 +405,10 @@ class TestCleanEventsProduceNoVerdicts:
         test's real value is the explicit contains_pii check below.
         """
         event = Event(
+            tenant_id="blinkit",
             event_id="44444444-4444-4444-4444-444444444444",
             source_type=SourceType.LOG,
-            source_system=SourceSystem.ORDER_SERVICE,
+            source_system="order-service",
             timestamp="2026-08-21T00:00:00Z",
             raw_snippet="order confirmed",
             fields={"order_id": "BLK-999999"},

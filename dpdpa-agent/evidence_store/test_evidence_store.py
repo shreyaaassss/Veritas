@@ -17,7 +17,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from schemas.models import (
-    Verdict, RuleId, Severity, SourceType, SourceSystem, RemediationStatus
+    Verdict, RuleId, Severity, SourceType, RemediationStatus
 )
 from llm_explainer.explainer import ExplainedVerdict
 from evidence_store.store import EvidenceStore
@@ -25,10 +25,12 @@ from evidence_store.store import EvidenceStore
 
 def _make_explained_verdict(
     rule_id: RuleId = RuleId.EXPOSURE_001,
-    source_system: SourceSystem = SourceSystem.ORDER_SERVICE,
+    source_system: str = "order-service",
     severity: Severity = Severity.HIGH,
+    tenant_id: str = "blinkit",
 ) -> ExplainedVerdict:
     verdict = Verdict(
+        tenant_id=tenant_id,
         verdict_id=uuid.uuid4(),
         event_id=uuid.uuid4(),
         rule_id=rule_id,
@@ -202,8 +204,8 @@ class TestQuery:
         assert len(acknowledged_results) == 1
 
     def test_query_by_source_system(self, tmp_store):
-        ev_order = _make_explained_verdict(source_system=SourceSystem.ORDER_SERVICE)
-        ev_marketing = _make_explained_verdict(source_system=SourceSystem.MARKETING_ANALYTICS)
+        ev_order = _make_explained_verdict(source_system="order-service")
+        ev_marketing = _make_explained_verdict(source_system="marketing-analytics")
         tmp_store.append(ev_order)
         tmp_store.append(ev_marketing)
 

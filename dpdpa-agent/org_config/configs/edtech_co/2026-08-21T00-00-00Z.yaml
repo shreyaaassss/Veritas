@@ -1,0 +1,153 @@
+# Veritas Org Config — EdTech Co (Educational Technology)
+# =========================================================
+# This config demonstrates Veritas's genericity: a completely different
+# organisation with entirely different fields, identifier types, source
+# systems, and linkage rules — running on the SAME Veritas instance with
+# ZERO code changes.
+#
+# EdTech Co is a fictional education platform managing student records,
+# admissions data, and parent/guardian contacts under India's DPDPA.
+# Their PII profile is fundamentally different from Blinkit's:
+#   - Identity: APAAR ID (Academic Bank of Credits ID, not Aadhaar/PAN)
+#   - Purpose: academic_records, admissions, parental_consent (not orders/KYC)
+#   - Source systems: student_portal, admissions_service, guardian_portal (not microservices)
+#   - Linkage risk: name+school+dob is re-identifying at population scale (k-anonymity)
+#
+# PROOF OF GENERICITY: get_org_config("edtech_co") returns this config from
+# the same running code that handles "blinkit". No branching logic.
+
+org_id: edtech_co
+
+# Custom identifier types EdTech Co cares about.
+# APAAR ID (Academic Bank of Credits) is a 12-character alphanumeric national
+# education identifier — not a standard Veritas built-in, so the org declares
+# their own pattern. No checksum validator exists yet (Phase 2 placeholder).
+identifiers:
+  - name: apaar_id
+    pattern: "^[A-Z0-9]{12}$"
+    validator: none  # Phase 2 may add apaar_id validator
+
+  - name: student_phone
+    pattern: indian_phone
+    validator: none
+
+  - name: guardian_phone
+    pattern: indian_phone
+    validator: none
+
+# PII fields EdTech Co collects across their source systems.
+# Note: entirely different field names and source systems from Blinkit.
+fields:
+  # ------------------------------------------------------------------
+  # student_portal: student profile data
+  # declared_purpose: academic_records
+  # retention: 10 years (3650 days) — educational records have long legal hold
+  # ------------------------------------------------------------------
+  - field_name: apaar_id
+    pii_category: student_identifier
+    declared_purpose: academic_records
+    consent_scope: enrollment
+    retention_days: 3650
+    source_system: student_portal
+
+  - field_name: student_name
+    pii_category: name
+    declared_purpose: academic_records
+    consent_scope: enrollment
+    retention_days: 3650
+    source_system: student_portal
+
+  - field_name: dob
+    pii_category: date_of_birth
+    declared_purpose: academic_records
+    consent_scope: enrollment
+    retention_days: 3650
+    source_system: student_portal
+
+  - field_name: school_name
+    pii_category: institution_affiliation
+    declared_purpose: academic_records
+    consent_scope: enrollment
+    retention_days: 3650
+    source_system: student_portal
+
+  - field_name: student_phone
+    pii_category: phone
+    declared_purpose: academic_records
+    consent_scope: enrollment
+    retention_days: 3650
+    source_system: student_portal
+
+  # ------------------------------------------------------------------
+  # admissions_service: admissions data
+  # declared_purpose: admissions
+  # retention: 730 days (2 years — application audit trail)
+  # ------------------------------------------------------------------
+  - field_name: application_id
+    pii_category: application_reference
+    declared_purpose: admissions
+    consent_scope: admissions
+    retention_days: 730
+    source_system: admissions_service
+
+  - field_name: academic_score
+    pii_category: academic_record
+    declared_purpose: admissions
+    consent_scope: admissions
+    retention_days: 730
+    source_system: admissions_service
+
+  - field_name: previous_institution
+    pii_category: institution_affiliation
+    declared_purpose: admissions
+    consent_scope: admissions
+    retention_days: 730
+    source_system: admissions_service
+
+  # ------------------------------------------------------------------
+  # guardian_portal: parent/guardian contact data
+  # declared_purpose: parental_consent
+  # retention: 1825 days (5 years — while student is enrolled)
+  # ------------------------------------------------------------------
+  - field_name: guardian_name
+    pii_category: name
+    declared_purpose: parental_consent
+    consent_scope: parental_consent
+    retention_days: 1825
+    source_system: guardian_portal
+
+  - field_name: guardian_contact
+    pii_category: phone
+    declared_purpose: parental_consent
+    consent_scope: parental_consent
+    retention_days: 1825
+    source_system: guardian_portal
+
+  - field_name: guardian_email
+    pii_category: email
+    declared_purpose: parental_consent
+    consent_scope: parental_consent
+    retention_days: 1825
+    source_system: guardian_portal
+
+  - field_name: relationship_to_student
+    pii_category: relationship_data
+    declared_purpose: parental_consent
+    consent_scope: parental_consent
+    retention_days: 1825
+    source_system: guardian_portal
+
+# Linkage rules for EdTech Co.
+# These combinations are individually-innocuous fields that together
+# allow re-identification at population scale (k-anonymity violation).
+# Phase 3 will evaluate these — for Phase 0 they are config data only.
+linkage_rules:
+  # student_name + school_name + dob: at national population scale, this
+  # triple re-identifies a specific student with high confidence.
+  - fields: [student_name, school_name, dob]
+    risk: LINKAGE_RISK
+
+  # guardian_name + guardian_contact + student_name: re-identifies the
+  # family unit, not just the student.
+  - fields: [guardian_name, guardian_contact, student_name]
+    risk: LINKAGE_RISK

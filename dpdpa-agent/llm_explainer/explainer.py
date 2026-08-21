@@ -110,7 +110,7 @@ def _build_fallback(verdict: Verdict, rule_id: str) -> ExplainedVerdict:
     section = snippet.get("reference", rule_id)
     explanation = (
         f"Violation: {rule_id} — {verdict.field!r} exposed "
-        f"in {verdict.source_system.value}. See {section}."
+        f"in {verdict.source_system}. See {section}."
     )
     return ExplainedVerdict(
         verdict=verdict,

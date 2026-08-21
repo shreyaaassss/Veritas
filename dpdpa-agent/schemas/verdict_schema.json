@@ -2,9 +2,10 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://dpdpa-agent/schemas/verdict_schema.json",
   "title": "DPDPAVerdict",
-  "description": "A compliance verdict produced by the Rule Engine for a single Event. IMMUTABILITY CONTRACT: only 'remediation_status' and 'remediation_updated_at' may be mutated after a verdict is written to the Evidence Store. All other fields are immutable and will form part of a hash chain in Phase 6.",
+  "description": "A compliance verdict produced by the Rule Engine for a single Event. IMMUTABILITY CONTRACT: only 'remediation_status' and 'remediation_updated_at' may be mutated after a verdict is written to the Evidence Store. All other fields are immutable and form part of a hash chain.",
   "type": "object",
   "required": [
+    "tenant_id",
     "verdict_id",
     "event_id",
     "rule_id",
@@ -19,6 +20,11 @@
   ],
   "additionalProperties": false,
   "properties": {
+    "tenant_id": {
+      "type": "string",
+      "description": "The organisation this verdict belongs to. Inherited from the triggering Event. Scopes all Evidence Store queries and dashboard views. IMMUTABLE.",
+      "minLength": 1
+    },
     "verdict_id": {
       "type": "string",
       "description": "Globally unique identifier for this verdict. Format: UUID v4. IMMUTABLE.",
@@ -31,7 +37,7 @@
     },
     "rule_id": {
       "type": "string",
-      "description": "The DPDPA compliance rule that was violated. IMMUTABLE.",
+      "description": "The DPDPA compliance rule that was violated. IMMUTABLE. (LINKAGE_001 is planned for Phase 3.)",
       "enum": ["EXPOSURE_001", "PURPOSE_001", "RETENTION_001"]
     },
     "severity": {
@@ -46,17 +52,12 @@
     },
     "source_system": {
       "type": "string",
-      "description": "Source system inherited from the triggering Event. Enables per-system breakdown in audit view. IMMUTABLE.",
-      "enum": [
-        "order-service",
-        "delivery-partner-service",
-        "support-ticketing",
-        "marketing-analytics"
-      ]
+      "description": "Source system inherited from the triggering Event. Free-form string — valid values are org-defined. Enables per-system breakdown in audit view. IMMUTABLE.",
+      "minLength": 1
     },
     "field": {
       "type": "string",
-      "description": "The specific PII field name that triggered this verdict (e.g. 'aadhaar', 'pan', 'phone'). IMMUTABLE.",
+      "description": "The specific PII field name that triggered this verdict. IMMUTABLE.",
       "minLength": 1
     },
     "timestamp": {
@@ -66,7 +67,7 @@
     },
     "matched_registry_entry": {
       "type": ["object", "null"],
-      "description": "The consent registry entry that was matched (or violated) to produce this verdict. Typed as object stub — Phase 1 will define the registry entry model. IMMUTABLE."
+      "description": "The consent registry entry that was matched (or violated) to produce this verdict. IMMUTABLE."
     },
     "breach_notification_candidate": {
       "type": "boolean",

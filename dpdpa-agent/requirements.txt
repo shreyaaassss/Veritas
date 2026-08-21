@@ -7,6 +7,7 @@ fastapi==0.115.0
 uvicorn[standard]==0.30.6
 pydantic==2.8.2
 pydantic[email]
+pyyaml>=6.0          # Org Config store: YAML serialization for org config files
 
 # --- Phase 2: Ingestion Pipeline ---
 # stdlib asyncio only; pytest-asyncio for tests

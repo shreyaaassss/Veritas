@@ -78,12 +78,13 @@ def _serialize_immutable(ev: ExplainedVerdict) -> str:
     verdict = ev.verdict
     payload = {
         # Verdict immutable fields
+        "tenant_id": verdict.tenant_id,
         "verdict_id": str(verdict.verdict_id),
         "event_id": str(verdict.event_id),
         "rule_id": verdict.rule_id.value,
         "severity": verdict.severity.value,
         "source": verdict.source.value,
-        "source_system": verdict.source_system.value,
+        "source_system": verdict.source_system,
         "field": verdict.field,
         "timestamp": verdict.timestamp.isoformat(),
         "matched_registry_entry": verdict.matched_registry_entry,

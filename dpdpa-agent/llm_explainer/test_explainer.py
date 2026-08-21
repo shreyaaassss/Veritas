@@ -13,21 +13,22 @@ from datetime import datetime, timezone
 from unittest.mock import patch, MagicMock
 
 from schemas.models import (
-    Verdict, RuleId, Severity, SourceType, SourceSystem, RemediationStatus
+    Verdict, RuleId, Severity, SourceType, RemediationStatus
 )
 from llm_explainer.explainer import (
     explain_verdict, ExplainedVerdict, _build_fallback, _grounding_check, _LLMResponse
 )
 
 
-def _make_verdict(rule_id: RuleId = RuleId.EXPOSURE_001) -> Verdict:
+def _make_verdict(rule_id: RuleId = RuleId.EXPOSURE_001, tenant_id: str = "blinkit") -> Verdict:
     return Verdict(
+        tenant_id=tenant_id,
         verdict_id=uuid.uuid4(),
         event_id=uuid.uuid4(),
         rule_id=rule_id,
         severity=Severity.HIGH,
         source=SourceType.LOG,
-        source_system=SourceSystem.ORDER_SERVICE,
+        source_system="order-service",
         field="pan",
         timestamp=datetime.now(timezone.utc),
         matched_registry_entry=None,

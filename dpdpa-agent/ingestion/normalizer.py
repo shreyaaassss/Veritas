@@ -32,7 +32,8 @@ from typing import Any, Dict, Optional
 
 from pydantic import ValidationError
 
-from schemas.models import Event, SourceSystem, SourceType
+from schemas.models import Event, SourceType
+# NOTE: SourceSystem enum removed in Phase 0 — source_system is now a free-form str.
 
 logger = logging.getLogger("ingestion.normalizer")
 
@@ -47,22 +48,24 @@ def _now_iso() -> str:
 
 def normalize_log_event(
     raw_line: str,
-    source_system: SourceSystem,
+    source_system: str,
     fields: Dict[str, str],
     timestamp: Optional[datetime] = None,
+    tenant_id: str = "",
 ) -> Dict[str, Any]:
     """
     Normalize a raw log line into a Phase 0 Event-shaped dict.
 
+    source_system: free-form string (org-defined, from Org Config).
+    tenant_id: the org this event belongs to. Must be supplied by the caller.
     raw_snippet = the full log line as emitted.
-    fields = parsed key-values extracted from that line by the caller
-             (the log generator is responsible for parsing its own
-             output shape; this function does not do PII detection).
+    fields = parsed key-values extracted from that line by the caller.
     """
     return {
+        "tenant_id": tenant_id,
         "event_id": _new_event_id(),
         "source_type": SourceType.LOG.value,
-        "source_system": source_system.value,
+        "source_system": source_system,
         "timestamp": (timestamp or datetime.now(timezone.utc)).isoformat(),
         "raw_snippet": raw_line,
         "fields": fields,
@@ -71,22 +74,25 @@ def normalize_log_event(
 
 def normalize_api_event(
     payload: Dict[str, Any],
-    source_system: SourceSystem,
+    source_system: str,
     fields: Dict[str, str],
     timestamp: Optional[datetime] = None,
+    tenant_id: str = "",
 ) -> Dict[str, Any]:
     """
-    Normalize a raw API request/response payload into a Phase 0
-    Event-shaped dict.
+    Normalize a raw API request/response payload into a Phase 0 Event-shaped dict.
 
+    source_system: free-form string (org-defined, from Org Config).
+    tenant_id: the org this event belongs to. Must be supplied by the caller.
     raw_snippet = the raw JSON payload, serialized to a string (see
     module docstring for why this is not left empty).
     fields = parsed key-values extracted from the payload by the caller.
     """
     return {
+        "tenant_id": tenant_id,
         "event_id": _new_event_id(),
         "source_type": SourceType.API.value,
-        "source_system": source_system.value,
+        "source_system": source_system,
         "timestamp": (timestamp or datetime.now(timezone.utc)).isoformat(),
         "raw_snippet": json.dumps(payload, ensure_ascii=False),
         "fields": fields,

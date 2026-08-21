@@ -1,25 +1,11 @@
 """
-DPDPA Compliance Agent — Detection Test Fixtures
-====================================================
-Real/realistic sample events used across detection tests. Where possible
-these are pulled from actual Phase 2 generator output (captured and
-pinned below) rather than only hand-invented textbook examples, per the
-plan's explicit instruction.
+DPDPA Compliance Agent — Detection Test Fixtures (Phase 0 Generalised)
+========================================================================
+Real/realistic sample events used across detection tests.
 
-NOTE on support_tickets: Phase 2's log_generator only emits
-source_system in {support-ticketing, order-service} with a fixed
-"fetched customer record {...}" log shape — it does NOT yet produce a
-free-text "support ticket notes" style event (that table exists in
-Phase 1's registry, but Phase 2 didn't build a dedicated generator
-variant for it, since the plan's Phase 2 spec only required the
-exposure vector via the existing log line shape). To satisfy this
-phase's explicit requirement to test free-text detection against a
-support_tickets-style event, SUPPORT_TICKET_FREE_TEXT_EVENT below
-constructs a realistic support-ticket note by hand, modeled directly on
-Phase 1's registry.seed_registry.py comment: "an agent pastes a
-customer's phone number into a resolution note" — i.e. PII riding along
-in unstructured text with NO corresponding structured field, which is
-exactly the case field-scanning alone cannot catch.
+Phase 0:
+  - tenant_id added to every Event fixture (default: "blinkit")
+  - source_system values are plain strings ("support-ticketing", "order-service", etc.)
 """
 
 from __future__ import annotations
@@ -27,19 +13,15 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from schemas.models import Event, SourceSystem, SourceType
+from schemas.models import Event, SourceType
 
-# ---------------------------------------------------------------------------
-# Pulled from real Phase 2 log_generator output (log_generator.py,
-# _exposure_violation_log_line), field values substituted with fixed
-# values here so tests are deterministic and don't depend on random seeds
-# matching across a Phase 2 version bump.
-# ---------------------------------------------------------------------------
+TENANT_ID = "blinkit"
 
 EXPOSURE_LOG_EVENT = Event(
+    tenant_id=TENANT_ID,
     event_id=str(uuid4()),
     source_type=SourceType.LOG,
-    source_system=SourceSystem.SUPPORT_TICKETING,
+    source_system="support-ticketing",
     timestamp=datetime.now(timezone.utc).isoformat(),
     raw_snippet=(
         '[2026-08-21T10:32:14Z] DEBUG support-ticketing: fetched customer record '
@@ -52,23 +34,23 @@ EXPOSURE_LOG_EVENT = Event(
     },
 )
 
-# A completely clean log line (Phase 2's _clean_log_line shape) — no PII anywhere.
+# A completely clean log line — no PII anywhere.
 CLEAN_LOG_EVENT = Event(
+    tenant_id=TENANT_ID,
     event_id=str(uuid4()),
     source_type=SourceType.LOG,
-    source_system=SourceSystem.ORDER_SERVICE,
+    source_system="order-service",
     timestamp=datetime.now(timezone.utc).isoformat(),
     raw_snippet='[2026-08-21T10:33:01Z] INFO order-service: order BLK-431682 status updated to \'confirmed\'',
     fields={"order_id": "BLK-431682"},
 )
 
-# Pulled from real Phase 2 api_generator output shape
-# (_purpose_violation_marketing_payload) — raw phone leaking into a
-# marketing-analytics event that should be hashed-only.
+# Raw phone leaking into a marketing-analytics event that should be hashed-only.
 MARKETING_PURPOSE_VIOLATION_EVENT = Event(
+    tenant_id=TENANT_ID,
     event_id=str(uuid4()),
     source_type=SourceType.API,
-    source_system=SourceSystem.MARKETING_ANALYTICS,
+    source_system="marketing-analytics",
     timestamp=datetime.now(timezone.utc).isoformat(),
     raw_snippet=(
         '{"event": "marketing_engagement", "hashed_customer_id": "hcid_d8ba0b4b", '
@@ -84,9 +66,10 @@ MARKETING_PURPOSE_VIOLATION_EVENT = Event(
 
 # Clean marketing event — hashed fields only, no raw PII.
 MARKETING_CLEAN_EVENT = Event(
+    tenant_id=TENANT_ID,
     event_id=str(uuid4()),
     source_type=SourceType.API,
-    source_system=SourceSystem.MARKETING_ANALYTICS,
+    source_system="marketing-analytics",
     timestamp=datetime.now(timezone.utc).isoformat(),
     raw_snippet=(
         '{"event": "marketing_engagement", "hashed_customer_id": "hcid_f3e46bdd", '
@@ -99,14 +82,12 @@ MARKETING_CLEAN_EVENT = Event(
     },
 )
 
-# Pulled from real Phase 2 api_generator output shape
-# (_retention_violation_delivery_partner_payload) — the exact seeded
-# stale delivery partner (DP-4471 / Suresh K.) shared with Phase 1's
-# registry.
+# Retention violation delivery partner event.
 RETENTION_VIOLATION_EVENT = Event(
+    tenant_id=TENANT_ID,
     event_id=str(uuid4()),
     source_type=SourceType.API,
-    source_system=SourceSystem.DELIVERY_PARTNER,
+    source_system="delivery-partner-service",
     timestamp=datetime.now(timezone.utc).isoformat(),
     raw_snippet=(
         '{"event": "delivery_partner_profile_fetch", "partner_id": "DP-4471", '
@@ -121,14 +102,12 @@ RETENTION_VIOLATION_EVENT = Event(
     },
 )
 
-# PAN appears in a fresh (non-violation) delivery_partners-shaped payload
-# — Phase 2's _fresh_delivery_partner_payload includes a pan field that
-# the retention-violation variant does not. Constructed here to give
-# Phase 3's PAN recognizer a realistic field-sourced test case.
+# Fresh delivery partner with PAN.
 DELIVERY_PARTNER_WITH_PAN_EVENT = Event(
+    tenant_id=TENANT_ID,
     event_id=str(uuid4()),
     source_type=SourceType.API,
-    source_system=SourceSystem.DELIVERY_PARTNER,
+    source_system="delivery-partner-service",
     timestamp=datetime.now(timezone.utc).isoformat(),
     raw_snippet=(
         '{"event": "delivery_partner_profile_fetch", "partner_id": "DP-7712", '
@@ -144,20 +123,12 @@ DELIVERY_PARTNER_WITH_PAN_EVENT = Event(
     },
 )
 
-# ---------------------------------------------------------------------------
-# Hand-constructed support_tickets free-text event (see module docstring
-# for why this doesn't come from an actual Phase 2 generator run).
-# Models Phase 1's registry.seed_registry.py comment: a support agent
-# pastes PII into a free-text resolution note. There is NO structured
-# 'phone' field here — the phone number exists ONLY inside raw_snippet,
-# which is exactly the case field-scanning alone cannot catch and
-# raw_snippet-scanning exists to cover.
-# ---------------------------------------------------------------------------
-
+# Support ticket free-text event.
 SUPPORT_TICKET_FREE_TEXT_EVENT = Event(
+    tenant_id=TENANT_ID,
     event_id=str(uuid4()),
     source_type=SourceType.LOG,
-    source_system=SourceSystem.SUPPORT_TICKETING,
+    source_system="support-ticketing",
     timestamp=datetime.now(timezone.utc).isoformat(),
     raw_snippet=(
         "[2026-08-21T11:02:47Z] INFO support-ticketing: ticket #48213 resolved. "
@@ -167,7 +138,5 @@ SUPPORT_TICKET_FREE_TEXT_EVENT = Event(
     fields={
         "ticket_id": "48213",
         "resolution_status": "resolved",
-        # Deliberately NO 'phone' or 'name' field here — those values
-        # exist only inside the free-text agent note in raw_snippet.
     },
 )

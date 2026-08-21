@@ -1,32 +1,29 @@
 """
 DPDPA Compliance Agent — API Traffic Generator (Purpose + Retention Vectors)
 ===============================================================================
-Emits realistic Blinkit-style API request/response JSON payloads at a
-steady, configurable interval. Models TWO independent violation vectors:
+Emits realistic API request/response JSON payloads at a steady, configurable
+interval. Models TWO independent violation vectors:
 
 1. PURPOSE-LIMITATION vector (marketing-analytics):
    Marketing events should carry only hashed/de-identified fields
-   (hashed_customer_id, campaign_segment, event_type — matching Phase 1's
-   registry exactly). At a configurable rate, this generator deliberately
-   emits a raw phone or Aadhaar number instead. FRAMING for Phase 8's
-   pitch: modeled as "the analytics event schema got copy-pasted from an
-   internal-only type that still had the raw customer object nested in
-   it" — i.e. vendor/team over-sharing via schema reuse, not malice.
+   (hashed_customer_id, campaign_segment, event_type). At a configurable
+   rate, this generator deliberately emits a raw phone number instead.
+   FRAMING: modeled as "the analytics event schema got copy-pasted from an
+   internal-only type that still had the raw customer object nested in it"
+   — vendor/team over-sharing via schema reuse, not malice.
 
 2. RETENTION vector (delivery-partner-service):
    Emits payloads that reference an onboarding record older than its
    180-day retention window. Uses the EXACT SAME seeded delivery partner
    (DP-4471 / "Suresh K." / aadhaar "5521 8890 3347" / 240 days old) as
-   Phase 1's registry.seed_registry.DELIVERY_PARTNERS_ENTRIES seeded
-   violation row, so Phase 4's rule engine resolves both to the same
-   ground-truth record — this is not a coincidence, see fixtures.py's
-   STALE_DELIVERY_PARTNER constant, which is the single source of truth
-   both this generator and Phase 1 reference.
+   registry/seed_registry.py's seeded violation row — see fixtures.py's
+   STALE_DELIVERY_PARTNER constant, the single source of truth.
 
-This module performs NO PII detection and NO rule evaluation — it only
-produces raw payloads and hands them to the normalizer. Field-name
-alignment with Phase 1's registry is a data-shape concern, not a
-compliance-logic concern; this layer makes no decisions about what it emits.
+Phase 0 change: source_system is now a plain string (no SourceSystem enum).
+These specific source system strings match what blinkit.yaml will declare.
+Phase 1 will read them from the org's config file.
+
+This module performs NO PII detection and NO rule evaluation.
 """
 
 from __future__ import annotations
@@ -49,9 +46,16 @@ from ingestion.fixtures import (
     fake_phone,
 )
 from ingestion.normalizer import normalize_api_event, validate_event
-from schemas.models import SourceSystem
 
 logger = logging.getLogger("ingestion.api_generator")
+
+# Phase 0: source_system values are plain strings (org-defined).
+# These match the blinkit.yaml config's source_systems. Phase 1 will read from config.
+_MARKETING_SOURCE = "marketing-analytics"
+_DELIVERY_SOURCE = "delivery-partner-service"
+
+# Tenant for this generator — blinkit for Phase 0 transitional state.
+TENANT_ID = "blinkit"
 
 
 # ---------------------------------------------------------------------------
@@ -81,11 +85,10 @@ def _clean_marketing_payload() -> Tuple[Dict[str, Any], Dict[str, str]]:
 def _purpose_violation_marketing_payload() -> Tuple[Dict[str, Any], Dict[str, str]]:
     """
     A marketing event that leaks a raw identifier — the deliberate
-    purpose-limitation violation. Field name 'phone' matches Phase 1's
-    seeded marketing_events registry entry exactly (see
-    registry/seed_registry.py MARKETING_EVENTS_ENTRIES), so
-    get_registry_entry("phone", "marketing-analytics") resolves to a real
-    entry and entry.forbids_raw_pii() is True downstream in Phase 4.
+    purpose-limitation violation. Field name 'phone' matches the seeded
+    marketing_events registry entry exactly, so get_registry_entry("phone",
+    "marketing-analytics") resolves to a real entry and forbids_raw_pii()
+    is True downstream in Phase 4.
     """
     hashed_id = f"hcid_{random.randint(10**9, 10**10 - 1):x}"
     segment = random.choice(CAMPAIGN_SEGMENTS)
@@ -149,8 +152,7 @@ def _retention_violation_delivery_partner_payload() -> Tuple[Dict[str, Any], Dic
     A payload referencing the seeded stale delivery-partner record
     (DP-4471 / Suresh K., 240 days old, 60 days past the 180-day retention
     window) — the deliberate retention violation. Uses
-    fixtures.STALE_DELIVERY_PARTNER as the single source of truth so this
-    generator and Phase 1's registry seed never drift apart.
+    fixtures.STALE_DELIVERY_PARTNER as the single source of truth.
     """
     partner = STALE_DELIVERY_PARTNER
     created_at = (
@@ -181,11 +183,7 @@ def _retention_violation_delivery_partner_payload() -> Tuple[Dict[str, Any], Dic
 def _stub_cache_overretention_payload() -> None:
     """
     # Phase 2 stretch, not MVP-blocking.
-    Would model a Redis-cached user object payload past its TTL — a cache
-    that never expired and is now serving stale personal data long after
-    it should have been evicted. Not implemented; pick up in Phase 9 if
-    pursued. Left as a stub only, per the plan's explicit instruction not
-    to build stretch vectors out fully.
+    Would model a Redis-cached user object payload past its TTL. Not implemented.
     """
     raise NotImplementedError("Phase 2 stretch vector — not implemented, see docstring.")
 
@@ -193,10 +191,7 @@ def _stub_cache_overretention_payload() -> None:
 def _stub_stale_staging_data_payload() -> None:
     """
     # Phase 2 stretch, not MVP-blocking.
-    Would model a payload tagged env: staging that nonetheless carries
-    production-shaped PII (e.g. a staging environment seeded from a prod
-    snapshot that was never scrubbed). Not implemented; pick up in Phase 9
-    if pursued.
+    Would model a payload tagged env: staging with production PII. Not implemented.
     """
     raise NotImplementedError("Phase 2 stretch vector — not implemented, see docstring.")
 
@@ -210,19 +205,18 @@ async def api_generator(
     config: Optional[IngestionConfig] = None,
     max_events: Optional[int] = None,
     rng: Optional[random.Random] = None,
+    tenant_id: str = TENANT_ID,
 ) -> None:
     """
     Runs indefinitely (or until max_events is emitted), pushing normalized,
     schema-validated Event objects onto the shared queue at
     config.api_emit_interval_seconds intervals.
 
-    Each tick, independently decides:
-      - whether to emit a marketing-analytics event (and whether that
-        event is a purpose-limitation violation), or
-      - a delivery-partner-service event (and whether that event
-        references the stale/retention-violating record).
-    The two vectors alternate rather than compete, so both are reliably
-    represented in any reasonably long run — important for demo repeatability.
+    Each tick alternates between marketing-analytics and delivery-partner-service
+    events so both vectors are reliably represented in any reasonably long run.
+
+    Phase 0: tenant_id parameter added — defaults to "blinkit" for the
+    transitional period. Phase 1 will wire this to the config loader.
     """
     cfg = config or IngestionConfig()
     r = rng or random.Random(cfg.random_seed) if rng is None else rng
@@ -232,14 +226,14 @@ async def api_generator(
 
     while max_events is None or emitted < max_events:
         if vector_toggle % 2 == 0:
-            source_system = SourceSystem.MARKETING_ANALYTICS
+            source_system = _MARKETING_SOURCE
             is_violation = r.random() < cfg.api_marketing_purpose_violation_rate
             if is_violation:
                 payload, fields = _purpose_violation_marketing_payload()
             else:
                 payload, fields = _clean_marketing_payload()
         else:
-            source_system = SourceSystem.DELIVERY_PARTNER
+            source_system = _DELIVERY_SOURCE
             is_violation = r.random() < cfg.api_retention_violation_rate
             if is_violation:
                 payload, fields = _retention_violation_delivery_partner_payload()
@@ -252,6 +246,7 @@ async def api_generator(
             payload=payload,
             source_system=source_system,
             fields=fields,
+            tenant_id=tenant_id,
         )
         event = validate_event(event_dict)
         if event is not None:

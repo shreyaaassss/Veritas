@@ -1,0 +1,175 @@
+# Veritas Org Config — Blinkit (Retail)
+# ======================================
+# This is the REFERENCE config for the Blinkit retail org.
+# It migrates the hardcoded Blinkit registry from registry/seed_registry.py
+# into the generic Org Config format.
+#
+# EXIT CRITERIA REGRESSION TEST: if the generic config loader can correctly
+# reproduce everything the old hardcoded version did, Phase 0 is proven correct.
+#
+# NOTE: This file is a SEED CONFIG loaded at startup for demo purposes.
+# In production, an org would upload their config via upload_org_config().
+#
+# Source systems mapped here (these are Blinkit's own microservice names,
+# not Veritas internals — another org would use entirely different names):
+#   order-service           -> order_fulfillment data (customers table)
+#   delivery-partner-service -> onboarding_kyc data (delivery_partners table)
+#   support-ticketing        -> customer_support data (support_tickets table)
+#   marketing-analytics      -> analytics/campaign data (marketing_events table)
+
+org_id: blinkit
+
+# Custom identifier types Blinkit cares about (beyond generic phone/email)
+identifiers:
+  - name: aadhaar
+    pattern: indian_aadhaar
+    validator: aadhaar
+  - name: pan
+    pattern: indian_pan
+    validator: pan
+  - name: phone
+    pattern: indian_phone
+    validator: none
+
+# PII fields declared by Blinkit across all their source systems.
+# These replace the hardcoded 4-table structure from registry/seed_registry.py.
+# Each field is scoped to the source_system it flows through.
+fields:
+  # ------------------------------------------------------------------
+  # Table 1: customers (order-service)
+  # declared_purpose: order_fulfillment
+  # retention: 1095 days (3 years)
+  # ------------------------------------------------------------------
+  - field_name: name
+    pii_category: name
+    declared_purpose: order_fulfillment
+    consent_scope: order_fulfillment
+    retention_days: 1095
+    source_system: order-service
+
+  - field_name: phone
+    pii_category: phone
+    declared_purpose: order_fulfillment
+    consent_scope: order_fulfillment
+    retention_days: 1095
+    source_system: order-service
+
+  - field_name: delivery_address
+    pii_category: address
+    declared_purpose: order_fulfillment
+    consent_scope: order_fulfillment
+    retention_days: 1095
+    source_system: order-service
+
+  - field_name: order_history
+    pii_category: order_history
+    declared_purpose: order_fulfillment
+    consent_scope: order_fulfillment
+    retention_days: 1095
+    source_system: order-service
+
+  # ------------------------------------------------------------------
+  # Table 2: delivery_partners (delivery-partner-service)
+  # declared_purpose: onboarding_kyc
+  # retention: 180 days (tight — KYC data)
+  # ------------------------------------------------------------------
+  - field_name: aadhaar
+    pii_category: aadhaar
+    declared_purpose: onboarding_kyc
+    consent_scope: onboarding_kyc
+    retention_days: 180
+    source_system: delivery-partner-service
+
+  - field_name: pan
+    pii_category: pan
+    declared_purpose: onboarding_kyc
+    consent_scope: onboarding_kyc
+    retention_days: 180
+    source_system: delivery-partner-service
+
+  - field_name: bank_details
+    pii_category: financial_account
+    declared_purpose: onboarding_kyc
+    consent_scope: onboarding_kyc
+    retention_days: 180
+    source_system: delivery-partner-service
+
+  - field_name: address
+    pii_category: address
+    declared_purpose: onboarding_kyc
+    consent_scope: onboarding_kyc
+    retention_days: 180
+    source_system: delivery-partner-service
+
+  # ------------------------------------------------------------------
+  # Table 3: support_tickets (support-ticketing)
+  # declared_purpose: customer_support
+  # retention: 730 days (2 years — dispute/audit trail)
+  # ------------------------------------------------------------------
+  - field_name: name
+    pii_category: name
+    declared_purpose: customer_support
+    consent_scope: customer_support
+    retention_days: 730
+    source_system: support-ticketing
+
+  - field_name: phone
+    pii_category: phone
+    declared_purpose: customer_support
+    consent_scope: customer_support
+    retention_days: 730
+    source_system: support-ticketing
+
+  - field_name: order_reference
+    pii_category: order_reference
+    declared_purpose: customer_support
+    consent_scope: customer_support
+    retention_days: 730
+    source_system: support-ticketing
+
+  # ------------------------------------------------------------------
+  # Table 4: marketing_events (marketing-analytics)
+  # declared_purpose: marketing_analytics
+  # consent_scope: deidentified_or_hashed_only
+  # INVARIANT: any raw PII in a marketing-analytics event is a PURPOSE_001
+  #            violation. The consent_scope value is the signal Phase 4 uses.
+  # retention: 365 days
+  # ------------------------------------------------------------------
+  - field_name: hashed_customer_id
+    pii_category: hashed_identifier
+    declared_purpose: marketing_analytics
+    consent_scope: deidentified_or_hashed_only
+    retention_days: 365
+    source_system: marketing-analytics
+
+  - field_name: campaign_segment
+    pii_category: hashed_identifier
+    declared_purpose: marketing_analytics
+    consent_scope: deidentified_or_hashed_only
+    retention_days: 365
+    source_system: marketing-analytics
+
+  - field_name: event_type
+    pii_category: hashed_identifier
+    declared_purpose: marketing_analytics
+    consent_scope: deidentified_or_hashed_only
+    retention_days: 365
+    source_system: marketing-analytics
+
+  # Seeded invariant-carrier: a raw 'phone' field declared under marketing_analytics
+  # so Phase 4 can resolve a registry hit (and call forbids_raw_pii()) when
+  # the generator injects a raw phone into a marketing event.
+  - field_name: phone
+    pii_category: phone
+    declared_purpose: marketing_analytics
+    consent_scope: deidentified_or_hashed_only
+    retention_days: 365
+    source_system: marketing-analytics
+
+# Linkage rules for Blinkit
+# (Phase 3 will evaluate these — for Phase 0 they are config data only)
+linkage_rules:
+  - fields: [name, delivery_address, phone]
+    risk: LINKAGE_RISK
+  - fields: [aadhaar, pan, bank_details]
+    risk: LINKAGE_RISK
