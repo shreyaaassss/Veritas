@@ -153,8 +153,8 @@ class OrgField(BaseModel):
         description="The consent boundary for this field's use."
     )
     retention_days: int = Field(
-        ..., ge=0,
-        description="Maximum days this field may be retained before it becomes a RETENTION_001 violation."
+        ..., gt=0,
+        description="Positive integer: maximum days this field may be retained before it becomes a RETENTION_001 violation."
     )
     source_system: str = Field(
         ..., min_length=1,
@@ -217,8 +217,9 @@ class OrgConfig(BaseModel):
     """
 
     org_id: str = Field(
-        ..., min_length=1,
-        description="Unique organisation identifier. Used as the partition key for all data."
+        ...,
+        pattern=r"^[a-z0-9_]+$",
+        description="Unique organisation identifier. Must match ^[a-z0-9_]+$. Used as the partition key for all data."
     )
     identifiers: List[OrgIdentifier] = Field(
         default_factory=list,
@@ -235,6 +236,33 @@ class OrgConfig(BaseModel):
             "re-identification/linkage risk. Evaluated in Phase 3."
         )
     )
+
+    @field_validator("org_id", mode="before")
+    @classmethod
+    def validate_org_id_format(cls, v: str) -> str:
+        if not isinstance(v, str) or not re.match(r"^[a-z0-9_]+$", v):
+            raise ValueError(
+                f"org_id {v!r} is invalid. It must be non-empty and match pattern '^[a-z0-9_]+$'."
+            )
+        return v
+
+    @model_validator(mode="after")
+    def check_no_duplicate_identifier_names(self) -> "OrgConfig":
+        """
+        Identifier name must be unique within an org's config.
+        """
+        seen: set[str] = set()
+        duplicates: list[str] = []
+        for ident in self.identifiers:
+            if ident.name in seen:
+                duplicates.append(ident.name)
+            seen.add(ident.name)
+        if duplicates:
+            raise ValueError(
+                f"org_config.identifiers contains duplicate identifier name(s): {duplicates}. "
+                f"Each identifier name must be unique within an org's config."
+            )
+        return self
 
     @model_validator(mode="after")
     def check_no_duplicate_field_names(self) -> "OrgConfig":

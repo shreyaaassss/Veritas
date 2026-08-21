@@ -28,7 +28,11 @@ from org_config.store import (
     list_org_config_versions,
     upload_org_config,
 )
-from org_config.validator import OrgConfigValidationError, validate_org_config
+from org_config.validator import (
+    OrgConfigValidationError,
+    validate_org_config,
+    validate_org_config_strict,
+)
 from schemas.models import Event, RemediationStatus, RuleId, Severity, SourceType, Verdict
 
 
@@ -208,7 +212,7 @@ class TestBrokenConfigRejection:
             ]
         }
         with pytest.raises(OrgConfigValidationError) as exc_info:
-            validate_org_config(config)
+            validate_org_config_strict(config)
         errors = exc_info.value.errors
         assert any("org_id" in e for e in errors), (
             f"Expected an error mentioning 'org_id', got: {errors}"
@@ -217,7 +221,7 @@ class TestBrokenConfigRejection:
     def test_missing_fields_is_rejected(self):
         config = {"org_id": "test_org"}
         with pytest.raises(OrgConfigValidationError) as exc_info:
-            validate_org_config(config)
+            validate_org_config_strict(config)
         errors = exc_info.value.errors
         assert any("fields" in e for e in errors), (
             f"Expected an error mentioning 'fields', got: {errors}"
@@ -246,7 +250,7 @@ class TestBrokenConfigRejection:
             ],
         }
         with pytest.raises(OrgConfigValidationError) as exc_info:
-            validate_org_config(config)
+            validate_org_config_strict(config)
         errors = exc_info.value.errors
         assert any("duplicate" in e.lower() or "phone" in e for e in errors), (
             f"Expected an error mentioning 'duplicate' or 'phone', got: {errors}"
@@ -274,7 +278,7 @@ class TestBrokenConfigRejection:
             ],
         }
         with pytest.raises(OrgConfigValidationError) as exc_info:
-            validate_org_config(config)
+            validate_org_config_strict(config)
         errors = exc_info.value.errors
         assert any("regex" in e.lower() or "pattern" in e.lower() for e in errors), (
             f"Expected an error mentioning 'regex' or 'pattern', got: {errors}"
@@ -302,7 +306,7 @@ class TestBrokenConfigRejection:
             ],
         }
         with pytest.raises(OrgConfigValidationError) as exc_info:
-            validate_org_config(config)
+            validate_org_config_strict(config)
         errors = exc_info.value.errors
         assert any("validator" in e.lower() or "not_a_real_validator" in e for e in errors), (
             f"Expected an error mentioning 'validator', got: {errors}"
@@ -329,7 +333,7 @@ class TestBrokenConfigRejection:
             ],
         }
         with pytest.raises(OrgConfigValidationError) as exc_info:
-            validate_org_config(config)
+            validate_org_config_strict(config)
         errors = exc_info.value.errors
         assert any("email_address_not_declared" in e or "undeclared" in e.lower() or "not declared" in e.lower() for e in errors), (
             f"Expected an error mentioning the undeclared field, got: {errors}"
@@ -353,7 +357,7 @@ class TestBrokenConfigRejection:
             ],
         }
         with pytest.raises(OrgConfigValidationError) as exc_info:
-            validate_org_config(config)
+            validate_org_config_strict(config)
         assert len(exc_info.value.errors) > 0
 
     def test_upload_org_config_returns_error_dict_on_invalid(self):
@@ -373,7 +377,7 @@ class TestBrokenConfigRejection:
     def test_empty_fields_list_is_rejected(self):
         config = {"org_id": "test_org", "fields": []}
         with pytest.raises(OrgConfigValidationError) as exc_info:
-            validate_org_config(config)
+            validate_org_config_strict(config)
         errors = exc_info.value.errors
         assert any("fields" in e.lower() for e in errors)
 
@@ -472,7 +476,7 @@ class TestTenantIdRequired:
 
 class TestBuiltinPatterns:
     def test_indian_phone_builtin_resolves(self):
-        cfg = validate_org_config({
+        cfg = validate_org_config_strict({
             "org_id": "test_org",
             "identifiers": [
                 {"name": "phone", "pattern": "indian_phone", "validator": "none"}

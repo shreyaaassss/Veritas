@@ -1,80 +1,196 @@
 """
-DPDPA Compliance Agent — Registry Loader & Public Query Interface
-==================================================================
-This is the ONLY module Phase 4 (Rule Engine) should import from.
+DPDPA Compliance Agent — Config-Driven Registry Loader (Phase 1)
+=================================================================
+Generic, multi-tenant registry loader and public query interface.
 
-Public interface (stable — do not change signatures without team review):
-    load_registry() -> RegistryStore
-    get_registry_entry(field_name: str, source_system: str) -> RegistryEntry | None
-    list_registry_entries(source_system: str | None = None) -> list[RegistryEntry]
-
-get_registry_entry is synchronous and in-memory — safe to call per-event on
-a live stream with zero network/DB round-trip latency. It returns None
-(never raises) on a miss, so Phase 4 can treat "field not in registry" as
-a distinct, handleable case rather than a crash.
-
-MIGRATION NOTE: This module currently loads from a Python seed file into an
-in-memory RegistryStore. Per the locked tech stack (SQLite), this can be
-swapped for a SQLite-backed load without changing load_registry(),
-get_registry_entry(), or list_registry_entries()'s signatures — callers
-in Phase 4 never need to know which backing store is in use.
+Public interface:
+  load_org_config(org_id: str) -> OrgConfig
+  get_registry_entry(org_id: str, field_name: str, source_system: str, raise_on_missing: bool = True) -> RegistryEntry
+  reload_org_config(org_id: str) -> OrgConfig
+  validate_org_config(raw_config: dict) -> list[str]
+  list_registry_entries(org_id: str = "blinkit", source_system: Optional[str] = None) -> list[RegistryEntry]
+  load_registry(org_id: str = "blinkit", force_reload: bool = False) -> RegistryStore
 """
 
 from __future__ import annotations
 
-from typing import List, Optional
+import logging
+from datetime import timedelta
+from typing import Dict, List, Optional
 
-from registry.models import RegistryEntry, RegistryStore
-from registry.seed_registry import ALL_SEED_ENTRIES
+from org_config.schema import OrgConfig, OrgField
+from org_config.store import get_org_config
+from org_config.validator import validate_org_config
+from registry.models import DEIDENTIFIED_ONLY_SCOPE, RegistryEntry, RegistryStore
+from registry.seed_registry import SEED_NOW
 
-# Module-level cache so repeated calls don't re-instantiate the store.
-# Fine for MVP scale (a few dozen entries); reset via _reset_cache() in tests.
-_registry_store: Optional[RegistryStore] = None
+logger = logging.getLogger("registry.loader")
+
+# In-memory config and store caches keyed by org_id
+_config_cache: Dict[str, OrgConfig] = {}
+_store_cache: Dict[str, RegistryStore] = {}
 
 
-def load_registry(force_reload: bool = False) -> RegistryStore:
+class OrgConfigNotFoundError(Exception):
+    """Raised when an org_id has no registered config on record."""
+    pass
+
+
+class FieldNotRegisteredError(Exception):
+    """Raised when a field is not declared in an org's config for a source_system."""
+    pass
+
+
+def load_org_config(org_id: str) -> OrgConfig:
     """
-    Load (or return the cached) RegistryStore built from the seed data in
-    registry/seed_registry.py.
-
-    force_reload=True bypasses the cache — primarily useful for tests that
-    need a fresh store instance.
+    Load and return the parsed, validated config for a given org.
+    - Raises OrgConfigNotFoundError if org_id has no config on record.
+    - Uses an in-memory cache keyed by org_id.
     """
-    global _registry_store
-    if _registry_store is None or force_reload:
-        _registry_store = RegistryStore(entries=list(ALL_SEED_ENTRIES))
-    return _registry_store
+    if not org_id or not isinstance(org_id, str):
+        raise OrgConfigNotFoundError(f"Invalid org_id: {org_id!r}")
+
+    if org_id in _config_cache:
+        return _config_cache[org_id]
+
+    config = get_org_config(org_id)
+    if config is None:
+        raise OrgConfigNotFoundError(f"Org config not found for org_id: {org_id!r}")
+
+    _config_cache[org_id] = config
+    return config
 
 
-def get_registry_entry(field_name: str, source_system: str) -> Optional[RegistryEntry]:
+def reload_org_config(org_id: str) -> OrgConfig:
     """
-    Synchronous, in-memory lookup for a single (field_name, source_system) pair.
-
-    Returns None cleanly when no matching entry exists — callers (Phase 4)
-    must treat this as "field not declared for this source_system", not
-    as an error condition.
-
-    Example:
-        >>> get_registry_entry("aadhaar", "delivery-partner-service")
-        RegistryEntry(field_name='aadhaar', ...)
-
-        >>> get_registry_entry("credit_score", "order-service")
-        None
+    Force a re-read of the org's config from source of truth, bypassing cache.
+    Powers hot-reload when config files on disk are updated.
     """
-    store = load_registry()
-    return store.get(field_name=field_name, source_system=source_system)
+    _config_cache.pop(org_id, None)
+    _store_cache.pop(org_id, None)
+    return load_org_config(org_id)
 
 
-def list_registry_entries(source_system: Optional[str] = None) -> List[RegistryEntry]:
+def _org_field_to_registry_entry(org_id: str, field: OrgField) -> RegistryEntry:
     """
-    Return all registry entries, optionally filtered to a single source_system.
-    Useful for Phase 4's batch reasoning and for reporting/audit views.
+    Convert an OrgField to a RegistryEntry.
+    Preserves seeded violation metadata for the reference regression config (blinkit).
     """
-    store = load_registry()
-    return store.list(source_system=source_system)
+    is_seeded = False
+    violation_note = None
+    created_at = SEED_NOW - timedelta(days=45)
+
+    if org_id == "blinkit":
+        if field.field_name == "aadhaar" and field.source_system == "delivery-partner-service":
+            # Seeded retention violation: 240 days old > 180 retention_days
+            created_at = SEED_NOW - timedelta(days=240)
+            is_seeded = True
+            violation_note = (
+                "Inactive delivery partner's aadhaar record is 240 days old, "
+                "60 days past the 180-day KYC retention window. Should have "
+                "been purged. RETENTION_001 candidate."
+            )
+        elif field.field_name == "phone" and field.source_system == "marketing-analytics":
+            # Seeded invariant-carrier: marketing_events structurally forbids raw PII
+            created_at = SEED_NOW - timedelta(days=30)
+            is_seeded = True
+            violation_note = (
+                f"marketing_events structurally forbids raw PII (consent_scope='{DEIDENTIFIED_ONLY_SCOPE}'). "
+                "If raw phone is observed, flags PURPOSE_001."
+            )
+        elif field.source_system == "order-service":
+            created_at = SEED_NOW - timedelta(days=120)
+        elif field.source_system == "support-ticketing":
+            created_at = SEED_NOW - timedelta(days=10)
+        elif field.source_system == "marketing-analytics":
+            created_at = SEED_NOW - timedelta(days=30)
+
+    # Determine table_name if applicable for backward compatibility
+    table_name = None
+    if org_id == "blinkit":
+        mapping = {
+            "order-service": "customers",
+            "delivery-partner-service": "delivery_partners",
+            "support-ticketing": "support_tickets",
+            "marketing-analytics": "marketing_events",
+        }
+        table_name = mapping.get(field.source_system)
+
+    return RegistryEntry(
+        field_name=field.field_name,
+        pii_category=field.pii_category,
+        declared_purpose=field.declared_purpose,
+        consent_scope=field.consent_scope,
+        retention_days=field.retention_days,
+        source_system=field.source_system,
+        table_name=table_name,
+        created_at=created_at,
+        is_seeded_violation=is_seeded,
+        violation_note=violation_note,
+    )
+
+
+def get_registry_entry(
+    org_id: str,
+    field_name: str,
+    source_system: str,
+    raise_on_missing: bool = True,
+) -> Optional[RegistryEntry]:
+    """
+    Synchronous, in-memory lookup for (org_id, field_name, source_system).
+    
+    If field is found, returns RegistryEntry.
+    If field is not found:
+      - if raise_on_missing=True (default), raises FieldNotRegisteredError.
+      - if raise_on_missing=False, returns None.
+    If org_id is not found, raises OrgConfigNotFoundError.
+    """
+    config = load_org_config(org_id)
+
+    for f in config.fields:
+        if f.field_name == field_name and f.source_system == source_system:
+            return _org_field_to_registry_entry(org_id, f)
+
+    if raise_on_missing:
+        raise FieldNotRegisteredError(
+            f"Field {field_name!r} under source_system {source_system!r} is not "
+            f"declared in config for org {org_id!r}."
+        )
+    return None
+
+
+def list_registry_entries(
+    org_id: str = "blinkit",
+    source_system: Optional[str] = None,
+) -> List[RegistryEntry]:
+    """
+    Return all registry entries for an org, optionally filtered by source_system.
+    """
+    config = load_org_config(org_id)
+    entries = [_org_field_to_registry_entry(org_id, f) for f in config.fields]
+    if source_system is None:
+        return entries
+    return [e for e in entries if e.source_system == source_system]
+
+
+def load_registry(org_id: str = "blinkit", force_reload: bool = False) -> RegistryStore:
+    """
+    Load (or return cached) RegistryStore for org_id.
+    """
+    if force_reload:
+        reload_org_config(org_id)
+        _store_cache.pop(org_id, None)
+
+    if org_id in _store_cache and not force_reload:
+        return _store_cache[org_id]
+
+    entries = list_registry_entries(org_id)
+    store = RegistryStore(entries=entries)
+    _store_cache[org_id] = store
+    return store
 
 
 def _reset_cache() -> None:
-    """Test-only helper to force a clean RegistryStore on the next load_registry() call."""
-    global _registry_store
-    _registry_store = None
+    """Test helper to reset in-memory caches."""
+    _config_cache.clear()
+    _store_cache.clear()

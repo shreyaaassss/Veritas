@@ -96,7 +96,7 @@ class TestSeededRetentionViolation:
         is_past_retention() helper on the same underlying data.
         """
         from registry.loader import get_registry_entry
-        entry = get_registry_entry("aadhaar", "delivery-partner-service")
+        entry = get_registry_entry("blinkit", "aadhaar", "delivery-partner-service")
         assert entry.is_seeded_violation is True
         assert entry.is_past_retention() is True
 
@@ -145,7 +145,7 @@ class TestSeededMarketingPurposeCase:
         documented tension — both facts are true simultaneously.
         """
         from registry.loader import get_registry_entry
-        entry = get_registry_entry("phone", "marketing-analytics")
+        entry = get_registry_entry("blinkit", "phone", "marketing-analytics")
         assert entry is not None
         assert entry.forbids_raw_pii() is True
 

@@ -113,13 +113,12 @@ def upload_org_config(org_id: str, config_dict: Dict[str, Any]) -> Dict[str, Any
             ],
         }
 
-    try:
-        validate_org_config(config_dict)
-    except OrgConfigValidationError as e:
+    errors = validate_org_config(config_dict)
+    if errors:
         logger.warning(
-            "Rejected config upload for org_id=%r: %d error(s)", org_id, len(e.errors)
+            "Rejected config upload for org_id=%r: %d error(s)", org_id, len(errors)
         )
-        return {"status": "error", "org_id": org_id, "errors": e.errors}
+        return {"status": "error", "org_id": org_id, "errors": errors}
 
     # Validation passed — persist to disk
     filename = _timestamp_filename()
@@ -155,14 +154,22 @@ def get_org_config(org_id: str) -> Optional[OrgConfig]:
     with open(path, "r", encoding="utf-8") as f:
         raw = yaml.safe_load(f)
 
-    try:
-        config = validate_org_config(raw)
-    except OrgConfigValidationError as e:
+    if not isinstance(raw, dict):
+        return None
+
+    errors = validate_org_config(raw)
+    if errors:
         logger.warning(
             "Stored config for org_id=%r at %s failed re-validation: %s. "
             "This suggests the file was manually edited after upload.",
-            org_id, path, e.errors,
+            org_id, path, errors,
         )
+        return None
+
+    try:
+        config = OrgConfig(**raw)
+    except Exception as e:
+        logger.warning("Stored config for org_id=%r failed parsing: %s", org_id, e)
         return None
 
     return config

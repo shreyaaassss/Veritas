@@ -97,7 +97,11 @@ from datetime import datetime, timezone
 from typing import List, Optional
 
 from detection.models import DetectedEvent, MatchedEntity
-from registry.loader import get_registry_entry
+from registry.loader import (
+    FieldNotRegisteredError,
+    OrgConfigNotFoundError,
+    get_registry_entry,
+)
 from registry.models import RegistryEntry
 from rules.sensitivity import (
     BREACH_NOTIFICATION_ELIGIBLE_CATEGORIES,
@@ -267,10 +271,16 @@ def _check_2_purpose(detected: DetectedEvent, match: MatchedEntity) -> Optional[
     event = detected.event
     pii_category = entity_type_to_pii_category(match.entity_type)
 
-    # Phase 0: source_system is now a plain str — no .value needed.
-    entry: Optional[RegistryEntry] = get_registry_entry(
-        field_name=match.field, source_system=event.source_system
-    )
+    # Phase 1: get_registry_entry is now keyed by org_id (event.tenant_id)
+    try:
+        entry: Optional[RegistryEntry] = get_registry_entry(
+            org_id=event.tenant_id,
+            field_name=match.field,
+            source_system=event.source_system,
+            raise_on_missing=True,
+        )
+    except (FieldNotRegisteredError, OrgConfigNotFoundError):
+        entry = None
 
     if entry is None:
         # UNREGISTERED FIELD — Design Decision #2: treated as a violation,
@@ -350,10 +360,16 @@ def _check_3_retention(detected: DetectedEvent, match: MatchedEntity) -> Optiona
     """
     event = detected.event
 
-    # Phase 0: source_system is now a plain str — no .value needed.
-    entry: Optional[RegistryEntry] = get_registry_entry(
-        field_name=match.field, source_system=event.source_system
-    )
+    # Phase 1: get_registry_entry is now keyed by org_id (event.tenant_id)
+    try:
+        entry: Optional[RegistryEntry] = get_registry_entry(
+            org_id=event.tenant_id,
+            field_name=match.field,
+            source_system=event.source_system,
+            raise_on_missing=True,
+        )
+    except (FieldNotRegisteredError, OrgConfigNotFoundError):
+        entry = None
     if entry is None:
         # Should not happen in practice — Check 2 already returned a
         # verdict for the no-entry case before Check 3 ever runs (see
