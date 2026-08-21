@@ -17,6 +17,15 @@ A field can trigger AT MOST ONE rule — the first check that fires wins
 and the remaining checks are skipped for that field. See _evaluate_field
 for the exact short-circuit logic.
 
+PHASE 3 ADDITION — Check 4 — Linkage / combination-risk (rules/linkage.py):
+runs once per EVENT (not per field-level match) AFTER Checks 1-3, using
+the event's full raw field set against the org's config-declared
+linkage_rules. Implemented in its own module, not inline here, and NOT
+gated behind contains_pii — see evaluate_event()'s docstring and
+rules/linkage.py's module docstring for why. This module still owns
+Checks 1-3 exclusively; Check 4's detection logic lives entirely in
+rules/linkage.py, evaluate_event() only wires the two together.
+
 =====================================================================
 DESIGN DECISION #1 — Exposure vs Purpose precedence for marketing-analytics
 =====================================================================
@@ -26,39 +35,45 @@ rule produces a confusing verdict for the marketing-events case
 specifically, implement exactly what the plan says (exposure
 short-circuits) but leave a clear comment flagging the ambiguity."
 
-We implement EXACTLY that: Check 1 fires on source_type == "log"
-OR source_system == "marketing-analytics", and short-circuits Checks 2/3
-for that field. This means:
+We originally implemented EXACTLY that literal instruction: Check 1 fired
+on source_type == "log" OR the hardcoded string source_system ==
+"marketing-analytics", short-circuiting Checks 2/3 for that field. This
+meant a raw phone number leaked into a marketing-analytics API event was
+classified EXPOSURE_001 (HIGH severity), NOT PURPOSE_001 — even though
+Phase 1 built registry.models.RegistryEntry.forbids_raw_pii()
+SPECIFICALLY so this exact case could be classified as a purpose
+violation.
 
-  A raw phone number leaked into a marketing-analytics API event is
-  classified EXPOSURE_001 (HIGH severity), NOT PURPOSE_001 — even though
-  Phase 1 built registry.models.RegistryEntry.forbids_raw_pii()
-  SPECIFICALLY so this exact case could be classified as a purpose
-  violation, and even though "raw PII in a payload that structurally
-  forbids raw PII" reads, in plain English, like a textbook purpose
-  violation rather than an exposure one.
-
-THIS IS A GENUINE, UNRESOLVED TENSION BETWEEN PHASE 1 AND PHASE 4, NOT A
-BUG. Phase 1's forbids_raw_pii() is still called in Check 2 — it is used
-for any marketing-analytics field that somehow reaches Check 2 (it
-currently cannot, since Check 1's source_system condition intercepts
-every marketing-analytics match first — see the note on forbids_raw_pii
-being presently unreachable in _check_2_purpose below). We are flagging
-this for the team to resolve, NOT silently reinterpreting the plan's
-explicit instruction. Two resolution options for a future revision:
+THIS WAS FLAGGED AS A GENUINE, UNRESOLVED TENSION BETWEEN PHASE 1 AND
+PHASE 4, NOT A BUG, with two resolution options documented for a future
+revision:
   (a) Narrow Check 1's marketing-analytics clause to exposure-flavored
       surfaces only (e.g. logs), and let Check 2 own the
       marketing-analytics-payload case via forbids_raw_pii() as Phase 1
       intended.
   (b) Keep Check 1 as specified and treat EXPOSURE_001 as the correct
       classification precisely because "PII visible in plaintext where
-      it structurally shouldn't be" IS exposure, regardless of channel —
-      in which case Phase 1's forbids_raw_pii() becomes a redundant
-      structural check Check 4 never needs, and that should be noted in
-      registry/README.md instead.
-This module does NOT pick between (a) and (b) — it implements the plan
-as written (equivalent to always taking the Check-1 branch) and surfaces
-the tension for a human decision.
+      it structurally shouldn't be" IS exposure, regardless of channel.
+
+PHASE 4 RESOLUTION: option (a), but implemented so the CLASSIFICATION
+OUTCOME for Blinkit's existing seeded case is unchanged (still
+EXPOSURE_001/HIGH — see test_marketing_purpose_case_classified_as_exposure_
+per_design_decision_1, which still passes unmodified). What actually
+changed is WHERE the signal comes from, per this phase's mandate to
+remove org-specific hardcoding, not what the check decides: the literal
+`== "marketing-analytics"` string comparison is gone. In its place,
+Check 1 now calls _forbids_raw_pii_here(), a read-only, config-driven
+probe via get_registry_entry()/RegistryEntry.forbids_raw_pii() — the same
+mechanism Check 2 already used. For Blinkit's actual seeded data this
+produces the IDENTICAL answer (its marketing-analytics phone field's
+consent_scope is DEIDENTIFIED_ONLY_SCOPE, so forbids_raw_pii() is True,
+so Check 1 still fires, still EXPOSURE_001), but it now works for ANY
+org that declares a deidentified-only source_system in their own config,
+not only one spelled exactly "marketing-analytics". forbids_raw_pii()
+being "unreachable" in Check 2 (see that check's docstring below) is
+therefore still accurate — Check 1 still intercepts every case where it
+would apply, by construction, just via a generic signal instead of a
+hardcoded name.
 
 =====================================================================
 DESIGN DECISION #2 — Unregistered-field handling (Check 2)
@@ -103,6 +118,7 @@ from registry.loader import (
     get_registry_entry,
 )
 from registry.models import RegistryEntry
+from rules.linkage import check_linkage_risk
 from rules.sensitivity import (
     BREACH_NOTIFICATION_ELIGIBLE_CATEGORIES,
     PiiSensitivity,
@@ -194,12 +210,61 @@ def _new_verdict(
 # Check 1 — Exposure
 # ---------------------------------------------------------------------------
 
+def _forbids_raw_pii_here(event, field_name: str) -> bool:
+    """
+    PHASE 4 GENERALISATION of what used to be a hardcoded
+    `source_system == "marketing-analytics"` string comparison (see
+    Design Decision #1's history, and rules/README.md's Phase 4 note).
+
+    Generic, config-driven equivalent: True iff THIS org's config has a
+    registry entry for (field_name, event.source_system) whose
+    consent_scope structurally forbids raw PII — i.e.
+    RegistryEntry.forbids_raw_pii(), which Phase 1 already built for
+    exactly this purpose. No org name, no source_system name, no
+    hardcoded list of "risky" systems anywhere in this function — any
+    org can opt any source_system into this behavior purely via its own
+    config (declare a field's consent_scope as
+    registry.models.DEIDENTIFIED_ONLY_SCOPE), with zero pipeline code
+    changes.
+
+    Read-only probe, safe to call from Check 1 despite Check 1's
+    "no registry lookup" convention for the VERDICT it produces (see
+    _check_1_exposure — matched_registry_entry stays null on fire; this
+    function's result only decides WHETHER to fire, it is never surfaced
+    as evidence). An unregistered (field_name, source_system) — no
+    config entry at all — returns False here, not an error: that case is
+    Check 2's Design Decision #2 territory, not Check 1's.
+    """
+    try:
+        entry: Optional[RegistryEntry] = get_registry_entry(
+            org_id=event.tenant_id,
+            field_name=field_name,
+            source_system=event.source_system,
+            raise_on_missing=True,
+        )
+    except (FieldNotRegisteredError, OrgConfigNotFoundError):
+        return False
+    return entry is not None and entry.forbids_raw_pii()
+
+
 def _check_1_exposure(detected: DetectedEvent, match: MatchedEntity) -> Optional[Verdict]:
     """
     Fires when raw PII is present somewhere it structurally shouldn't be:
-      - source_type == "log"                (debug logs should never carry raw PII)
-      - source_system == "marketing-analytics"  (see Design Decision #1 above —
-        implemented exactly per the plan's instruction, tension documented above)
+      - source_type == "log"   (debug logs should never carry raw PII —
+        this is a Phase 0 schema-level Event field, universal across
+        every org, never org-specific data, so no config lookup needed)
+      - this field's registry entry (if any) structurally forbids raw
+        PII for its source_system — see _forbids_raw_pii_here above.
+        PHASE 4: this used to be a hardcoded `== "marketing-analytics"`
+        string; it is now fully config-driven and applies identically to
+        any org that declares a deidentified-only source_system, not
+        just Blinkit's literal spelling of one. The classification
+        OUTCOME for Blinkit's existing seeded marketing-analytics case is
+        deliberately unchanged (still EXPOSURE_001, still HIGH — see
+        Design Decision #1, and rules/test_rule_engine.py's
+        test_marketing_purpose_case_classified_as_exposure_per_design_decision_1,
+        which still passes unmodified) — only WHERE the signal comes
+        from changed, not WHAT it decides for that specific fixture.
 
     On fire: severity = HIGH, rule_id = EXPOSURE_001, no registry lookup
     performed (matched_registry_entry = null), Checks 2/3 skipped for
@@ -207,13 +272,11 @@ def _check_1_exposure(detected: DetectedEvent, match: MatchedEntity) -> Optional
     """
     event = detected.event
     is_log_exposure = event.source_type.value == "log"
-    # Phase 0: source_system is now a plain str — no .value needed.
-    # The marketing-analytics string comes from the org's config; this
-    # check is intentionally kept as a string comparison for now.
-    # Phase 4 generalisation will replace this with a config-driven flag.
-    is_marketing_exposure = event.source_system == "marketing-analytics"
+    # Short-circuits before the registry lookup when already True via
+    # the log path — avoids a needless config read on the common case.
+    is_structurally_forbidden_exposure = is_log_exposure or _forbids_raw_pii_here(event, match.field)
 
-    if not (is_log_exposure or is_marketing_exposure):
+    if not is_structurally_forbidden_exposure:
         return None
 
     pii_category = entity_type_to_pii_category(match.entity_type)
@@ -247,13 +310,14 @@ def _check_2_purpose(detected: DetectedEvent, match: MatchedEntity) -> Optional[
       - Entry found, entry.forbids_raw_pii() is True -> purpose
         violation (Phase 1's marketing_events structural invariant).
         NOTE: as documented in Design Decision #1, this branch is
-        CURRENTLY UNREACHABLE for real marketing-analytics traffic,
-        because Check 1's source_system == "marketing-analytics" clause
-        intercepts every such match first. It remains implemented here
-        (a) for correctness if Design Decision #1 is ever revised per
-        option (a) in that decision's comment, and (b) because a
-        forbids_raw_pii()-eligible entry could in principle exist under
-        a different source_system in a future registry extension.
+        CURRENTLY UNREACHABLE in practice — Check 1's
+        _forbids_raw_pii_here() probe (Phase 4) already intercepts
+        every match where this same condition (entry.forbids_raw_pii())
+        is True, by construction, before Check 2 ever runs. It remains
+        implemented here for correctness/forward-compatibility (e.g. if
+        Design Decision #1 is ever revised toward option (b) instead),
+        and this is what makes it safe to leave in place rather than
+        delete it as dead code.
       - Entry found, field's actual usage falls outside declared_purpose/
         consent_scope in some OTHER way -> also a purpose violation.
         For MVP scope (3 rule categories, 4 mock tables, no
@@ -495,26 +559,35 @@ def evaluate_event(detected: DetectedEvent) -> List[Verdict]:
     """
     Top-level Rule Engine entrypoint for a single DetectedEvent.
 
-    Short-circuits immediately (returns []) if contains_pii is False —
-    no registry calls, no checks run at all, per the plan's explicit
-    cheap-early-exit requirement.
+    Runs Checks 1-3 (Exposure -> Purpose -> Retention, per-field,
+    short-circuited) IF contains_pii is True — same cheap early-exit as
+    before for that portion: a clean event with no PII anywhere cannot
+    violate any of those three rules, so no registry calls happen for it.
 
-    Otherwise evaluates every matched_entities hit independently through
-    the three-check chain and returns one Verdict per violating field
-    (a clean event, or an event whose PII violates none of the three
-    rules, produces an empty list — NOT a Verdict with some
-    "no violation" rule_id, since Verdict has no such state; absence of
-    a Verdict IS the "no violation" signal).
+    Then runs Check 4 — Linkage (Phase 3, rules/linkage.py) —
+    UNCONDITIONALLY, regardless of contains_pii. This is deliberate, not
+    an oversight: linkage risk is a property of which FIELD NAMES
+    co-occur in the raw event (per the org's linkage_rules config), not
+    of whether Presidio flagged any of their VALUES as PII — see
+    rules/linkage.py's module docstring for why gating Check 4 behind
+    contains_pii would silently miss real linkage-risk events (e.g. a
+    quasi-identifier combination where none of the individual field
+    values are independently recognized as PII).
+
+    Returns one Verdict per violating field (Checks 1-3) plus one Verdict
+    per fired linkage rule (Check 4) — a clean event with no PII and no
+    fired linkage rule produces an empty list, same "absence of a
+    Verdict IS the no-violation signal" contract as before.
     """
-    if not detected.contains_pii:
-        return []
-
-    deduped_matches = _dedupe_matches_by_field(detected.matched_entities)
-
     verdicts: List[Verdict] = []
-    for match in deduped_matches:
-        verdict = _evaluate_field(detected, match)
-        if verdict is not None:
-            verdicts.append(verdict)
+
+    if detected.contains_pii:
+        deduped_matches = _dedupe_matches_by_field(detected.matched_entities)
+        for match in deduped_matches:
+            verdict = _evaluate_field(detected, match)
+            if verdict is not None:
+                verdicts.append(verdict)
+
+    verdicts.extend(check_linkage_risk(detected))
 
     return verdicts

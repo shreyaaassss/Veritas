@@ -59,11 +59,11 @@ class RuleId(str, Enum):
     Out-of-scope rules (consent-notice validity, DPO governance, etc.) are
     documented in /docs/scope.md — do not add new rule IDs here without
     updating scope.md and the rule engine simultaneously.
-    LINKAGE_001 is planned for Phase 3 — not added here yet.
     """
     EXPOSURE_001  = "EXPOSURE_001"   # PII exposed in log / API response
     PURPOSE_001   = "PURPOSE_001"    # Data used beyond declared consent purpose
     RETENTION_001 = "RETENTION_001"  # Data retained past consent expiry window
+    LINKAGE_001   = "LINKAGE_001"    # Phase 3: quasi-identifier combination / linkage risk (rules/linkage.py)
 
 
 class Severity(str, Enum):
