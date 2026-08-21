@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Veritas — DPDPA Compliance Dashboard | Blinkit</title>
+  <meta name="description" content="Real-time DPDPA compliance monitoring for Blinkit. Live violation feed, tamper-evident evidence store, and auditor-grade remediation tracking." />
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+    :root {
+      --bg: #0a0d14;
+      --surface: #111623;
+      --surface2: #1a2035;
+      --surface3: #222b42;
+      --border: #2a3555;
+      --border2: #3a4a6b;
+      --text: #e2e8f0;
+      --text2: #94a3b8;
+      --text3: #64748b;
+      --accent: #ffffff;
+      --accent2: #818cf8;
+      --accent-glow: rgba(99,102,241,0.15);
+      --high: #ef4444;
+      --high-bg: rgba(239,68,68,0.12);
+      --medium: #f59e0b;
+      --medium-bg: rgba(245,158,11,0.12);
+      --low: #22c55e;
+      --low-bg: rgba(34,197,94,0.12);
+      --open: #94a3b8;
+      --ack: #f59e0b;
+      --resolved: #22c55e;
+      --breach: #f87171;
+      --radius: 10px;
+      --radius-sm: 6px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ---- Header ---- */
+    .header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-brand { display: flex; align-items: center; gap: 12px; }
+    .header-brand .logo {
+      width: 32px; height: 32px;
+      background: linear-gradient(135deg, var(--accent), #a855f7);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+    }
+    .header-brand h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+    .header-brand .sub { font-size: 12px; color: var(--text3); font-weight: 400; }
+    .header-status { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text3); }
+    .ws-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--text3);
+      transition: background 0.3s;
+    }
+    .ws-dot.connected { background: var(--low); box-shadow: 0 0 6px var(--low); }
+    .ws-dot.connecting { background: var(--medium); animation: pulse 1s infinite; }
+
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    /* ---- Tabs ---- */
+    .tabs {
+      display: flex;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 28px;
+      gap: 4px;
+    }
+    .tab {
+      padding: 12px 20px;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text3);
+      transition: all 0.2s;
+      user-select: none;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--accent2); border-bottom-color: var(--accent); }
+
+    /* ---- Main layout ---- */
+    .main { flex: 1; padding: 24px 28px; display: none; flex-direction: column; gap: 20px; }
+    .main.active { display: flex; }
+
+    /* ---- Stats bar ---- */
+    .stats-bar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      transition: border-color 0.2s;
+    }
+    .stat-card:hover { border-color: var(--border2); }
+    .stat-card .label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+    .stat-card .value { font-size: 26px; font-weight: 700; line-height: 1; }
+    .stat-card .value.high { color: var(--high); }
+    .stat-card .value.medium { color: var(--medium); }
+    .stat-card .value.breach { color: var(--breach); }
+    .stat-card .value.accent { color: var(--accent2); }
+
+    /* ---- Section headings ---- */
+    .section-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .section-header h2 { font-size: 15px; font-weight: 600; }
+
+    /* ---- Violation card (live feed) ---- */
+    .violation-list { display: flex; flex-direction: column; gap: 10px; max-height: 70vh; overflow-y: auto; }
+    .violation-list::-webkit-scrollbar { width: 4px; }
+    .violation-list::-webkit-scrollbar-track { background: var(--surface); }
+    .violation-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+    .violation-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      animation: slideIn 0.3s ease;
+      transition: border-color 0.2s, transform 0.1s;
+    }
+    .violation-card:hover { border-color: var(--border2); transform: translateX(2px); }
+    .violation-card.HIGH { border-left-color: var(--high); background: linear-gradient(90deg, var(--high-bg) 0%, var(--surface) 60%); }
+    .violation-card.MEDIUM { border-left-color: var(--medium); background: linear-gradient(90deg, var(--medium-bg) 0%, var(--surface) 60%); }
+    .violation-card.LOW { border-left-color: var(--low); background: linear-gradient(90deg, var(--low-bg) 0%, var(--surface) 60%); }
+
+    @keyframes slideIn { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
+
+    .violation-top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+    .badge {
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .badge.HIGH { background: var(--high-bg); color: var(--high); }
+    .badge.MEDIUM { background: var(--medium-bg); color: var(--medium); }
+    .badge.LOW { background: var(--low-bg); color: var(--low); }
+    .badge.rule { background: var(--accent-glow); color: var(--accent2); }
+    .badge.system { background: rgba(148,163,184,0.08); color: var(--text2); }
+    .badge.breach { background: rgba(248,113,113,0.15); color: var(--breach); border: 1px solid var(--breach); }
+    .badge.fallback { background: rgba(245,158,11,0.1); color: var(--medium); }
+
+    .violation-field { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text2); }
+    .violation-explanation { font-size: 13px; color: var(--text2); margin-top: 6px; line-height: 1.5; }
+    .violation-section { font-size: 11px; color: var(--text3); margin-top: 4px; font-style: italic; }
+    .violation-time { font-size: 11px; color: var(--text3); margin-left: auto; white-space: nowrap; }
+
+    /* ---- Filters ---- */
+    .filters {
+      display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+    }
+    .filters label { font-size: 12px; color: var(--text3); margin-right: 4px; }
+    .filters select, .filters input {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: var(--radius-sm);
+      padding: 6px 10px;
+      font-size: 13px;
+      font-family: inherit;
+      outline: none;
+      cursor: pointer;
+    }
+    .filters select:focus, .filters input:focus { border-color: var(--accent); }
+    .btn {
+      padding: 7px 14px;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent2); }
+    .btn-secondary { background: var(--surface2); color: var(--text2); border: 1px solid var(--border); }
+    .btn-secondary:hover { border-color: var(--border2); color: var(--text); }
+    .btn-verify { background: transparent; color: var(--accent2); border: 1px solid var(--accent); }
+    .btn-verify:hover { background: var(--accent-glow); }
+    .btn-danger { background: var(--high-bg); color: var(--high); border: 1px solid var(--high); font-size: 12px; padding: 4px 10px; }
+    .btn-warn { background: var(--medium-bg); color: var(--medium); border: 1px solid var(--medium); font-size: 12px; padding: 4px 10px; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ---- Audit table ---- */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead tr { background: var(--surface2); }
+    th { padding: 10px 14px; text-align: left; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text3); border-bottom: 1px solid var(--border); white-space: nowrap; }
+    td { padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    tr:hover td { background: var(--surface2); }
+    .mono { font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+    .status-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;
+    }
+    .status-badge.OPEN { background: rgba(148,163,184,0.1); color: var(--open); }
+    .status-badge.ACKNOWLEDGED { background: var(--medium-bg); color: var(--medium); }
+    .status-badge.RESOLVED { background: var(--low-bg); color: var(--resolved); }
+
+    /* ---- Integrity panel ---- */
+    .integrity-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .integrity-result {
+      font-size: 14px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .integrity-result.valid { color: var(--low); }
+    .integrity-result.invalid { color: var(--high); }
+
+    /* ---- Detail drawer ---- */
+    .drawer-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 200;
+    }
+    .drawer-overlay.open { display: block; }
+    .drawer {
+      position: fixed;
+      right: 0; top: 0; bottom: 0;
+      width: min(520px, 100vw);
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+      padding: 24px;
+      overflow-y: auto;
+      z-index: 201;
+      transform: translateX(100%);
+      transition: transform 0.25s ease;
+    }
+    .drawer.open { transform: translateX(0); }
+    .drawer h3 { font-size: 16px; font-weight: 700; margin-bottom: 16px; }
+    .drawer-close { float: right; cursor: pointer; color: var(--text3); font-size: 20px; line-height: 1; }
+    .drawer-close:hover { color: var(--text); }
+    .drawer-field { margin-bottom: 14px; }
+    .drawer-field .lbl { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+    .drawer-field .val { font-size: 13px; color: var(--text); }
+    .drawer-field .val.mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; word-break: break-all; }
+    .drawer-field .explanation-text { font-size: 13px; color: var(--text2); line-height: 1.6; }
+    .drawer-actions { display: flex; gap: 8px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+
+    /* ---- Empty state ---- */
+    .empty {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text3);
+      font-size: 14px;
+    }
+    .empty .icon { font-size: 40px; margin-bottom: 12px; }
+
+    /* ---- Toast ---- */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 18px;
+      font-size: 13px;
+      z-index: 300;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: all 0.25s;
+      pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.success { border-color: var(--low); color: var(--low); }
+    .toast.error { border-color: var(--high); color: var(--high); }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-brand">
+    <div class="logo">⚖️</div>
+    <div>
+      <h1>Veritas</h1>
+      <div class="sub">DPDPA Compliance Monitor · Blinkit</div>
+    </div>
+  </div>
+  <div class="header-status">
+    <div class="ws-dot connecting" id="wsDot"></div>
+    <span id="wsLabel">Connecting…</span>
+  </div>
+</header>
+
+<nav class="tabs">
+  <div class="tab active" id="tab-live" onclick="showTab('live')">📡 Live Feed</div>
+  <div class="tab" id="tab-audit" onclick="showTab('audit')">🔍 Evidence / Audit</div>
+</nav>
+
+<!-- ====== LIVE FEED TAB ====== -->
+<main class="main active" id="main-live">
+  <div class="stats-bar" id="statsBar">
+    <div class="stat-card"><div class="label">Total Violations</div><div class="value accent" id="st-total">0</div></div>
+    <div class="stat-card"><div class="label">High Severity</div><div class="value high" id="st-high">0</div></div>
+    <div class="stat-card"><div class="label">Medium</div><div class="value medium" id="st-medium">0</div></div>
+    <div class="stat-card"><div class="label">Breach Candidates</div><div class="value breach" id="st-breach">0</div></div>
+    <div class="stat-card"><div class="label">Exposure (E001)</div><div class="value accent" id="st-e001">0</div></div>
+    <div class="stat-card"><div class="label">Purpose (P001)</div><div class="value accent" id="st-p001">0</div></div>
+    <div class="stat-card"><div class="label">Retention (R001)</div><div class="value accent" id="st-r001">0</div></div>
+  </div>
+  <div class="section-header">
+    <h2>Live Violation Stream</h2>
+    <button class="btn btn-secondary" onclick="clearFeed()">Clear</button>
+  </div>
+  <div class="violation-list" id="violationList">
+    <div class="empty" id="liveFeedEmpty"><div class="icon">📡</div>Waiting for violations…<br/><small>Start the pipeline to see events here.</small></div>
+  </div>
+</main>
+
+<!-- ====== AUDIT TAB ====== -->
+<main class="main" id="main-audit">
+  <!-- Integrity check -->
+  <div class="integrity-panel">
+    <button class="btn btn-verify" onclick="runVerifyChain()">🔐 Verify Evidence Integrity</button>
+    <div class="integrity-result" id="integrityResult"></div>
+    <span style="margin-left:auto;font-size:12px;color:var(--text3)" id="integrityTime"></span>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters">
+    <div>
+      <label>Source System</label>
+      <select id="f-system">
+        <option value="">All Systems</option>
+        <option value="order-service">order-service</option>
+        <option value="delivery-partner-service">delivery-partner-service</option>
+        <option value="support-ticketing">support-ticketing</option>
+        <option value="marketing-analytics">marketing-analytics</option>
+      </select>
+    </div>
+    <div>
+      <label>Severity</label>
+      <select id="f-severity">
+        <option value="">All</option>
+        <option value="HIGH">HIGH</option>
+        <option value="MEDIUM">MEDIUM</option>
+        <option value="LOW">LOW</option>
+      </select>
+    </div>
+    <div>
+      <label>Status</label>
+      <select id="f-status">
+        <option value="">All</option>
+        <option value="OPEN">OPEN</option>
+        <option value="ACKNOWLEDGED">ACKNOWLEDGED</option>
+        <option value="RESOLVED">RESOLVED</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" onclick="loadAuditTable()">Apply</button>
+    <button class="btn btn-secondary" onclick="resetFilters()">Reset</button>
+    <span id="auditCount" style="margin-left:auto;font-size:12px;color:var(--text3)"></span>
+  </div>
+
+  <!-- Table -->
+  <div class="table-wrap">
+    <table id="auditTable">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Timestamp</th>
+          <th>Rule</th>
+          <th>Severity</th>
+          <th>Field</th>
+          <th>System</th>
+          <th>Status</th>
+          <th>Breach?</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="auditTbody">
+        <tr><td colspan="9" class="empty"><div class="icon">🔍</div>Click "Apply" to load audit records.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</main>
+
+<!-- ====== DETAIL DRAWER ====== -->
+<div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-close" onclick="closeDrawer()">✕</div>
+  <h3>Verdict Detail</h3>
+  <div id="drawerContent"></div>
+</div>
+
+<!-- ====== TOAST ====== -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ---- State ----
+let ws = null;
+let wsConnected = false;
+let localViolations = []; // live feed buffer
+const MAX_FEED = 100;
+
+// ---- Tab switching ----
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.main').forEach(m => m.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  document.getElementById('main-' + name).classList.add('active');
+  if (name === 'audit') { loadAuditTable(); refreshStats(); }
+}
+
+// ---- WebSocket ----
+function connectWS() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}/ws`);
+
+  ws.onopen = () => {
+    wsConnected = true;
+    document.getElementById('wsDot').className = 'ws-dot connected';
+    document.getElementById('wsLabel').textContent = 'Live';
+  };
+
+  ws.onmessage = (evt) => {
+    try {
+      const data = JSON.parse(evt.data);
+      handleLiveViolation(data);
+    } catch(e) {}
+  };
+
+  ws.onclose = () => {
+    wsConnected = false;
+    document.getElementById('wsDot').className = 'ws-dot';
+    document.getElementById('wsLabel').textContent = 'Disconnected — reconnecting…';
+    setTimeout(connectWS, 3000);
+  };
+
+  ws.onerror = () => ws.close();
+}
+
+// ---- Live feed ----
+function handleLiveViolation(v) {
+  localViolations.unshift(v);
+  if (localViolations.length > MAX_FEED) localViolations.pop();
+  renderFeed();
+  refreshStats();
+}
+
+function renderFeed() {
+  const list = document.getElementById('violationList');
+  const empty = document.getElementById('liveFeedEmpty');
+  if (localViolations.length === 0) { empty.style.display = ''; list.innerHTML = ''; list.appendChild(empty); return; }
+  empty.style.display = 'none';
+
+  // Only prepend newest card instead of re-rendering all
+  const v = localViolations[0];
+  const card = buildViolationCard(v);
+  list.insertBefore(card, list.firstChild);
+  // Trim excess DOM nodes
+  while (list.children.length > MAX_FEED) list.removeChild(list.lastChild);
+}
+
+function buildViolationCard(v) {
+  const el = document.createElement('div');
+  el.className = `violation-card ${v.severity || ''}`;
+  const ts = v.timestamp ? new Date(v.timestamp).toLocaleTimeString() : '';
+  const breach = v.breach_notification_candidate ? `<span class="badge breach">⚠ Breach Candidate</span>` : '';
+  const fallback = v.used_fallback ? `<span class="badge fallback">⚡ Template</span>` : '';
+  el.innerHTML = `
+    <div class="violation-top">
+      <span class="badge ${v.severity}">${v.severity}</span>
+      <span class="badge rule">${v.rule_id}</span>
+      <span class="badge system">${v.source_system}</span>
+      <span class="violation-field">${v.field}</span>
+      ${breach}${fallback}
+      <span class="violation-time">${ts}</span>
+    </div>
+    <div class="violation-explanation">${v.explanation || '<em>No explanation</em>'}</div>
+    <div class="violation-section">${v.section_cited || ''}</div>
+  `;
+  return el;
+}
+
+function clearFeed() {
+  localViolations = [];
+  const list = document.getElementById('violationList');
+  const empty = document.getElementById('liveFeedEmpty');
+  empty.style.display = '';
+  list.innerHTML = '';
+  list.appendChild(empty);
+}
+
+// ---- Stats ----
+async function refreshStats() {
+  try {
+    const r = await fetch('/api/stats');
+    const s = await r.json();
+    document.getElementById('st-total').textContent = s.total;
+    document.getElementById('st-high').textContent = s.by_severity?.HIGH || 0;
+    document.getElementById('st-medium').textContent = s.by_severity?.MEDIUM || 0;
+    document.getElementById('st-breach').textContent = s.breach_candidates;
+    document.getElementById('st-e001').textContent = s.by_rule?.EXPOSURE_001 || 0;
+    document.getElementById('st-p001').textContent = s.by_rule?.PURPOSE_001 || 0;
+    document.getElementById('st-r001').textContent = s.by_rule?.RETENTION_001 || 0;
+  } catch(e) {}
+}
+
+// ---- Audit table ----
+async function loadAuditTable() {
+  const system = document.getElementById('f-system').value;
+  const severity = document.getElementById('f-severity').value;
+  const status = document.getElementById('f-status').value;
+
+  const params = new URLSearchParams();
+  if (system) params.set('source_system', system);
+  if (severity) params.set('severity', severity);
+  if (status) params.set('remediation_status', status);
+
+  try {
+    const r = await fetch('/api/verdicts?' + params);
+    const data = await r.json();
+    renderAuditTable(data.verdicts || []);
+    document.getElementById('auditCount').textContent = `${data.count} record${data.count !== 1 ? 's' : ''}`;
+  } catch(e) {
+    showToast('Failed to load audit records', 'error');
+  }
+}
+
+function resetFilters() {
+  document.getElementById('f-system').value = '';
+  document.getElementById('f-severity').value = '';
+  document.getElementById('f-status').value = '';
+  loadAuditTable();
+}
+
+function renderAuditTable(rows) {
+  const tbody = document.getElementById('auditTbody');
+  if (!rows || rows.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="9" class="empty"><div class="icon">🔍</div>No records match the current filters.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = rows.map((v, i) => {
+    const ts = v.timestamp ? new Date(v.timestamp).toLocaleString() : '';
+    const breach = v.breach_notification_candidate ? '⚠' : '';
+    const statusCls = v.remediation_status || 'OPEN';
+    const canAck = statusCls === 'OPEN';
+    const canRes = statusCls === 'ACKNOWLEDGED';
+    return `<tr>
+      <td class="mono">${v.row_index + 1}</td>
+      <td style="white-space:nowrap;font-size:12px">${ts}</td>
+      <td><span class="badge rule">${v.rule_id}</span></td>
+      <td><span class="badge ${v.severity}">${v.severity}</span></td>
+      <td class="mono">${v.field}</td>
+      <td style="font-size:12px">${v.source_system}</td>
+      <td><span class="status-badge ${statusCls}">${statusCls}</span></td>
+      <td style="text-align:center">${breach}</td>
+      <td style="white-space:nowrap;display:flex;gap:6px">
+        <button class="btn btn-secondary" style="font-size:11px;padding:4px 8px" onclick="openDrawer('${v.verdict_id}')">Detail</button>
+        ${canAck ? `<button class="btn btn-warn" onclick="updateStatus('${v.verdict_id}','ACKNOWLEDGED')">Acknowledge</button>` : ''}
+        ${canRes ? `<button class="btn btn-danger" onclick="updateStatus('${v.verdict_id}','RESOLVED')">Resolve</button>` : ''}
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function updateStatus(verdictId, newStatus) {
+  try {
+    const r = await fetch(`/api/verdicts/${verdictId}/status`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({status: newStatus}),
+    });
+    if (!r.ok) {
+      const e = await r.json();
+      showToast(e.detail || 'Update failed', 'error');
+      return;
+    }
+    showToast(`Marked ${newStatus}`, 'success');
+    loadAuditTable();
+    if (document.getElementById('drawer').classList.contains('open')) {
+      openDrawer(verdictId);
+    }
+  } catch(e) {
+    showToast('Network error', 'error');
+  }
+}
+
+// ---- Integrity check ----
+async function runVerifyChain() {
+  const el = document.getElementById('integrityResult');
+  const tEl = document.getElementById('integrityTime');
+  el.innerHTML = '⏳ Verifying…';
+  el.className = 'integrity-result';
+  try {
+    const r = await fetch('/api/verify-chain');
+    const data = await r.json();
+    if (data.valid) {
+      el.innerHTML = '✅ Chain intact — all records verified';
+      el.className = 'integrity-result valid';
+    } else {
+      el.innerHTML = `❌ Chain broken at record #${data.first_broken_index + 1} — tamper detected`;
+      el.className = 'integrity-result invalid';
+    }
+    tEl.textContent = 'Checked ' + new Date().toLocaleTimeString();
+  } catch(e) {
+    el.innerHTML = '⚠ Verification failed — server error';
+    el.className = 'integrity-result invalid';
+  }
+}
+
+// ---- Detail drawer ----
+async function openDrawer(verdictId) {
+  const r = await fetch(`/api/verdicts/${verdictId}`);
+  if (!r.ok) { showToast('Failed to load verdict', 'error'); return; }
+  const v = await r.json();
+
+  const ts = v.timestamp ? new Date(v.timestamp).toLocaleString() : '';
+  const canAck = v.remediation_status === 'OPEN';
+  const canRes = v.remediation_status === 'ACKNOWLEDGED';
+
+  document.getElementById('drawerContent').innerHTML = `
+    <div class="violation-top" style="margin-bottom:16px">
+      <span class="badge ${v.severity}">${v.severity}</span>
+      <span class="badge rule">${v.rule_id}</span>
+      ${v.breach_notification_candidate ? '<span class="badge breach">⚠ Breach Candidate</span>' : ''}
+      ${v.used_fallback ? '<span class="badge fallback">⚡ Template Explanation</span>' : ''}
+    </div>
+    <div class="drawer-field"><div class="lbl">Field</div><div class="val mono">${v.field}</div></div>
+    <div class="drawer-field"><div class="lbl">Source System</div><div class="val">${v.source_system}</div></div>
+    <div class="drawer-field"><div class="lbl">Timestamp</div><div class="val">${ts}</div></div>
+    <div class="drawer-field"><div class="lbl">Verdict ID</div><div class="val mono" style="font-size:11px">${v.verdict_id}</div></div>
+    <div class="drawer-field"><div class="lbl">Explanation</div><div class="val explanation-text">${v.explanation}</div></div>
+    <div class="drawer-field"><div class="lbl">Statute Citation</div><div class="val" style="font-size:12px;font-style:italic;color:var(--text2)">${v.section_cited}</div></div>
+    <div class="drawer-field"><div class="lbl">Current Status</div><div class="val"><span class="status-badge ${v.remediation_status}">${v.remediation_status}</span></div></div>
+    ${v.remediation_updated_at ? `<div class="drawer-field"><div class="lbl">Status Updated</div><div class="val" style="font-size:12px">${new Date(v.remediation_updated_at).toLocaleString()}</div></div>` : ''}
+    <div class="drawer-field"><div class="lbl">Hash (chain position #${v.row_index + 1})</div><div class="val mono" style="font-size:10px;color:var(--text3)">${v.row_hash}</div></div>
+    <div class="drawer-actions">
+      ${canAck ? `<button class="btn btn-warn" onclick="updateStatus('${v.verdict_id}','ACKNOWLEDGED')">Acknowledge</button>` : ''}
+      ${canRes ? `<button class="btn btn-danger" onclick="updateStatus('${v.verdict_id}','RESOLVED')">Mark Resolved</button>` : ''}
+    </div>
+  `;
+
+  document.getElementById('drawerOverlay').classList.add('open');
+  document.getElementById('drawer').classList.add('open');
+}
+
+function closeDrawer() {
+  document.getElementById('drawerOverlay').classList.remove('open');
+  document.getElementById('drawer').classList.remove('open');
+}
+
+// ---- Toast ----
+function showToast(msg, type='success') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `toast show ${type}`;
+  setTimeout(() => { el.className = 'toast'; }, 3000);
+}
+
+// ---- Init ----
+connectWS();
+refreshStats();
+setInterval(refreshStats, 5000);
+</script>
+</body>
+</html>

@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://dpdpa-agent/schemas/event_schema.json",
+  "title": "DPDPAEvent",
+  "description": "A single unit of telemetry ingested from a Blinkit system source (log line or API payload). This schema is frozen after Phase 0 — do not modify without a full team review.",
+  "type": "object",
+  "required": ["event_id", "source_type", "source_system", "timestamp", "raw_snippet", "fields"],
+  "additionalProperties": false,
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "description": "Globally unique identifier for this event. Format: UUID v4.",
+      "format": "uuid"
+    },
+    "source_type": {
+      "type": "string",
+      "description": "Whether this event originated from an application log line or an API request/response payload.",
+      "enum": ["log", "api"]
+    },
+    "source_system": {
+      "type": "string",
+      "description": "The Blinkit microservice or system that emitted this event. Used by auditors to break down violations by system.",
+      "enum": [
+        "order-service",
+        "delivery-partner-service",
+        "support-ticketing",
+        "marketing-analytics"
+      ]
+    },
+    "timestamp": {
+      "type": "string",
+      "description": "ISO8601 UTC timestamp of when the event was emitted by the source system.",
+      "format": "date-time"
+    },
+    "raw_snippet": {
+      "type": "string",
+      "description": "The raw log line or API payload string as received. Used for audit evidence and human review. Must never be modified after ingestion.",
+      "minLength": 1
+    },
+    "fields": {
+      "type": "object",
+      "description": "Extracted key-value pairs from the raw_snippet. Keys are field names (e.g. 'aadhaar', 'phone'); values are the corresponding raw values. Open map — different source systems carry different fields.",
+      "additionalProperties": {
+        "type": "string"
+      }
+    }
+  }
+}

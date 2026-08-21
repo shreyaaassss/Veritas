@@ -1,0 +1,33 @@
+# DPDPA Compliance Agent — Dependencies
+# =======================================
+# Phase 0-8: All phases implemented. Install all before running.
+
+# --- Phase 0 (active) ---
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+pydantic==2.8.2
+pydantic[email]
+
+# --- Phase 2: Ingestion Pipeline ---
+# stdlib asyncio only; pytest-asyncio for tests
+pytest-asyncio==0.24.0
+
+# --- Phase 3: PII Detection ---
+presidio-analyzer==2.2.364
+presidio-anonymizer==2.2.364
+spacy==3.8.15
+# en_core_web_lg — install separately:
+#   pip install https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl
+
+# --- Phase 5: LLM Explainer ---
+openai>=1.0.0                 # Used for LLM calls; falls back gracefully if no API key
+# anthropic>=0.34.2           # Alternative — uncomment if using Claude directly
+
+# --- Phase 6: Evidence Store ---
+# stdlib sqlite3 + hashlib — no additional deps needed
+
+# --- Phase 7: Dashboard ---
+# FastAPI + uvicorn already listed above; dashboard is served HTML/JS, no React build step
+
+# --- Testing ---
+pytest==8.3.3

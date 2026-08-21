@@ -1,0 +1,238 @@
+"""
+Tests for Phase 6 — Evidence Store
+
+Critical tests:
+  (a) Corrupt a row's content directly in the DB, confirm verify_chain() catches it.
+  (b) Update a status, confirm verify_chain() still passes.
+"""
+
+from __future__ import annotations
+
+import pytest
+import sqlite3
+import tempfile
+import uuid
+from datetime import datetime, timezone
+from pathlib import Path
+from unittest.mock import patch
+
+from schemas.models import (
+    Verdict, RuleId, Severity, SourceType, SourceSystem, RemediationStatus
+)
+from llm_explainer.explainer import ExplainedVerdict
+from evidence_store.store import EvidenceStore
+
+
+def _make_explained_verdict(
+    rule_id: RuleId = RuleId.EXPOSURE_001,
+    source_system: SourceSystem = SourceSystem.ORDER_SERVICE,
+    severity: Severity = Severity.HIGH,
+) -> ExplainedVerdict:
+    verdict = Verdict(
+        verdict_id=uuid.uuid4(),
+        event_id=uuid.uuid4(),
+        rule_id=rule_id,
+        severity=severity,
+        source=SourceType.LOG,
+        source_system=source_system,
+        field="pan",
+        timestamp=datetime.now(timezone.utc),
+        matched_registry_entry=None,
+        breach_notification_candidate=True,
+        remediation_status=RemediationStatus.OPEN,
+        remediation_updated_at=None,
+    )
+    return ExplainedVerdict(
+        verdict=verdict,
+        explanation="Test explanation",
+        section_cited="DPDPA 2023 § 8(1) — Security Safeguards",
+        confidence=0.9,
+        used_fallback=False,
+    )
+
+
+@pytest.fixture
+def tmp_store(tmp_path):
+    """Fresh in-memory EvidenceStore backed by a temp file for each test."""
+    db = tmp_path / "test_evidence.db"
+    store = EvidenceStore(db_path=db)
+    yield store
+    store.close()
+
+
+class TestHashChain:
+    def test_empty_store_verifies(self, tmp_store):
+        result = tmp_store.verify_chain()
+        assert result["valid"] is True
+        assert result["first_broken_index"] is None
+
+    def test_single_row_verifies(self, tmp_store):
+        ev = _make_explained_verdict()
+        tmp_store.append(ev)
+        result = tmp_store.verify_chain()
+        assert result["valid"] is True
+
+    def test_multiple_rows_verify(self, tmp_store):
+        for _ in range(5):
+            tmp_store.append(_make_explained_verdict())
+        result = tmp_store.verify_chain()
+        assert result["valid"] is True
+
+    def test_corrupted_payload_detected(self, tmp_store):
+        """
+        CRITICAL TEST (a): Corrupt a row's payload_json directly in the DB.
+        verify_chain() must catch it and report the correct broken index.
+        """
+        for _ in range(3):
+            tmp_store.append(_make_explained_verdict())
+
+        # Directly corrupt the first row's payload
+        tmp_store._conn.execute(
+            "UPDATE evidence SET payload_json = ? WHERE row_index = 1",
+            ('{"tampered": "data"}',)
+        )
+        tmp_store._conn.commit()
+
+        result = tmp_store.verify_chain()
+        assert result["valid"] is False
+        assert result["first_broken_index"] == 0  # 0-based, first row
+
+    def test_corrupted_middle_row_detected(self, tmp_store):
+        """Corruption in a middle row is detected at that row's index."""
+        for _ in range(5):
+            tmp_store.append(_make_explained_verdict())
+
+        # Corrupt the 3rd row (row_index=3 in SQLite = index 2 in 0-based)
+        tmp_store._conn.execute(
+            "UPDATE evidence SET payload_json = ? WHERE row_index = 3",
+            ('{"tampered": "middle"}',)
+        )
+        tmp_store._conn.commit()
+
+        result = tmp_store.verify_chain()
+        assert result["valid"] is False
+        assert result["first_broken_index"] == 2  # 0-based
+
+    def test_status_update_does_not_break_chain(self, tmp_store):
+        """
+        CRITICAL TEST (b): Update remediation_status, confirm verify_chain()
+        still passes. The hash covers only immutable fields; mutable columns
+        live outside it, so status updates must never affect chain validity.
+        """
+        ev = _make_explained_verdict()
+        tmp_store.append(ev)
+        verdict_id = str(ev.verdict.verdict_id)
+
+        tmp_store.update_status(verdict_id, "ACKNOWLEDGED")
+
+        result = tmp_store.verify_chain()
+        assert result["valid"] is True
+
+        tmp_store.update_status(verdict_id, "RESOLVED")
+        result = tmp_store.verify_chain()
+        assert result["valid"] is True
+
+    def test_chain_intact_after_multiple_statuses_and_appends(self, tmp_store):
+        evs = [_make_explained_verdict() for _ in range(4)]
+        for ev in evs:
+            tmp_store.append(ev)
+
+        tmp_store.update_status(str(evs[0].verdict.verdict_id), "ACKNOWLEDGED")
+        tmp_store.update_status(str(evs[1].verdict.verdict_id), "ACKNOWLEDGED")
+        tmp_store.update_status(str(evs[1].verdict.verdict_id), "RESOLVED")
+
+        result = tmp_store.verify_chain()
+        assert result["valid"] is True
+
+
+class TestStatusTransitions:
+    def test_open_to_acknowledged(self, tmp_store):
+        ev = _make_explained_verdict()
+        tmp_store.append(ev)
+        tmp_store.update_status(str(ev.verdict.verdict_id), "ACKNOWLEDGED")
+        row = tmp_store.get_by_verdict_id(str(ev.verdict.verdict_id))
+        assert row["remediation_status"] == "ACKNOWLEDGED"
+
+    def test_acknowledged_to_resolved(self, tmp_store):
+        ev = _make_explained_verdict()
+        tmp_store.append(ev)
+        vid = str(ev.verdict.verdict_id)
+        tmp_store.update_status(vid, "ACKNOWLEDGED")
+        tmp_store.update_status(vid, "RESOLVED")
+        row = tmp_store.get_by_verdict_id(vid)
+        assert row["remediation_status"] == "RESOLVED"
+
+    def test_open_to_resolved_rejected(self, tmp_store):
+        ev = _make_explained_verdict()
+        tmp_store.append(ev)
+        with pytest.raises(ValueError, match="Invalid status transition"):
+            tmp_store.update_status(str(ev.verdict.verdict_id), "RESOLVED")
+
+    def test_resolved_is_terminal(self, tmp_store):
+        ev = _make_explained_verdict()
+        tmp_store.append(ev)
+        vid = str(ev.verdict.verdict_id)
+        tmp_store.update_status(vid, "ACKNOWLEDGED")
+        tmp_store.update_status(vid, "RESOLVED")
+        with pytest.raises(ValueError, match="Invalid status transition"):
+            tmp_store.update_status(vid, "ACKNOWLEDGED")
+
+    def test_unknown_verdict_raises(self, tmp_store):
+        with pytest.raises(ValueError, match="Verdict not found"):
+            tmp_store.update_status("non-existent-id", "ACKNOWLEDGED")
+
+
+class TestQuery:
+    def test_query_all(self, tmp_store):
+        for _ in range(3):
+            tmp_store.append(_make_explained_verdict())
+        results = tmp_store.query()
+        assert len(results) == 3
+
+    def test_query_by_remediation_status(self, tmp_store):
+        ev1 = _make_explained_verdict()
+        ev2 = _make_explained_verdict()
+        tmp_store.append(ev1)
+        tmp_store.append(ev2)
+        tmp_store.update_status(str(ev1.verdict.verdict_id), "ACKNOWLEDGED")
+
+        open_results = tmp_store.query(remediation_status="OPEN")
+        acknowledged_results = tmp_store.query(remediation_status="ACKNOWLEDGED")
+        assert len(open_results) == 1
+        assert len(acknowledged_results) == 1
+
+    def test_query_by_source_system(self, tmp_store):
+        ev_order = _make_explained_verdict(source_system=SourceSystem.ORDER_SERVICE)
+        ev_marketing = _make_explained_verdict(source_system=SourceSystem.MARKETING_ANALYTICS)
+        tmp_store.append(ev_order)
+        tmp_store.append(ev_marketing)
+
+        results = tmp_store.query(source_system="order-service")
+        assert len(results) == 1
+        assert results[0]["source_system"] == "order-service"
+
+    def test_query_by_severity(self, tmp_store):
+        ev_high = _make_explained_verdict(severity=Severity.HIGH)
+        ev_medium = _make_explained_verdict(severity=Severity.MEDIUM)
+        tmp_store.append(ev_high)
+        tmp_store.append(ev_medium)
+
+        results = tmp_store.query(severity="HIGH")
+        assert len(results) == 1
+        assert results[0]["severity"] == "HIGH"
+
+    def test_get_by_verdict_id(self, tmp_store):
+        ev = _make_explained_verdict()
+        tmp_store.append(ev)
+        row = tmp_store.get_by_verdict_id(str(ev.verdict.verdict_id))
+        assert row is not None
+        assert row["verdict_id"] == str(ev.verdict.verdict_id)
+
+    def test_get_by_unknown_id_returns_none(self, tmp_store):
+        assert tmp_store.get_by_verdict_id("nonexistent") is None
+
+    def test_duplicate_verdict_id_rejected(self, tmp_store):
+        ev = _make_explained_verdict()
+        tmp_store.append(ev)
+        with pytest.raises(sqlite3.IntegrityError):
+            tmp_store.append(ev)

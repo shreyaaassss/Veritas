@@ -1,0 +1,17 @@
+{
+  "EXPOSURE_001": {
+    "section": "Section 8(1) of the Digital Personal Data Protection Act, 2023",
+    "text": "A Data Fiduciary shall implement appropriate technical and organisational measures to ensure compliance with the provisions of this Act and the rules made thereunder. Every Data Fiduciary shall maintain reasonable security safeguards to protect personal data in its possession or under its control — and must ensure personal data is not exposed to unauthorised access through application logs, debug outputs, or unmasked API responses.",
+    "reference": "DPDPA 2023 § 8(1) — Security Safeguards"
+  },
+  "PURPOSE_001": {
+    "section": "Section 6(1) of the Digital Personal Data Protection Act, 2023",
+    "text": "A Data Fiduciary shall process the personal data of a Data Principal only for the purpose for which consent was given. Personal data may not be used outside the declared purpose and consent scope under which it was originally collected. Routing personal data to a system or process whose declared consent scope does not permit that field is a purpose-limitation violation.",
+    "reference": "DPDPA 2023 § 6(1) — Lawful Processing and Purpose Limitation"
+  },
+  "RETENTION_001": {
+    "section": "Section 8(7) of the Digital Personal Data Protection Act, 2023",
+    "text": "A Data Fiduciary shall, unless retention of personal data is necessary for compliance with any law for the time being in force, erase the personal data, upon the Data Principal withdrawing consent or as soon as it is reasonable to assume that the specified purpose is no longer being served. Data retained beyond the declared retention window constitutes a retention violation under this provision.",
+    "reference": "DPDPA 2023 § 8(7) — Erasure Obligation"
+  }
+}

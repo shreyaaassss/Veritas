@@ -1,0 +1,310 @@
+"""
+DPDPA Compliance Agent — LLM Explainer (Phase 5)
+=================================================
+Takes a Verdict produced by Phase 4's Rule Engine and returns an
+ExplainedVerdict: the original verdict + a human-readable explanation,
+a verified statute citation, a confidence score, and a flag indicating
+whether the LLM call succeeded or fell back to a deterministic template.
+
+GUARDRAIL DESIGN:
+  1. Statute text is supplied entirely from a static local JSON file
+     (statute_snippets.json) — the LLM never recalls statute text from
+     its own training weights.
+  2. `temperature=0` for deterministic, low-variance output.
+  3. Structured JSON output validated with Pydantic on every call.
+  4. Cheap grounding check: confirm the section_cited in the LLM response
+     actually matches the section string we fed it. Mismatch → discard,
+     fall back.
+  5. ANY failure at all (API error, invalid JSON, schema mismatch,
+     grounding check fail) → deterministic template fallback. The pipeline
+     NEVER crashes or hangs on an LLM failure.
+
+IMMUTABILITY CONTRACT:
+  This module NEVER mutates the Verdict object. It wraps the Verdict in
+  ExplainedVerdict; the original Verdict is untouched. Phase 6 receives
+  ExplainedVerdict and stores the whole thing.
+
+ONE-WAY DATA FLOW:
+  LLM output only annotates the ExplainedVerdict wrapper — no write access
+  to registry, no ability to re-trigger Phase 4, no mutations to any
+  Phase 0-4 data structure.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import os
+from pathlib import Path
+from typing import Optional
+
+from pydantic import BaseModel, ValidationError
+
+from schemas.models import Verdict, RuleId
+
+logger = logging.getLogger("llm_explainer.explainer")
+
+# ---------------------------------------------------------------------------
+# Load statute snippets (static — locked at module init)
+# ---------------------------------------------------------------------------
+
+_SNIPPETS_PATH = Path(__file__).parent / "statute_snippets.json"
+
+
+def _load_snippets() -> dict:
+    with open(_SNIPPETS_PATH, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+_STATUTE_SNIPPETS: dict = _load_snippets()
+
+
+def get_statute_snippet(rule_id: str) -> dict:
+    """
+    Returns the statute snippet dict for a given rule_id.
+    Raises KeyError if rule_id is not in the static file — this should
+    never happen for the three locked rule IDs; it would indicate a
+    code/config bug, not a runtime error.
+    """
+    return _STATUTE_SNIPPETS[rule_id]
+
+
+# ---------------------------------------------------------------------------
+# ExplainedVerdict — wraps Verdict, never mutates it
+# ---------------------------------------------------------------------------
+
+class ExplainedVerdict(BaseModel):
+    """
+    Wraps a Phase 4 Verdict with LLM-generated (or template) explanation.
+    The original Verdict is embedded, never modified.
+    used_fallback=True means the LLM path failed for any reason and the
+    deterministic template was used instead.
+    """
+    verdict: Verdict
+    explanation: str
+    section_cited: str
+    confidence: float
+    used_fallback: bool
+
+
+# ---------------------------------------------------------------------------
+# LLM response schema — validated on every call
+# ---------------------------------------------------------------------------
+
+class _LLMResponse(BaseModel):
+    explanation: str
+    section_cited: str
+    confidence: float
+
+
+# ---------------------------------------------------------------------------
+# Fallback template — guaranteed never to crash
+# ---------------------------------------------------------------------------
+
+def _build_fallback(verdict: Verdict, rule_id: str) -> ExplainedVerdict:
+    """
+    Deterministic template fallback. Used whenever the LLM call fails for
+    any reason. Always returns a complete ExplainedVerdict — never raises.
+    """
+    snippet = _STATUTE_SNIPPETS.get(rule_id, {})
+    section = snippet.get("reference", rule_id)
+    explanation = (
+        f"Violation: {rule_id} — {verdict.field!r} exposed "
+        f"in {verdict.source_system.value}. See {section}."
+    )
+    return ExplainedVerdict(
+        verdict=verdict,
+        explanation=explanation,
+        section_cited=section,
+        confidence=1.0,
+        used_fallback=True,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Grounding check — cheap: confirm section_cited matches what we provided
+# ---------------------------------------------------------------------------
+
+def _grounding_check(llm_response: _LLMResponse, expected_section: str) -> bool:
+    """
+    Cheap grounding check: the section_cited in the LLM response must
+    match (or be a substring of) the section string we provided from the
+    static snippet. This catches the most likely failure mode —
+    hallucinated statute citation — without full token-level fact-matching.
+    """
+    cited = llm_response.section_cited.strip()
+    expected = expected_section.strip()
+    # Accept if the cited text IS the expected section or contains it as
+    # a substring (the LLM may slightly paraphrase the section label).
+    return cited == expected or expected in cited or cited in expected
+
+
+# ---------------------------------------------------------------------------
+# OpenAI-compatible LLM call (uses openai package already installed)
+# ---------------------------------------------------------------------------
+
+def _call_llm(verdict: Verdict, snippet: dict) -> Optional[_LLMResponse]:
+    """
+    Calls the LLM with the verdict + statute snippet, temperature=0,
+    requiring structured JSON output. Returns a validated _LLMResponse on
+    success, None on ANY failure (caught, never re-raised).
+    """
+    try:
+        from openai import OpenAI
+
+        api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")
+        # Support Anthropic-compatible OpenAI SDK usage if ANTHROPIC_API_KEY set
+        if os.environ.get("ANTHROPIC_API_KEY") and not os.environ.get("OPENAI_API_KEY"):
+            client = OpenAI(
+                api_key=os.environ["ANTHROPIC_API_KEY"],
+                base_url="https://api.anthropic.com/v1/",
+            )
+            model = "claude-sonnet-4-5"
+        else:
+            client = OpenAI(api_key=api_key)
+            model = os.environ.get("LLM_MODEL", "gpt-4o-mini")
+
+        prompt = f"""You are a DPDPA (Digital Personal Data Protection Act 2023) compliance analyst assistant.
+You will be given a compliance violation verdict and the relevant statute text.
+Your task is to produce a concise, human-readable explanation for a compliance auditor.
+
+VERDICT:
+{json.dumps(verdict.model_dump(mode='json'), indent=2, default=str)}
+
+STATUTE SNIPPET (the ONLY legal text you may reference):
+Section: {snippet['section']}
+Text: {snippet['text']}
+
+Respond with ONLY valid JSON matching this exact schema (no markdown, no extra text):
+{{
+  "explanation": "<2-3 sentence plain-English explanation of what went wrong and why it violates DPDPA>",
+  "section_cited": "{snippet['reference']}",
+  "confidence": <float 0.0-1.0 indicating your confidence in this explanation>
+}}
+
+Rules:
+- section_cited MUST be exactly: {snippet['reference']}
+- Do not cite any statute text not provided above
+- Do not mention specific user names or invent context not in the verdict
+- Confidence should be 0.8-1.0 for clear violations, 0.5-0.8 for ambiguous cases
+"""
+
+        # Force JSON mode where supported
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0,
+            max_tokens=400,
+            response_format={"type": "json_object"} if "gpt" in model else None,
+        )
+
+        raw = response.choices[0].message.content
+        if not raw:
+            logger.warning("LLM returned empty content")
+            return None
+
+        parsed = json.loads(raw)
+        return _LLMResponse(**parsed)
+
+    except Exception as exc:
+        logger.warning("LLM call failed: %s: %s", type(exc).__name__, exc)
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Force-fail flag for demo/testing (Part 4 — demo script)
+# ---------------------------------------------------------------------------
+
+def _should_force_fallback() -> bool:
+    """
+    When env var FORCE_LLM_FALLBACK=1, always skip the LLM and return
+    fallback. Used during the demo to show the guardrail on cue.
+    """
+    return os.environ.get("FORCE_LLM_FALLBACK", "").strip() == "1"
+
+
+# ---------------------------------------------------------------------------
+# Public entrypoint
+# ---------------------------------------------------------------------------
+
+def explain_verdict(verdict: Verdict) -> ExplainedVerdict:
+    """
+    Main entrypoint for Phase 5. Given a Verdict, returns an ExplainedVerdict.
+
+    Guarantee: NEVER raises, NEVER blocks indefinitely. Any failure at any
+    step → deterministic template fallback with used_fallback=True.
+
+    Flow:
+      1. Load statute snippet for rule_id.
+      2. If FORCE_LLM_FALLBACK=1 (demo mode), skip to fallback immediately.
+      3. Call LLM with {verdict, statute_snippet}, temperature=0.
+      4. Validate response against _LLMResponse schema.
+      5. Run grounding check on section_cited.
+      6. Any failure at steps 3-5 → fallback.
+      7. Return ExplainedVerdict wrapping the original Verdict (never mutated).
+    """
+    rule_id = verdict.rule_id.value
+    snippet = _STATUTE_SNIPPETS.get(rule_id)
+    if not snippet:
+        logger.error("No statute snippet for rule_id=%r — using fallback", rule_id)
+        return _build_fallback(verdict, rule_id)
+
+    if _should_force_fallback():
+        logger.info("FORCE_LLM_FALLBACK=1 — skipping LLM, using template fallback")
+        return _build_fallback(verdict, rule_id)
+
+    llm_response = _call_llm(verdict, snippet)
+
+    if llm_response is None:
+        logger.info("LLM call failed — using template fallback for verdict %s", verdict.verdict_id)
+        return _build_fallback(verdict, rule_id)
+
+    if not _grounding_check(llm_response, snippet["reference"]):
+        logger.warning(
+            "Grounding check failed: section_cited=%r, expected=%r — using fallback",
+            llm_response.section_cited, snippet["reference"],
+        )
+        return _build_fallback(verdict, rule_id)
+
+    logger.info("LLM explanation accepted for verdict %s (confidence=%.2f)", verdict.verdict_id, llm_response.confidence)
+    return ExplainedVerdict(
+        verdict=verdict,
+        explanation=llm_response.explanation,
+        section_cited=llm_response.section_cited,
+        confidence=llm_response.confidence,
+        used_fallback=False,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Queue consumer — Phase 4's fanout → this module
+# ---------------------------------------------------------------------------
+
+async def explain_from_queue(
+    in_queue,
+    out_queue,
+    max_verdicts: int | None = None,
+) -> None:
+    """
+    Async consumer: pulls Verdict objects off in_queue (Phase 4's fanout
+    llm_explainer_queue), explains each, pushes ExplainedVerdict to out_queue.
+
+    Pass-through on failure: if explain_verdict() itself ever raises
+    (it shouldn't — it's designed to absorb all errors), the fallback is
+    still applied here as a last line of defence.
+    """
+    import asyncio
+
+    processed = 0
+    while max_verdicts is None or processed < max_verdicts:
+        verdict: Verdict = await in_queue.get()
+        try:
+            explained = explain_verdict(verdict)
+        except Exception as exc:
+            logger.error(
+                "Unexpected error in explain_verdict (this is a bug): %s — using fallback",
+                exc, exc_info=True,
+            )
+            explained = _build_fallback(verdict, verdict.rule_id.value)
+        await out_queue.put(explained)
+        processed += 1

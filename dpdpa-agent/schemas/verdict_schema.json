@@ -1,0 +1,87 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://dpdpa-agent/schemas/verdict_schema.json",
+  "title": "DPDPAVerdict",
+  "description": "A compliance verdict produced by the Rule Engine for a single Event. IMMUTABILITY CONTRACT: only 'remediation_status' and 'remediation_updated_at' may be mutated after a verdict is written to the Evidence Store. All other fields are immutable and will form part of a hash chain in Phase 6.",
+  "type": "object",
+  "required": [
+    "verdict_id",
+    "event_id",
+    "rule_id",
+    "severity",
+    "source",
+    "source_system",
+    "field",
+    "timestamp",
+    "matched_registry_entry",
+    "breach_notification_candidate",
+    "remediation_status"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "verdict_id": {
+      "type": "string",
+      "description": "Globally unique identifier for this verdict. Format: UUID v4. IMMUTABLE.",
+      "format": "uuid"
+    },
+    "event_id": {
+      "type": "string",
+      "description": "UUID of the Event that triggered this verdict. Foreign key to event_schema. IMMUTABLE.",
+      "format": "uuid"
+    },
+    "rule_id": {
+      "type": "string",
+      "description": "The DPDPA compliance rule that was violated. IMMUTABLE.",
+      "enum": ["EXPOSURE_001", "PURPOSE_001", "RETENTION_001"]
+    },
+    "severity": {
+      "type": "string",
+      "description": "Severity level assigned by the Rule Engine. IMMUTABLE.",
+      "enum": ["LOW", "MEDIUM", "HIGH"]
+    },
+    "source": {
+      "type": "string",
+      "description": "Source type inherited from the triggering Event. IMMUTABLE.",
+      "enum": ["log", "api"]
+    },
+    "source_system": {
+      "type": "string",
+      "description": "Source system inherited from the triggering Event. Enables per-system breakdown in audit view. IMMUTABLE.",
+      "enum": [
+        "order-service",
+        "delivery-partner-service",
+        "support-ticketing",
+        "marketing-analytics"
+      ]
+    },
+    "field": {
+      "type": "string",
+      "description": "The specific PII field name that triggered this verdict (e.g. 'aadhaar', 'pan', 'phone'). IMMUTABLE.",
+      "minLength": 1
+    },
+    "timestamp": {
+      "type": "string",
+      "description": "ISO8601 UTC timestamp of when this verdict was generated. IMMUTABLE.",
+      "format": "date-time"
+    },
+    "matched_registry_entry": {
+      "type": ["object", "null"],
+      "description": "The consent registry entry that was matched (or violated) to produce this verdict. Typed as object stub — Phase 1 will define the registry entry model. IMMUTABLE."
+    },
+    "breach_notification_candidate": {
+      "type": "boolean",
+      "description": "Whether this verdict qualifies as a candidate for DPDPA breach notification to the Data Protection Board of India (72-hour reporting window). Set by Rule Engine. IMMUTABLE."
+    },
+    "remediation_status": {
+      "type": "string",
+      "description": "Current human follow-up status. MUTABLE — this and remediation_updated_at are the ONLY fields that may be updated after the verdict is written to the Evidence Store.",
+      "enum": ["OPEN", "ACKNOWLEDGED", "RESOLVED"],
+      "default": "OPEN"
+    },
+    "remediation_updated_at": {
+      "type": ["string", "null"],
+      "description": "ISO8601 UTC timestamp of the last remediation_status update. Null until first status change. MUTABLE — only field besides remediation_status that may be updated post-write.",
+      "format": "date-time"
+    }
+  }
+}
