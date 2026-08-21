@@ -19,19 +19,30 @@
 org_id: edtech_co
 
 # Custom identifier types EdTech Co cares about.
-# APAAR ID (Academic Bank of Credits) is a 12-character alphanumeric national
-# education identifier — not a standard Veritas built-in, so the org declares
-# their own pattern. No checksum validator exists yet (Phase 2 placeholder).
+# APAAR ID (Automated Permanent Academic Account Registry, under the
+# Academic Bank of Credits / "One Nation, One Student ID" scheme) is a
+# 12-DIGIT national education identifier — confirmed via public sources
+# (apaar.education.gov.in and Ministry of Education materials) to be
+# numeric, like Aadhaar, not alphanumeric. Phase 7 corrected this pattern
+# from an earlier alphanumeric placeholder after checking rather than
+# assuming — see docs/onboarding.md / the Phase 7 report for the source.
+# No public checksum spec exists for APAAR, so validator stays "none" —
+# this is an honest, intentional gap (see validators.py's Phase 2 scope),
+# not something to fake with an invented checksum.
 identifiers:
   - name: apaar_id
-    pattern: "^[A-Z0-9]{12}$"
-    validator: none  # Phase 2 may add apaar_id validator
+    pattern: "^[0-9]{12}$"
+    validator: none
 
   - name: student_phone
     pattern: indian_phone
     validator: none
 
-  - name: guardian_phone
+  # Matches the 'guardian_contact' field below (source_system:
+  # guardian_portal) — identifier name intentionally aligned with the real
+  # field_name so Phase 2's per-field validator lookup (which matches on
+  # field_name, not on pii_category) actually resolves against this entry.
+  - name: guardian_contact
     pattern: indian_phone
     validator: none
 

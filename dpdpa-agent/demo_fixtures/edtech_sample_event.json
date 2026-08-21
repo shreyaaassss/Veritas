@@ -1,0 +1,42 @@
+{
+  "_description": "EdTech Co (edtech_co) demo fixture for POST /v1/edtech_co/scan. Represents a realistic support-ticket record: a parent-contact-update ticket where the support agent pasted the student's raw APAAR ID into the free-text case note (an Exposure risk — a raw national identifier sitting in unstructured support-ticket text, the same shape of risk detection/README.md's support_tickets example already covers for Blinkit) while the ticket's structured metadata also carries student_name + school_name + dob together — individually low-signal fields that jointly re-identify a specific student (edtech_co's configured LINKAGE_RISK rule, org_config/configs/edtech_co/*.yaml).",
+  "_usage_note": "See docs/onboarding.md and the Phase 7 report for how this single fixture is exercised against /scan (as two calls — text-only for the Exposure proof, fields-only for the Linkage proof — plus a combined text+fields call showing the same data still produces a real, correctly-classified violation either way). This split is a deliberate, documented consequence of /scan's own text+fields precedence rule (api/integration.py), not an artifact of this fixture.",
+
+  "source_system": "support_ticket_system",
+
+  "raw_snippet": "[2026-08-22T09:14:02Z] EdTech Support Ticket #48213 - Parent called to update emergency contact. Agent note: verified student via APAAR ID 456789012348 read aloud over the phone, no ID document uploaded to case file. Student: Ananya Bhat, DOB 2011-03-14, enrolled at Delhi Public School RK Puram.",
+
+  "fields": {
+    "ticket_id": "48213",
+    "student_name": "Ananya Bhat",
+    "school_name": "Delhi Public School RK Puram",
+    "dob": "2011-03-14"
+  },
+
+  "scan_calls": {
+    "exposure_proof": {
+      "_comment": "text-only -> SourceType.LOG -> Check 1 (Exposure) fires deterministically on the raw APAAR ID embedded in free text.",
+      "text": "[2026-08-22T09:14:02Z] EdTech Support Ticket #48213 - Parent called to update emergency contact. Agent note: verified student via APAAR ID 456789012348 read aloud over the phone, no ID document uploaded to case file."
+    },
+    "linkage_proof": {
+      "_comment": "fields-only -> Check 4 (Linkage) fires on the co-occurring quasi-identifier combination, independent of source_type.",
+      "fields": {
+        "student_name": "Ananya Bhat",
+        "school_name": "Delhi Public School RK Puram",
+        "dob": "2011-03-14"
+      },
+      "source_system": "support_ticket_system"
+    },
+    "combined_realistic_call": {
+      "_comment": "The full record in one call, exactly as a real integration would send it. Produces LINKAGE_001 (Check 4) plus a real PURPOSE_001 (not EXPOSURE_001) on the APAAR ID — see the Phase 7 report's flagged finding on why, and note PURPOSE_001 is still a correctly-classified DPDPA violation, not a missed one.",
+      "text": "[2026-08-22T09:14:02Z] EdTech Support Ticket #48213 - Parent called to update emergency contact. Agent note: verified student via APAAR ID 456789012348 read aloud over the phone, no ID document uploaded to case file. Student: Ananya Bhat, DOB 2011-03-14, enrolled at Delhi Public School RK Puram.",
+      "fields": {
+        "ticket_id": "48213",
+        "student_name": "Ananya Bhat",
+        "school_name": "Delhi Public School RK Puram",
+        "dob": "2011-03-14"
+      },
+      "source_system": "support_ticket_system"
+    }
+  }
+}
