@@ -1,0 +1,23 @@
+org_id: acme_bank
+identifiers:
+- name: account_number
+  pattern: ^ACB[0-9]{9}$
+  validator: none
+fields:
+- field_name: account_number
+  pii_category: financial_account
+  declared_purpose: account_servicing
+  consent_scope: account_servicing
+  retention_days: 2555
+  source_system: core_banking
+- field_name: customer_name
+  pii_category: name
+  declared_purpose: account_servicing
+  consent_scope: account_servicing
+  retention_days: 2555
+  source_system: core_banking
+linkage_rules:
+- fields:
+  - customer_name
+  - account_number
+  risk: LINKAGE_RISK

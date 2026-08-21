@@ -74,6 +74,31 @@ DESIGN DECISIONS (documented per the plan's requirement):
    surface this phase exists to close. A caller that genuinely needs a
    cross-tenant admin view would need a new, explicitly-named method — none
    of Part A/B's callers need one, so none was added.
+
+7. PER-TENANT SEQUENTIAL VIOLATION ID (post-Phase-6 addition):
+   Every stored row also gets a plain, human-referenceable `violation_id` —
+   1, 2, 3, ... — SCOPED PER TENANT (org A's #1 and org B's #1 are
+   different rows; each tenant's numbering starts fresh at 1). This is
+   deliberately NOT the same thing as the existing `row_index`: row_index
+   is a GLOBAL SQLite AUTOINCREMENT shared by every tenant's physically
+   interleaved rows (e.g. org A's rows could sit at global positions
+   1, 3, 5 if org B wrote in between), so it was never actually usable as
+   "the Nth violation for this org" — an auditor filtering to their own
+   org would see gaps. `violation_id` fixes that: it's computed as
+   MAX(existing violation_id for this tenant) + 1 at append time, inside
+   the same write lock, so it is gap-free and race-safe per tenant.
+
+   It is deliberately NOT added to the Verdict schema (schemas/models.py)
+   or assigned by the rule engine — a violation only earns a permanent
+   audit-trail number once it is durably stored, which is exactly what
+   this layer already owns. This keeps Verdict (frozen since Phase 0) and
+   rules/engine.py untouched.
+
+   Lookup: get_by_sequence_number(tenant_id, violation_id) — the
+   "tag @03 and ask what happened" workflow. Since the explanation was
+   already generated and grounding-checked once at detection time (see
+   llm_explainer/explainer.py), this is a plain stored-row lookup, not a
+   fresh LLM call — instant, and doesn't re-spend an API call per lookup.
 """
 
 from __future__ import annotations
@@ -159,6 +184,7 @@ class EvidenceStore:
         update_status(tenant_id: str, verdict_id: str, new_status: str) -> None
         query(tenant_id: str, ...) -> list[dict]
         get_by_verdict_id(tenant_id: str, verdict_id: str) -> Optional[dict]
+        get_by_violation_id(tenant_id: str, violation_id: int) -> Optional[dict]
         count(tenant_id: str) -> int
 
     Thread-safe for single-process use via a write lock.
@@ -186,6 +212,7 @@ class EvidenceStore:
                 )
             """)
             self._migrate_add_tenant_id_column()
+            self._migrate_add_violation_id_column()
             self._conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_verdict_id ON evidence(verdict_id)"
             )
@@ -197,6 +224,9 @@ class EvidenceStore:
             )
             self._conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_tenant_id ON evidence(tenant_id)"
+            )
+            self._conn.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_tenant_violation_id ON evidence(tenant_id, violation_id)"
             )
             self._conn.commit()
 
@@ -226,6 +256,43 @@ class EvidenceStore:
         if rows:
             logger.info("Backfilled tenant_id for %d existing row(s).", len(rows))
 
+    def _migrate_add_violation_id_column(self) -> None:
+        """
+        Adds `violation_id` (per-tenant sequential number — see module
+        docstring point 7) if this DB predates it, and backfills existing
+        rows PER TENANT in row_index ASC order (i.e. insertion order),
+        so the earliest row a tenant ever had becomes their #1, preserving
+        real history rather than an arbitrary renumbering. Idempotent.
+        """
+        existing_cols = {row["name"] for row in self._conn.execute("PRAGMA table_info(evidence)")}
+        if "violation_id" in existing_cols:
+            return
+
+        logger.info("Migrating evidence store: adding violation_id column (per-tenant sequential numbering).")
+        self._conn.execute("ALTER TABLE evidence ADD COLUMN violation_id INTEGER")
+        tenant_ids = [r["tenant_id"] for r in self._conn.execute(
+            "SELECT DISTINCT tenant_id FROM evidence WHERE tenant_id IS NOT NULL"
+        )]
+        for tid in tenant_ids:
+            rows = self._conn.execute(
+                "SELECT row_index FROM evidence WHERE tenant_id = ? ORDER BY row_index ASC", (tid,)
+            ).fetchall()
+            for n, row in enumerate(rows, start=1):
+                self._conn.execute(
+                    "UPDATE evidence SET violation_id = ? WHERE row_index = ?", (n, row["row_index"])
+                )
+        if tenant_ids:
+            logger.info("Backfilled violation_id for %d tenant(s).", len(tenant_ids))
+
+    def _get_next_violation_id(self, tenant_id: str) -> int:
+        """Next per-tenant sequential number: MAX(existing)+1, or 1 if this
+        tenant has no rows yet. Called inside the write lock in append()."""
+        cursor = self._conn.execute(
+            "SELECT MAX(violation_id) as m FROM evidence WHERE tenant_id = ?", (tenant_id,)
+        )
+        current_max = cursor.fetchone()["m"]
+        return (current_max or 0) + 1
+
     def _get_last_hash(self, tenant_id: str) -> str:
         """Returns this tenant's last row's hash, or GENESIS_HASH if this
         tenant has no rows yet — the per-tenant chain start point."""
@@ -248,6 +315,7 @@ class EvidenceStore:
         tenant_id = ev.verdict.tenant_id
         with self._lock:
             previous_hash = self._get_last_hash(tenant_id)
+            violation_id = self._get_next_violation_id(tenant_id)
             payload_json = _serialize_immutable(ev)
             row_hash = _compute_hash(payload_json, previous_hash)
             appended_at = datetime.now(timezone.utc).isoformat()
@@ -255,8 +323,8 @@ class EvidenceStore:
             self._conn.execute("""
                 INSERT INTO evidence
                     (verdict_id, payload_json, row_hash, previous_hash,
-                     remediation_status, remediation_updated_at, appended_at, tenant_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                     remediation_status, remediation_updated_at, appended_at, tenant_id, violation_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 str(ev.verdict.verdict_id),
                 payload_json,
@@ -266,6 +334,7 @@ class EvidenceStore:
                 ev.verdict.remediation_updated_at.isoformat() if ev.verdict.remediation_updated_at else None,
                 appended_at,
                 tenant_id,
+                violation_id,
             ))
             self._conn.commit()
 
@@ -416,6 +485,7 @@ class EvidenceStore:
                     continue
 
             result = {
+                "violation_id": row["violation_id"],
                 "row_index": row["row_index"] - 1,  # 0-based
                 "row_hash": row["row_hash"],
                 "appended_at": row["appended_at"],
@@ -440,6 +510,34 @@ class EvidenceStore:
             return None
         payload = json.loads(row["payload_json"])
         return {
+            "violation_id": row["violation_id"],
+            "row_index": row["row_index"] - 1,
+            "row_hash": row["row_hash"],
+            "appended_at": row["appended_at"],
+            "remediation_status": row["remediation_status"],
+            "remediation_updated_at": row["remediation_updated_at"],
+            **payload,
+        }
+
+    def get_by_violation_id(self, tenant_id: str, violation_id: int) -> Optional[dict]:
+        """
+        Return a single row by its per-tenant sequential violation_id
+        (the "@03" lookup) — scoped to tenant_id, same non-distinguishing
+        None-on-miss behavior as get_by_verdict_id. This is the primary
+        entry point for "tag #N and ask what the breach is": the returned
+        dict already carries the stored `explanation`/`section_cited`
+        (generated once, grounding-checked, at detection time — see
+        llm_explainer/explainer.py), so no new LLM call happens here.
+        """
+        cursor = self._conn.execute(
+            "SELECT * FROM evidence WHERE tenant_id = ? AND violation_id = ?", (tenant_id, violation_id)
+        )
+        row = cursor.fetchone()
+        if row is None:
+            return None
+        payload = json.loads(row["payload_json"])
+        return {
+            "violation_id": row["violation_id"],
             "row_index": row["row_index"] - 1,
             "row_hash": row["row_hash"],
             "appended_at": row["appended_at"],

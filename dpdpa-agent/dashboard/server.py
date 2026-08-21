@@ -135,6 +135,23 @@ async def get_verdict(org_id: str, verdict_id: str):
     return row
 
 
+@app.get("/api/{org_id}/violations/{violation_id}")
+async def get_violation_by_number(org_id: str, violation_id: int):
+    """
+    The "tag #N and ask what the breach is" lookup — a plain,
+    human-referenceable per-tenant sequential number (1, 2, 3, ...) rather
+    than the full verdict_id UUID. Returns the same row shape as
+    GET /api/{org_id}/verdicts/{verdict_id}, already carrying the stored,
+    grounding-checked `explanation`/`section_cited` from detection time —
+    no new LLM call happens on lookup, it's a direct evidence-store read.
+    """
+    store = get_store()
+    row = store.get_by_violation_id(org_id, violation_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"Violation #{violation_id} not found for org_id {org_id!r}")
+    return row
+
+
 class StatusUpdate(BaseModel):
     status: str
 

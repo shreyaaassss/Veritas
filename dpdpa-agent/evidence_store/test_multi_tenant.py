@@ -211,3 +211,129 @@ class TestMigration:
             assert store.count("legacy_org") == 1  # unaffected by the new tenant's append
         finally:
             store.close()
+
+    def test_legacy_db_without_violation_id_column_migrates_and_backfills_per_tenant(self, tmp_path):
+        """
+        Simulates a pre-violation_id database (has tenant_id already, but
+        no violation_id column — i.e. a Phase 5+6-era DB, one step before
+        this feature). Migration must add the column and backfill each
+        tenant's existing rows with 1, 2, 3... in row_index (insertion)
+        order, independently per tenant, without touching row_hash.
+        """
+        import hashlib
+        import json
+        import sqlite3
+
+        db_path = tmp_path / "pre_violation_id.db"
+        conn = sqlite3.connect(str(db_path))
+        conn.execute("""
+            CREATE TABLE evidence (
+                row_index           INTEGER PRIMARY KEY AUTOINCREMENT,
+                verdict_id          TEXT NOT NULL UNIQUE,
+                payload_json        TEXT NOT NULL,
+                row_hash            TEXT NOT NULL,
+                previous_hash       TEXT NOT NULL,
+                remediation_status  TEXT NOT NULL DEFAULT 'OPEN',
+                remediation_updated_at TEXT,
+                appended_at         TEXT NOT NULL,
+                tenant_id           TEXT
+            )
+        """)
+        # org_a gets 2 rows, org_b gets 1, interleaved by insertion order
+        # (org_a, org_b, org_a) to prove per-tenant numbering isn't just
+        # "whatever global row_index happens to be".
+        rows = [
+            ("org_a", "v1", GENESIS_HASH),
+            ("org_b", "v2", GENESIS_HASH),
+            ("org_a", "v3", "PREV_HASH_FOR_V3_PLACEHOLDER"),
+        ]
+        prev_hash_org_a = GENESIS_HASH
+        for tenant, vid, _ in rows:
+            payload = json.dumps({"tenant_id": tenant, "verdict_id": vid, "field": "x"}, sort_keys=True)
+            prev = prev_hash_org_a if tenant == "org_a" else GENESIS_HASH
+            row_hash = hashlib.sha256((payload + prev).encode()).hexdigest()
+            conn.execute(
+                "INSERT INTO evidence (verdict_id, payload_json, row_hash, previous_hash, appended_at, tenant_id) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (vid, payload, row_hash, prev, datetime.now(timezone.utc).isoformat(), tenant),
+            )
+            if tenant == "org_a":
+                prev_hash_org_a = row_hash
+        conn.commit()
+        conn.close()
+
+        store = EvidenceStore(db_path=db_path)
+        try:
+            org_a_rows = store.query("org_a")
+            org_b_rows = store.query("org_b")
+            assert [r["violation_id"] for r in org_a_rows] == [1, 2]
+            assert [r["violation_id"] for r in org_b_rows] == [1]
+            assert store.verify_chain("org_a") == {"valid": True, "first_broken_index": None}
+            assert store.verify_chain("org_b") == {"valid": True, "first_broken_index": None}
+        finally:
+            store.close()
+
+
+class TestPerTenantViolationId:
+
+    def test_numbering_starts_at_one_and_is_sequential_per_tenant(self, store):
+        for _ in range(3):
+            store.append(_make_explained_verdict("org_a"))
+        rows = store.query("org_a")
+        assert [r["violation_id"] for r in rows] == [1, 2, 3]
+
+    def test_two_tenants_each_start_their_own_numbering_at_one(self, store):
+        """org_a's #1 and org_b's #1 must be different rows — the whole
+        point of this being per-tenant, not global."""
+        ev_a1 = _make_explained_verdict("org_a")
+        ev_b1 = _make_explained_verdict("org_b")
+        store.append(ev_a1)
+        store.append(ev_b1)
+        store.append(_make_explained_verdict("org_a"))
+
+        a_rows = store.query("org_a")
+        b_rows = store.query("org_b")
+        assert [r["violation_id"] for r in a_rows] == [1, 2]
+        assert [r["violation_id"] for r in b_rows] == [1]
+        # And they're genuinely different underlying rows, not the same one:
+        assert a_rows[0]["verdict_id"] == str(ev_a1.verdict.verdict_id)
+        assert b_rows[0]["verdict_id"] == str(ev_b1.verdict.verdict_id)
+
+    def test_interleaved_appends_still_produce_gap_free_per_tenant_sequence(self, store):
+        for tenant in ["org_a", "org_b", "org_a", "org_b", "org_b", "org_a"]:
+            store.append(_make_explained_verdict(tenant))
+        assert [r["violation_id"] for r in store.query("org_a")] == [1, 2, 3]
+        assert [r["violation_id"] for r in store.query("org_b")] == [1, 2, 3]
+
+    def test_get_by_violation_id_returns_correct_row(self, store):
+        ev1 = _make_explained_verdict("org_a", rule_id=RuleId.EXPOSURE_001)
+        ev2 = _make_explained_verdict("org_a", rule_id=RuleId.RETENTION_001)
+        store.append(ev1)
+        store.append(ev2)
+
+        row1 = store.get_by_violation_id("org_a", 1)
+        row2 = store.get_by_violation_id("org_a", 2)
+        assert row1["verdict_id"] == str(ev1.verdict.verdict_id)
+        assert row1["rule_id"] == "EXPOSURE_001"
+        assert row2["verdict_id"] == str(ev2.verdict.verdict_id)
+        assert row2["rule_id"] == "RETENTION_001"
+
+    def test_get_by_violation_id_cross_tenant_returns_none(self, store):
+        """org_b must not be able to fetch org_a's #1 by guessing the number."""
+        store.append(_make_explained_verdict("org_a"))
+        assert store.get_by_violation_id("org_a", 1) is not None
+        assert store.get_by_violation_id("org_b", 1) is None
+
+    def test_get_by_violation_id_unknown_number_returns_none(self, store):
+        store.append(_make_explained_verdict("org_a"))
+        assert store.get_by_violation_id("org_a", 999) is None
+
+    def test_explanation_is_already_present_no_fresh_llm_call_needed(self, store):
+        """The stored row must already carry the explanation/section_cited
+        generated at detection time — get_by_violation_id is a pure read,
+        not a trigger for a new LLM call."""
+        ev = _make_explained_verdict("org_a")
+        store.append(ev)
+        row = store.get_by_violation_id("org_a", 1)
+        assert row["explanation"] == ev.explanation
+        assert row["section_cited"] == ev.section_cited

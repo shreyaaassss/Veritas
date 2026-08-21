@@ -389,6 +389,14 @@
     <span style="margin-left:auto;font-size:12px;color:var(--text3)" id="integrityTime"></span>
   </div>
 
+  <!-- Jump-to-violation-number lookup: "tag #N, get the explanation" -->
+  <div class="filters">
+    <label>Jump to</label>
+    <input type="text" id="violationLookupInput" placeholder="#3 or 3" style="width:90px" onkeydown="if(event.key==='Enter')lookupViolationNumber()" />
+    <button class="btn btn-primary" onclick="lookupViolationNumber()">Go</button>
+    <span style="font-size:12px;color:var(--text3)">Look up a violation by its per-org sequential number and see its grounded explanation instantly.</span>
+  </div>
+
   <!-- Filters -->
   <div class="filters">
     <div>
@@ -656,7 +664,7 @@ function renderAuditTable(rows) {
     const canAck = statusCls === 'OPEN';
     const canRes = statusCls === 'ACKNOWLEDGED';
     return `<tr>
-      <td class="mono">${v.row_index + 1}</td>
+      <td class="mono">#${v.violation_id}</td>
       <td style="white-space:nowrap;font-size:12px">${ts}</td>
       <td><span class="badge rule">${v.rule_id}</span></td>
       <td><span class="badge ${v.severity}">${v.severity}</span></td>
@@ -730,6 +738,7 @@ async function openDrawer(verdictId) {
 
   document.getElementById('drawerContent').innerHTML = `
     <div class="violation-top" style="margin-bottom:16px">
+      <span class="badge rule" style="font-size:13px">#${v.violation_id}</span>
       <span class="badge ${v.severity}">${v.severity}</span>
       <span class="badge rule">${v.rule_id}</span>
       ${v.breach_notification_candidate ? '<span class="badge breach">⚠ Breach Candidate</span>' : ''}
@@ -743,7 +752,7 @@ async function openDrawer(verdictId) {
     <div class="drawer-field"><div class="lbl">Statute Citation</div><div class="val" style="font-size:12px;font-style:italic;color:var(--text2)">${v.section_cited}</div></div>
     <div class="drawer-field"><div class="lbl">Current Status</div><div class="val"><span class="status-badge ${v.remediation_status}">${v.remediation_status}</span></div></div>
     ${v.remediation_updated_at ? `<div class="drawer-field"><div class="lbl">Status Updated</div><div class="val" style="font-size:12px">${new Date(v.remediation_updated_at).toLocaleString()}</div></div>` : ''}
-    <div class="drawer-field"><div class="lbl">Hash (chain position #${v.row_index + 1})</div><div class="val mono" style="font-size:10px;color:var(--text3)">${v.row_hash}</div></div>
+    <div class="drawer-field"><div class="lbl">Hash (this org's chain position #${v.violation_id})</div><div class="val mono" style="font-size:10px;color:var(--text3)">${v.row_hash}</div></div>
     <div class="drawer-actions">
       ${canAck ? `<button class="btn btn-warn" onclick="updateStatus('${v.verdict_id}','ACKNOWLEDGED')">Acknowledge</button>` : ''}
       ${canRes ? `<button class="btn btn-danger" onclick="updateStatus('${v.verdict_id}','RESOLVED')">Mark Resolved</button>` : ''}
@@ -757,6 +766,28 @@ async function openDrawer(verdictId) {
 function closeDrawer() {
   document.getElementById('drawerOverlay').classList.remove('open');
   document.getElementById('drawer').classList.remove('open');
+}
+
+// ---- "@N" violation-number lookup ----
+async function lookupViolationNumber() {
+  if (!currentOrgId) return;
+  const raw = document.getElementById('violationLookupInput').value.trim().replace(/^#/, '');
+  const n = parseInt(raw, 10);
+  if (!raw || isNaN(n) || n < 1) {
+    showToast('Enter a violation number, e.g. 3', 'error');
+    return;
+  }
+  try {
+    const r = await fetch(`/api/${encodeURIComponent(currentOrgId)}/violations/${n}`);
+    if (!r.ok) {
+      showToast(`No violation #${n} found for ${currentOrgId}`, 'error');
+      return;
+    }
+    const v = await r.json();
+    openDrawer(v.verdict_id); // reuse the existing detail drawer — same grounded explanation, already stored
+  } catch (e) {
+    showToast('Lookup failed', 'error');
+  }
 }
 
 // ---- Toast ----

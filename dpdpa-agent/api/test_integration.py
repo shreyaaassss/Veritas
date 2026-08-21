@@ -209,6 +209,36 @@ class TestCrossTenantDashboardIsolation:
         assert stats_edtech["total"] == 0
 
 
+class TestViolationNumberLookup:
+    """GET /api/{org_id}/violations/{violation_id} — the "@N" lookup."""
+
+    def test_lookup_by_number_returns_the_right_violation_with_explanation(self):
+        r = client.post("/v1/blinkit/scan", json={"text": "leaked employee id: ABCDE1234F"})
+        verdict_id = r.json()["verdicts"][0]["verdict_id"]
+
+        looked_up = client.get("/api/blinkit/violations/1")
+        assert looked_up.status_code == 200
+        body = looked_up.json()
+        assert body["verdict_id"] == verdict_id
+        assert body["violation_id"] == 1
+        assert body["explanation"]  # already populated, no extra call needed
+        assert body["section_cited"]
+
+    def test_numbering_is_per_tenant_across_the_real_http_layer(self):
+        client.post("/v1/blinkit/scan", json={"text": "leaked employee id: ABCDE1234F"})
+        client.post("/v1/edtech_co/scan", json={"text": "customer email leaked: student@example.com"})
+
+        blinkit_1 = client.get("/api/blinkit/violations/1").json()
+        edtech_1 = client.get("/api/edtech_co/violations/1").json()
+        assert blinkit_1["tenant_id"] == "blinkit"
+        assert edtech_1["tenant_id"] == "edtech_co"
+        assert blinkit_1["verdict_id"] != edtech_1["verdict_id"]
+
+    def test_unknown_number_returns_404(self):
+        r = client.get("/api/blinkit/violations/999")
+        assert r.status_code == 404
+
+
 class TestScanAndEventsShareTheSameStore:
     """Part B3: violations from /scan and /events must land in the same,
     correctly-scoped Evidence Store — no divergent storage path."""
