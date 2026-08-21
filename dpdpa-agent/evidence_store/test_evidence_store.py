@@ -1,9 +1,16 @@
 """
-Tests for Phase 6 — Evidence Store
+Tests for Phase 6 — Evidence Store (updated for Phase 5+6 per-tenant scoping)
 
 Critical tests:
   (a) Corrupt a row's content directly in the DB, confirm verify_chain() catches it.
   (b) Update a status, confirm verify_chain() still passes.
+
+Every store method now requires tenant_id — all calls below pass it
+explicitly ("blinkit", matching _make_explained_verdict's default) so this
+file continues to exercise the single-tenant behavior it always has.
+Cross-tenant isolation itself (two tenants' chains/queries never touching
+each other) is covered separately in
+rules/../api or the dedicated Phase 5+6 test file, not duplicated here.
 """
 
 from __future__ import annotations
@@ -22,12 +29,14 @@ from schemas.models import (
 from llm_explainer.explainer import ExplainedVerdict
 from evidence_store.store import EvidenceStore
 
+TENANT_ID = "blinkit"
+
 
 def _make_explained_verdict(
     rule_id: RuleId = RuleId.EXPOSURE_001,
     source_system: str = "order-service",
     severity: Severity = Severity.HIGH,
-    tenant_id: str = "blinkit",
+    tenant_id: str = TENANT_ID,
 ) -> ExplainedVerdict:
     verdict = Verdict(
         tenant_id=tenant_id,
@@ -64,20 +73,20 @@ def tmp_store(tmp_path):
 
 class TestHashChain:
     def test_empty_store_verifies(self, tmp_store):
-        result = tmp_store.verify_chain()
+        result = tmp_store.verify_chain(TENANT_ID)
         assert result["valid"] is True
         assert result["first_broken_index"] is None
 
     def test_single_row_verifies(self, tmp_store):
         ev = _make_explained_verdict()
         tmp_store.append(ev)
-        result = tmp_store.verify_chain()
+        result = tmp_store.verify_chain(TENANT_ID)
         assert result["valid"] is True
 
     def test_multiple_rows_verify(self, tmp_store):
         for _ in range(5):
             tmp_store.append(_make_explained_verdict())
-        result = tmp_store.verify_chain()
+        result = tmp_store.verify_chain(TENANT_ID)
         assert result["valid"] is True
 
     def test_corrupted_payload_detected(self, tmp_store):
@@ -95,7 +104,7 @@ class TestHashChain:
         )
         tmp_store._conn.commit()
 
-        result = tmp_store.verify_chain()
+        result = tmp_store.verify_chain(TENANT_ID)
         assert result["valid"] is False
         assert result["first_broken_index"] == 0  # 0-based, first row
 
@@ -111,7 +120,7 @@ class TestHashChain:
         )
         tmp_store._conn.commit()
 
-        result = tmp_store.verify_chain()
+        result = tmp_store.verify_chain(TENANT_ID)
         assert result["valid"] is False
         assert result["first_broken_index"] == 2  # 0-based
 
@@ -125,13 +134,13 @@ class TestHashChain:
         tmp_store.append(ev)
         verdict_id = str(ev.verdict.verdict_id)
 
-        tmp_store.update_status(verdict_id, "ACKNOWLEDGED")
+        tmp_store.update_status(TENANT_ID, verdict_id, "ACKNOWLEDGED")
 
-        result = tmp_store.verify_chain()
+        result = tmp_store.verify_chain(TENANT_ID)
         assert result["valid"] is True
 
-        tmp_store.update_status(verdict_id, "RESOLVED")
-        result = tmp_store.verify_chain()
+        tmp_store.update_status(TENANT_ID, verdict_id, "RESOLVED")
+        result = tmp_store.verify_chain(TENANT_ID)
         assert result["valid"] is True
 
     def test_chain_intact_after_multiple_statuses_and_appends(self, tmp_store):
@@ -139,11 +148,11 @@ class TestHashChain:
         for ev in evs:
             tmp_store.append(ev)
 
-        tmp_store.update_status(str(evs[0].verdict.verdict_id), "ACKNOWLEDGED")
-        tmp_store.update_status(str(evs[1].verdict.verdict_id), "ACKNOWLEDGED")
-        tmp_store.update_status(str(evs[1].verdict.verdict_id), "RESOLVED")
+        tmp_store.update_status(TENANT_ID, str(evs[0].verdict.verdict_id), "ACKNOWLEDGED")
+        tmp_store.update_status(TENANT_ID, str(evs[1].verdict.verdict_id), "ACKNOWLEDGED")
+        tmp_store.update_status(TENANT_ID, str(evs[1].verdict.verdict_id), "RESOLVED")
 
-        result = tmp_store.verify_chain()
+        result = tmp_store.verify_chain(TENANT_ID)
         assert result["valid"] is True
 
 
@@ -151,44 +160,44 @@ class TestStatusTransitions:
     def test_open_to_acknowledged(self, tmp_store):
         ev = _make_explained_verdict()
         tmp_store.append(ev)
-        tmp_store.update_status(str(ev.verdict.verdict_id), "ACKNOWLEDGED")
-        row = tmp_store.get_by_verdict_id(str(ev.verdict.verdict_id))
+        tmp_store.update_status(TENANT_ID, str(ev.verdict.verdict_id), "ACKNOWLEDGED")
+        row = tmp_store.get_by_verdict_id(TENANT_ID, str(ev.verdict.verdict_id))
         assert row["remediation_status"] == "ACKNOWLEDGED"
 
     def test_acknowledged_to_resolved(self, tmp_store):
         ev = _make_explained_verdict()
         tmp_store.append(ev)
         vid = str(ev.verdict.verdict_id)
-        tmp_store.update_status(vid, "ACKNOWLEDGED")
-        tmp_store.update_status(vid, "RESOLVED")
-        row = tmp_store.get_by_verdict_id(vid)
+        tmp_store.update_status(TENANT_ID, vid, "ACKNOWLEDGED")
+        tmp_store.update_status(TENANT_ID, vid, "RESOLVED")
+        row = tmp_store.get_by_verdict_id(TENANT_ID, vid)
         assert row["remediation_status"] == "RESOLVED"
 
     def test_open_to_resolved_rejected(self, tmp_store):
         ev = _make_explained_verdict()
         tmp_store.append(ev)
         with pytest.raises(ValueError, match="Invalid status transition"):
-            tmp_store.update_status(str(ev.verdict.verdict_id), "RESOLVED")
+            tmp_store.update_status(TENANT_ID, str(ev.verdict.verdict_id), "RESOLVED")
 
     def test_resolved_is_terminal(self, tmp_store):
         ev = _make_explained_verdict()
         tmp_store.append(ev)
         vid = str(ev.verdict.verdict_id)
-        tmp_store.update_status(vid, "ACKNOWLEDGED")
-        tmp_store.update_status(vid, "RESOLVED")
+        tmp_store.update_status(TENANT_ID, vid, "ACKNOWLEDGED")
+        tmp_store.update_status(TENANT_ID, vid, "RESOLVED")
         with pytest.raises(ValueError, match="Invalid status transition"):
-            tmp_store.update_status(vid, "ACKNOWLEDGED")
+            tmp_store.update_status(TENANT_ID, vid, "ACKNOWLEDGED")
 
     def test_unknown_verdict_raises(self, tmp_store):
         with pytest.raises(ValueError, match="Verdict not found"):
-            tmp_store.update_status("non-existent-id", "ACKNOWLEDGED")
+            tmp_store.update_status(TENANT_ID, "non-existent-id", "ACKNOWLEDGED")
 
 
 class TestQuery:
     def test_query_all(self, tmp_store):
         for _ in range(3):
             tmp_store.append(_make_explained_verdict())
-        results = tmp_store.query()
+        results = tmp_store.query(TENANT_ID)
         assert len(results) == 3
 
     def test_query_by_remediation_status(self, tmp_store):
@@ -196,10 +205,10 @@ class TestQuery:
         ev2 = _make_explained_verdict()
         tmp_store.append(ev1)
         tmp_store.append(ev2)
-        tmp_store.update_status(str(ev1.verdict.verdict_id), "ACKNOWLEDGED")
+        tmp_store.update_status(TENANT_ID, str(ev1.verdict.verdict_id), "ACKNOWLEDGED")
 
-        open_results = tmp_store.query(remediation_status="OPEN")
-        acknowledged_results = tmp_store.query(remediation_status="ACKNOWLEDGED")
+        open_results = tmp_store.query(TENANT_ID, remediation_status="OPEN")
+        acknowledged_results = tmp_store.query(TENANT_ID, remediation_status="ACKNOWLEDGED")
         assert len(open_results) == 1
         assert len(acknowledged_results) == 1
 
@@ -209,7 +218,7 @@ class TestQuery:
         tmp_store.append(ev_order)
         tmp_store.append(ev_marketing)
 
-        results = tmp_store.query(source_system="order-service")
+        results = tmp_store.query(TENANT_ID, source_system="order-service")
         assert len(results) == 1
         assert results[0]["source_system"] == "order-service"
 
@@ -219,19 +228,19 @@ class TestQuery:
         tmp_store.append(ev_high)
         tmp_store.append(ev_medium)
 
-        results = tmp_store.query(severity="HIGH")
+        results = tmp_store.query(TENANT_ID, severity="HIGH")
         assert len(results) == 1
         assert results[0]["severity"] == "HIGH"
 
     def test_get_by_verdict_id(self, tmp_store):
         ev = _make_explained_verdict()
         tmp_store.append(ev)
-        row = tmp_store.get_by_verdict_id(str(ev.verdict.verdict_id))
+        row = tmp_store.get_by_verdict_id(TENANT_ID, str(ev.verdict.verdict_id))
         assert row is not None
         assert row["verdict_id"] == str(ev.verdict.verdict_id)
 
     def test_get_by_unknown_id_returns_none(self, tmp_store):
-        assert tmp_store.get_by_verdict_id("nonexistent") is None
+        assert tmp_store.get_by_verdict_id(TENANT_ID, "nonexistent") is None
 
     def test_duplicate_verdict_id_rejected(self, tmp_store):
         ev = _make_explained_verdict()

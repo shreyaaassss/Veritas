@@ -32,3 +32,7 @@ openai>=1.0.0                 # Used for LLM calls; falls back gracefully if no 
 
 # --- Testing ---
 pytest==8.3.3
+
+# --- Phase 5: Integration API Layer ---
+requests>=2.31.0       # veritas_scan_cli.py — thin HTTP client, calls the running service's /scan endpoint
+httpx>=0.27.0           # FastAPI TestClient dependency (tests only)

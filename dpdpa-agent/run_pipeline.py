@@ -110,7 +110,7 @@ async def broadcast_from_queue(
       1. Appends to Evidence Store (if not already stored)
       2. Broadcasts to WebSocket clients via the dashboard broadcaster
     """
-    from dashboard.server import broadcast_to_websockets
+    from dashboard.live_feed import publish as publish_live_feed
 
     processed = 0
     while max_items is None or processed < max_items:
@@ -121,7 +121,8 @@ async def broadcast_from_queue(
         except Exception as exc:
             logger.warning("Evidence store append failed (possible duplicate): %s", exc)
 
-        # Broadcast to WebSocket clients
+        # Broadcast to this verdict's tenant's WebSocket room only (Phase 6 —
+        # dashboard.live_feed routes by payload["tenant_id"], see that module).
         try:
             payload = {
                 **ev.verdict.model_dump(mode="json"),
@@ -130,7 +131,7 @@ async def broadcast_from_queue(
                 "confidence": ev.confidence,
                 "used_fallback": ev.used_fallback,
             }
-            await broadcast_to_websockets(payload)
+            await publish_live_feed(payload)
         except Exception as exc:
             logger.warning("WebSocket broadcast failed: %s", exc)
 

@@ -1,29 +1,45 @@
 """
-DPDPA Compliance Agent — Dashboard Server (Phase 7)
-====================================================
+DPDPA Compliance Agent — Dashboard Server (Phase 7, multi-tenant since Phase 5+6)
+====================================================================================
 FastAPI server providing:
-  - GET /           — serves the dashboard HTML
-  - WebSocket /ws   — live feed of ExplainedVerdicts as they arrive
-  - GET /api/verdicts — Evidence Store query with filters
-  - GET /api/verdicts/{verdict_id} — single verdict detail
-  - POST /api/verdicts/{verdict_id}/status — update remediation_status
-  - GET /api/verify-chain — run verify_chain() and return result
-  - GET /api/stats  — summary counts by rule_type, severity, source_system
+  - GET /                          — serves the dashboard HTML
+  - WebSocket /ws/{org_id}         — live feed of ExplainedVerdicts for ONE org
+  - GET /api/{org_id}/verdicts     — Evidence Store query, scoped to org_id
+  - GET /api/{org_id}/verdicts/{verdict_id} — single verdict detail, scoped
+  - POST /api/{org_id}/verdicts/{verdict_id}/status — update remediation_status, scoped
+  - GET /api/{org_id}/verify-chain — run verify_chain(org_id) and return result
+  - GET /api/{org_id}/stats        — summary counts, scoped to org_id
+  - PLUS everything mounted from api/integration.py (Phase 5): POST
+    /v1/{org_id}/events, POST /v1/{org_id}/scan, POST /v1/orgs/{org_id}/config
+
+PHASE 6 CHANGE — every one of the dashboard's own routes above now takes
+org_id as a required path parameter and scopes its EvidenceStore call
+accordingly (see evidence_store/store.py's own Phase 6 doc comment: every
+read method there now REQUIRES tenant_id). Before this phase, none of
+these routes took any org_id at all — GET /api/verdicts queried across
+every tenant's data unconditionally, and GET /ws broadcast every org's
+verdicts to every connected client. Both were real cross-tenant leaks;
+both are fixed here. See dashboard/live_feed.py for the WebSocket-room fix.
+
+The dashboard has no authentication/session model of any kind (checked
+before choosing an approach, per the plan's instruction) — so tenant
+scoping here is done via an explicit org_id in the URL, matched by a
+dropdown/org-selector in the front-end (index.html), not by any inferred
+identity. Real auth is flagged as a demo-readiness gap in the phase
+report, not built here (explicit non-goal).
 
 Run with:
     python -m dashboard.server
     python -m dashboard.server --port 8080
 
-Or from the pipeline (run.py) which starts it programmatically.
+Or from the pipeline (run_pipeline.py) which starts it programmatically.
 """
 
 from __future__ import annotations
 
 import argparse
 import asyncio
-import json
 import logging
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
@@ -33,7 +49,9 @@ from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from evidence_store.store import EvidenceStore, get_store
+from api.integration import router as integration_router
+from dashboard.live_feed import broadcaster_task, get_live_feed_queue, register_client, unregister_client
+from evidence_store.store import get_store
 
 logger = logging.getLogger("dashboard.server")
 
@@ -46,47 +64,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ---------------------------------------------------------------------------
-# Global state: connected WebSocket clients + the live-feed queue
-# ---------------------------------------------------------------------------
-
-_ws_clients: list[WebSocket] = []
-_live_feed_queue: asyncio.Queue = asyncio.Queue()
-
-
-def get_live_feed_queue() -> asyncio.Queue:
-    return _live_feed_queue
-
-
-async def broadcast_to_websockets(data: dict) -> None:
-    """Send a JSON payload to all connected WebSocket clients."""
-    dead = []
-    for ws in list(_ws_clients):
-        try:
-            await ws.send_json(data)
-        except Exception:
-            dead.append(ws)
-    for ws in dead:
-        if ws in _ws_clients:
-            _ws_clients.remove(ws)
+app.include_router(integration_router)
 
 
 # ---------------------------------------------------------------------------
-# WebSocket broadcaster background task
-# ---------------------------------------------------------------------------
-
-async def _ws_broadcaster() -> None:
-    """
-    Reads from _live_feed_queue and broadcasts to all connected WebSocket clients.
-    Runs forever as a background task once the server starts.
-    """
-    while True:
-        data = await _live_feed_queue.get()
-        await broadcast_to_websockets(data)
-
-
-# ---------------------------------------------------------------------------
-# Routes
+# Routes — dashboard page + WebSocket
 # ---------------------------------------------------------------------------
 
 @app.get("/", response_class=HTMLResponse)
@@ -95,27 +77,37 @@ async def serve_dashboard():
     return HTMLResponse(html_path.read_text(encoding="utf-8"))
 
 
-@app.websocket("/ws")
-async def websocket_endpoint(ws: WebSocket):
+@app.websocket("/ws/{org_id}")
+async def websocket_endpoint(ws: WebSocket, org_id: str):
+    """
+    Live feed for exactly ONE org's verdicts. A client connected here for
+    org_id="A" is registered only in dashboard.live_feed's "A" room and
+    will never receive a payload whose tenant_id is anything else — see
+    live_feed.broadcast()'s per-room routing.
+    """
     await ws.accept()
-    _ws_clients.append(ws)
-    logger.info("WebSocket client connected. Total: %d", len(_ws_clients))
+    register_client(org_id, ws)
+    logger.info("WebSocket client connected for org_id=%r.", org_id)
     try:
         while True:
-            # Keep connection alive; data flows from broadcaster
+            # Keep connection alive; data flows from broadcaster_task via publish().
             await asyncio.sleep(30)
     except WebSocketDisconnect:
         pass
     except Exception:
         pass
     finally:
-        if ws in _ws_clients:
-            _ws_clients.remove(ws)
-        logger.info("WebSocket client disconnected. Total: %d", len(_ws_clients))
+        unregister_client(org_id, ws)
+        logger.info("WebSocket client disconnected for org_id=%r.", org_id)
 
 
-@app.get("/api/verdicts")
+# ---------------------------------------------------------------------------
+# Routes — Evidence Store queries, all org_id-scoped
+# ---------------------------------------------------------------------------
+
+@app.get("/api/{org_id}/verdicts")
 async def list_verdicts(
+    org_id: str,
     source_system: Optional[str] = Query(None),
     severity: Optional[str] = Query(None),
     remediation_status: Optional[str] = Query(None),
@@ -125,6 +117,7 @@ async def list_verdicts(
     store = get_store()
     date_range = (date_start, date_end) if date_start and date_end else None
     rows = store.query(
+        org_id,
         date_range=date_range,
         source_system=source_system,
         severity=severity,
@@ -133,12 +126,12 @@ async def list_verdicts(
     return {"verdicts": rows, "count": len(rows)}
 
 
-@app.get("/api/verdicts/{verdict_id}")
-async def get_verdict(verdict_id: str):
+@app.get("/api/{org_id}/verdicts/{verdict_id}")
+async def get_verdict(org_id: str, verdict_id: str):
     store = get_store()
-    row = store.get_by_verdict_id(verdict_id)
+    row = store.get_by_verdict_id(org_id, verdict_id)
     if row is None:
-        raise HTTPException(status_code=404, detail=f"Verdict {verdict_id!r} not found")
+        raise HTTPException(status_code=404, detail=f"Verdict {verdict_id!r} not found for org_id {org_id!r}")
     return row
 
 
@@ -146,28 +139,28 @@ class StatusUpdate(BaseModel):
     status: str
 
 
-@app.post("/api/verdicts/{verdict_id}/status")
-async def update_verdict_status(verdict_id: str, body: StatusUpdate):
+@app.post("/api/{org_id}/verdicts/{verdict_id}/status")
+async def update_verdict_status(org_id: str, verdict_id: str, body: StatusUpdate):
     store = get_store()
     try:
-        store.update_status(verdict_id, body.status)
-        row = store.get_by_verdict_id(verdict_id)
+        store.update_status(org_id, verdict_id, body.status)
+        row = store.get_by_verdict_id(org_id, verdict_id)
         return {"ok": True, "verdict": row}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@app.get("/api/verify-chain")
-async def verify_chain():
+@app.get("/api/{org_id}/verify-chain")
+async def verify_chain(org_id: str):
     store = get_store()
-    result = store.verify_chain()
+    result = store.verify_chain(org_id)
     return result
 
 
-@app.get("/api/stats")
-async def get_stats():
+@app.get("/api/{org_id}/stats")
+async def get_stats(org_id: str):
     store = get_store()
-    rows = store.query()
+    rows = store.query(org_id)
     stats: dict[str, Any] = {
         "total": len(rows),
         "by_rule": {},
@@ -197,8 +190,8 @@ async def get_stats():
 
 @app.on_event("startup")
 async def startup_event():
-    asyncio.create_task(_ws_broadcaster())
-    logger.info("Dashboard server started. WebSocket broadcaster running.")
+    asyncio.create_task(broadcaster_task())
+    logger.info("Dashboard server started. Tenant-scoped WebSocket broadcaster running.")
 
 
 # ---------------------------------------------------------------------------

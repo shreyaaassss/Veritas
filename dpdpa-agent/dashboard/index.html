@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Veritas — DPDPA Compliance Dashboard | Blinkit</title>
-  <meta name="description" content="Real-time DPDPA compliance monitoring for Blinkit. Live violation feed, tamper-evident evidence store, and auditor-grade remediation tracking." />
+  <title>Veritas — DPDPA Compliance Dashboard</title>
+  <meta name="description" content="Real-time, multi-tenant DPDPA compliance monitoring. Live violation feed, tamper-evident evidence store, and auditor-grade remediation tracking, scoped per organisation." />
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
@@ -314,6 +314,23 @@
     .toast.show { opacity: 1; transform: translateY(0); }
     .toast.success { border-color: var(--low); color: var(--low); }
     .toast.error { border-color: var(--high); color: var(--high); }
+
+    /* ---- Org selector ---- */
+    .org-selector { display: flex; align-items: center; gap: 8px; }
+    .org-selector label { font-size: 12px; color: var(--text3); }
+    .org-selector select {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: var(--radius-sm);
+      padding: 6px 10px;
+      font-size: 13px;
+      font-family: inherit;
+      outline: none;
+      cursor: pointer;
+      min-width: 140px;
+    }
+    .org-selector select:focus { border-color: var(--accent); }
   </style>
 </head>
 <body>
@@ -323,10 +340,16 @@
     <div class="logo">⚖️</div>
     <div>
       <h1>Veritas</h1>
-      <div class="sub">DPDPA Compliance Monitor · Blinkit</div>
+      <div class="sub">DPDPA Compliance Monitor</div>
     </div>
   </div>
   <div class="header-status">
+    <div class="org-selector">
+      <label for="orgSelector">Org</label>
+      <select id="orgSelector" onchange="onOrgChange()">
+        <option value="">Loading…</option>
+      </select>
+    </div>
     <div class="ws-dot connecting" id="wsDot"></div>
     <span id="wsLabel">Connecting…</span>
   </div>
@@ -370,13 +393,7 @@
   <div class="filters">
     <div>
       <label>Source System</label>
-      <select id="f-system">
-        <option value="">All Systems</option>
-        <option value="order-service">order-service</option>
-        <option value="delivery-partner-service">delivery-partner-service</option>
-        <option value="support-ticketing">support-ticketing</option>
-        <option value="marketing-analytics">marketing-analytics</option>
-      </select>
+      <input type="text" id="f-system" placeholder="e.g. order-service (blank = all)" />
     </div>
     <div>
       <label>Severity</label>
@@ -439,8 +456,49 @@
 // ---- State ----
 let ws = null;
 let wsConnected = false;
+let wsReconnectTimer = null;
 let localViolations = []; // live feed buffer
 const MAX_FEED = 100;
+
+// currentOrgId scopes EVERY API call and the WebSocket connection below.
+// Persisted per-viewer in localStorage purely as a convenience (remembers
+// your last-selected org across reloads) — never trusted as auth, since
+// this dashboard has none (see dashboard/server.py's module docstring).
+let currentOrgId = localStorage.getItem('veritas_org_id') || '';
+
+// ---- Org selector ----
+async function populateOrgSelector() {
+  const sel = document.getElementById('orgSelector');
+  try {
+    const r = await fetch('/v1/orgs');
+    const data = await r.json();
+    const orgIds = data.org_ids || [];
+    if (orgIds.length === 0) {
+      sel.innerHTML = '<option value="">No orgs registered</option>';
+      return;
+    }
+    if (!currentOrgId || !orgIds.includes(currentOrgId)) {
+      currentOrgId = orgIds[0];
+    }
+    sel.innerHTML = orgIds.map(id =>
+      `<option value="${id}" ${id === currentOrgId ? 'selected' : ''}>${id}</option>`
+    ).join('');
+  } catch (e) {
+    sel.innerHTML = '<option value="">Failed to load orgs</option>';
+  }
+}
+
+function onOrgChange() {
+  const sel = document.getElementById('orgSelector');
+  currentOrgId = sel.value;
+  localStorage.setItem('veritas_org_id', currentOrgId);
+  clearFeed();
+  connectWS();
+  refreshStats();
+  if (document.getElementById('main-audit').classList.contains('active')) {
+    loadAuditTable();
+  }
+}
 
 // ---- Tab switching ----
 function showTab(name) {
@@ -453,13 +511,17 @@ function showTab(name) {
 
 // ---- WebSocket ----
 function connectWS() {
+  if (!currentOrgId) return;
+  if (wsReconnectTimer) { clearTimeout(wsReconnectTimer); wsReconnectTimer = null; }
+  if (ws) { ws.onclose = null; ws.close(); }
+
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  ws = new WebSocket(`${proto}://${location.host}/ws`);
+  ws = new WebSocket(`${proto}://${location.host}/ws/${encodeURIComponent(currentOrgId)}`);
 
   ws.onopen = () => {
     wsConnected = true;
     document.getElementById('wsDot').className = 'ws-dot connected';
-    document.getElementById('wsLabel').textContent = 'Live';
+    document.getElementById('wsLabel').textContent = `Live — ${currentOrgId}`;
   };
 
   ws.onmessage = (evt) => {
@@ -473,7 +535,7 @@ function connectWS() {
     wsConnected = false;
     document.getElementById('wsDot').className = 'ws-dot';
     document.getElementById('wsLabel').textContent = 'Disconnected — reconnecting…';
-    setTimeout(connectWS, 3000);
+    wsReconnectTimer = setTimeout(connectWS, 3000);
   };
 
   ws.onerror = () => ws.close();
@@ -481,6 +543,11 @@ function connectWS() {
 
 // ---- Live feed ----
 function handleLiveViolation(v) {
+  // Defense in depth: the WS connection is already per-org (see connectWS),
+  // but ignore any stray payload for a different org_id rather than trust
+  // the socket alone (e.g. a message already in flight at the instant of
+  // an org switch).
+  if (v.tenant_id && v.tenant_id !== currentOrgId) return;
   localViolations.unshift(v);
   if (localViolations.length > MAX_FEED) localViolations.pop();
   renderFeed();
@@ -533,8 +600,9 @@ function clearFeed() {
 
 // ---- Stats ----
 async function refreshStats() {
+  if (!currentOrgId) return;
   try {
-    const r = await fetch('/api/stats');
+    const r = await fetch(`/api/${encodeURIComponent(currentOrgId)}/stats`);
     const s = await r.json();
     document.getElementById('st-total').textContent = s.total;
     document.getElementById('st-high').textContent = s.by_severity?.HIGH || 0;
@@ -548,6 +616,7 @@ async function refreshStats() {
 
 // ---- Audit table ----
 async function loadAuditTable() {
+  if (!currentOrgId) return;
   const system = document.getElementById('f-system').value;
   const severity = document.getElementById('f-severity').value;
   const status = document.getElementById('f-status').value;
@@ -558,7 +627,7 @@ async function loadAuditTable() {
   if (status) params.set('remediation_status', status);
 
   try {
-    const r = await fetch('/api/verdicts?' + params);
+    const r = await fetch(`/api/${encodeURIComponent(currentOrgId)}/verdicts?` + params);
     const data = await r.json();
     renderAuditTable(data.verdicts || []);
     document.getElementById('auditCount').textContent = `${data.count} record${data.count !== 1 ? 's' : ''}`;
@@ -606,7 +675,7 @@ function renderAuditTable(rows) {
 
 async function updateStatus(verdictId, newStatus) {
   try {
-    const r = await fetch(`/api/verdicts/${verdictId}/status`, {
+    const r = await fetch(`/api/${encodeURIComponent(currentOrgId)}/verdicts/${verdictId}/status`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({status: newStatus}),
@@ -633,7 +702,7 @@ async function runVerifyChain() {
   el.innerHTML = '⏳ Verifying…';
   el.className = 'integrity-result';
   try {
-    const r = await fetch('/api/verify-chain');
+    const r = await fetch(`/api/${encodeURIComponent(currentOrgId)}/verify-chain`);
     const data = await r.json();
     if (data.valid) {
       el.innerHTML = '✅ Chain intact — all records verified';
@@ -651,7 +720,7 @@ async function runVerifyChain() {
 
 // ---- Detail drawer ----
 async function openDrawer(verdictId) {
-  const r = await fetch(`/api/verdicts/${verdictId}`);
+  const r = await fetch(`/api/${encodeURIComponent(currentOrgId)}/verdicts/${verdictId}`);
   if (!r.ok) { showToast('Failed to load verdict', 'error'); return; }
   const v = await r.json();
 
@@ -699,9 +768,12 @@ function showToast(msg, type='success') {
 }
 
 // ---- Init ----
-connectWS();
-refreshStats();
-setInterval(refreshStats, 5000);
+(async function init() {
+  await populateOrgSelector();
+  connectWS();
+  refreshStats();
+  setInterval(refreshStats, 5000);
+})();
 </script>
 </body>
 </html>

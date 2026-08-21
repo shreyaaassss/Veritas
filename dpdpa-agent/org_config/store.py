@@ -186,6 +186,22 @@ def list_org_config_versions(org_id: str) -> List[str]:
     return sorted(p.name for p in org_dir.glob("*.yaml"))
 
 
+def list_registered_orgs() -> List[str]:
+    """
+    Phase 5: returns every org_id that has at least one stored config
+    version, sorted alphabetically. Powers the dashboard's org-selector
+    (dashboard/index.html) and the /v1/orgs API route — deliberately a
+    thin read of the filesystem, no caching, since this is a low-traffic,
+    demo-scale listing, not a hot path.
+    """
+    if not _CONFIGS_DIR.exists():
+        return []
+    return sorted(
+        d.name for d in _CONFIGS_DIR.iterdir()
+        if d.is_dir() and any(d.glob("*.yaml"))
+    )
+
+
 def delete_org_configs(org_id: str) -> int:
     """
     Delete all stored configs for an org. Returns the number of files deleted.
