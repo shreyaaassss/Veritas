@@ -9,30 +9,33 @@
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
     :root {
-      --bg: #0a0d14;
-      --surface: #111623;
-      --surface2: #1a2035;
-      --surface3: #222b42;
-      --border: #2a3555;
-      --border2: #3a4a6b;
-      --text: #e2e8f0;
-      --text2: #94a3b8;
-      --text3: #64748b;
-      --accent: #ffffff;
-      --accent2: #818cf8;
-      --accent-glow: rgba(99,102,241,0.15);
+      --bg: #09090b;
+      --sidebar: #09090b;
+      --surface: #09090b;
+      --surface2: #18181b;
+      --surface3: #27272a;
+      --border: #27272a;
+      --border2: #3f3f46;
+      --text: #fafafa;
+      --text2: #a1a1aa;
+      --text3: #71717a;
+      --accent: #fafafa;
+      --accent2: #10b981;
+      --accent-glow: rgba(16, 185, 129, 0.15);
       --high: #ef4444;
-      --high-bg: rgba(239,68,68,0.12);
+      --high-bg: rgba(239, 68, 68, 0.15);
       --medium: #f59e0b;
-      --medium-bg: rgba(245,158,11,0.12);
-      --low: #22c55e;
-      --low-bg: rgba(34,197,94,0.12);
-      --open: #94a3b8;
+      --medium-bg: rgba(245, 158, 11, 0.15);
+      --low: #10b981;
+      --low-bg: rgba(16, 185, 129, 0.15);
+      --open: #3b82f6;
       --ack: #f59e0b;
-      --resolved: #22c55e;
-      --breach: #f87171;
-      --radius: 10px;
+      --resolved: #10b981;
+      --breach: #ef4444;
+      --radius: 12px;
       --radius-sm: 6px;
+      --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -43,83 +46,213 @@
       color: var(--text);
       min-height: 100vh;
       display: flex;
-      flex-direction: column;
+      overflow: hidden; /* App takes full screen, inner content scrolls */
     }
 
-    /* ---- Header ---- */
-    .header {
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      padding: 14px 28px;
+    /* ---- App Layout ---- */
+    .app-container {
+      display: flex;
+      width: 100%;
+      height: 100vh;
+    }
+
+    /* ---- Sidebar ---- */
+    .sidebar {
+      width: 260px;
+      background: var(--sidebar);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 24px 16px;
+      z-index: 50;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 40px;
+      padding: 0 8px;
+    }
+    .brand .logo {
+      width: 36px; height: 36px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px;
+      color: var(--accent2);
+    }
+    .brand h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; color: #fff;}
+    .brand .sub { font-size: 11px; color: var(--text3); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;}
+
+    .nav-menu {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      color: var(--text2);
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+      user-select: none;
+    }
+    .nav-item:hover {
+      background: var(--surface2);
+      color: var(--text);
+    }
+    .nav-item.active {
+      background: var(--accent-glow);
+      color: var(--accent2);
+    }
+    .nav-icon {
+      font-size: 16px;
+    }
+
+    /* ---- Main Content Area ---- */
+    .main-wrapper {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: var(--bg);
+    }
+
+    /* ---- Topbar ---- */
+    .topbar {
+      height: 72px;
+      padding: 0 32px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      position: sticky;
-      top: 0;
-      z-index: 100;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+      z-index: 40;
     }
-    .header-brand { display: flex; align-items: center; gap: 12px; }
-    .header-brand .logo {
-      width: 32px; height: 32px;
-      background: linear-gradient(135deg, var(--accent), #a855f7);
-      border-radius: 8px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 16px;
+
+    .topbar-title {
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--text);
     }
-    .header-brand h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
-    .header-brand .sub { font-size: 12px; color: var(--text3); font-weight: 400; }
-    .header-status { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text3); }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .org-selector { display: flex; align-items: center; gap: 10px; }
+    .org-selector label { font-size: 12px; color: var(--text3); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;}
+    .org-selector select {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: var(--radius-sm);
+      padding: 8px 12px;
+      font-size: 13px;
+      font-weight: 500;
+      font-family: inherit;
+      outline: none;
+      cursor: pointer;
+      min-width: 160px;
+      box-shadow: var(--shadow-sm);
+      transition: border-color 0.2s;
+    }
+    .org-selector select:focus { border-color: var(--accent2); }
+
+    .header-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text2);
+      padding: 8px 12px;
+      background: var(--surface);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-sm);
+    }
     .ws-dot {
       width: 8px; height: 8px; border-radius: 50%;
       background: var(--text3);
-      transition: background 0.3s;
+      transition: background 0.3s, box-shadow 0.3s;
     }
-    .ws-dot.connected { background: var(--low); box-shadow: 0 0 6px var(--low); }
-    .ws-dot.connecting { background: var(--medium); animation: pulse 1s infinite; }
-
+    .ws-dot.connected { background: var(--low); box-shadow: 0 0 8px var(--low); }
+    .ws-dot.connecting { background: var(--medium); animation: pulse 1.5s infinite; }
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 
-    /* ---- Tabs ---- */
-    .tabs {
-      display: flex;
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      padding: 0 28px;
-      gap: 4px;
+    /* ---- Page Content ---- */
+    .page-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 32px;
     }
-    .tab {
-      padding: 12px 20px;
-      cursor: pointer;
-      border-bottom: 2px solid transparent;
-      font-size: 14px;
-      font-weight: 500;
-      color: var(--text3);
-      transition: all 0.2s;
-      user-select: none;
-    }
-    .tab:hover { color: var(--text); }
-    .tab.active { color: var(--accent2); border-bottom-color: var(--accent); }
+    .page-section { display: none; flex-direction: column; gap: 24px; animation: fadeIn 0.3s ease; }
+    .page-section.active { display: flex; }
 
-    /* ---- Main layout ---- */
-    .main { flex: 1; padding: 24px 28px; display: none; flex-direction: column; gap: 20px; }
-    .main.active { display: flex; }
+    @keyframes fadeIn { from{opacity:0; transform:translateY(5px)} to{opacity:1; transform:translateY(0)} }
 
     /* ---- Stats bar ---- */
     .stats-bar {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-      gap: 12px;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
     }
     .stat-card {
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 16px;
-      transition: border-color 0.2s;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-shadow: var(--shadow-sm);
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
     }
-    .stat-card:hover { border-color: var(--border2); }
-    .stat-card .label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
-    .stat-card .value { font-size: 26px; font-weight: 700; line-height: 1; }
+    .stat-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+      border-color: var(--border2);
+    }
+
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 3px;
+      background: var(--border2);
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .stat-card:hover::before { opacity: 1; }
+    .stat-card.primary::before { background: var(--accent2); opacity: 1; }
+
+    .stat-card .label { font-size: 12px; color: var(--text2); font-weight: 500; }
+    .stat-card .value { font-size: 32px; font-weight: 700; line-height: 1; color: var(--text); }
+
+    /* Decorative background icon — was previously unstyled (no width/height),
+       so it rendered at full intrinsic SVG size and dominated the card. */
+    .stat-card .bg-icon {
+      position: absolute;
+      bottom: -14px;
+      right: -10px;
+      width: 56px;
+      height: 56px;
+      color: var(--text);
+      opacity: 0.06;
+      pointer-events: none;
+    }
+
+    /* Specific stat colors */
     .stat-card .value.high { color: var(--high); }
     .stat-card .value.medium { color: var(--medium); }
     .stat-card .value.breach { color: var(--breach); }
@@ -128,110 +261,165 @@
     /* ---- Section headings ---- */
     .section-header {
       display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 12px;
+      margin-top: 16px;
+      margin-bottom: 8px;
     }
-    .section-header h2 { font-size: 15px; font-weight: 600; }
+    .section-header h2 { font-size: 16px; font-weight: 600; color: var(--text); }
 
     /* ---- Violation card (live feed) ---- */
-    .violation-list { display: flex; flex-direction: column; gap: 10px; max-height: 70vh; overflow-y: auto; }
-    .violation-list::-webkit-scrollbar { width: 4px; }
-    .violation-list::-webkit-scrollbar-track { background: var(--surface); }
-    .violation-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+    .violation-list { display: flex; flex-direction: column; gap: 12px; }
 
     .violation-card {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-left: 3px solid var(--border);
-      border-radius: var(--radius);
-      padding: 14px 16px;
-      animation: slideIn 0.3s ease;
-      transition: border-color 0.2s, transform 0.1s;
+      border-left: 4px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 16px 20px;
+      box-shadow: var(--shadow-sm);
+      animation: slideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: border-color 0.2s, transform 0.15s, box-shadow 0.2s;
     }
-    .violation-card:hover { border-color: var(--border2); transform: translateX(2px); }
-    .violation-card.HIGH { border-left-color: var(--high); background: linear-gradient(90deg, var(--high-bg) 0%, var(--surface) 60%); }
-    .violation-card.MEDIUM { border-left-color: var(--medium); background: linear-gradient(90deg, var(--medium-bg) 0%, var(--surface) 60%); }
-    .violation-card.LOW { border-left-color: var(--low); background: linear-gradient(90deg, var(--low-bg) 0%, var(--surface) 60%); }
+    .violation-card:hover {
+      border-color: var(--border2);
+      transform: translateX(4px);
+      box-shadow: var(--shadow-md);
+    }
 
-    @keyframes slideIn { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
+    .violation-card.HIGH { border-left-color: var(--high); }
+    .violation-card.MEDIUM { border-left-color: var(--medium); }
+    .violation-card.LOW { border-left-color: var(--low); }
 
-    .violation-top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+    @keyframes slideIn { from{opacity:0;transform:translateX(-12px)} to{opacity:1;transform:translateX(0)} }
+
+    .violation-top { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
     .badge {
-      padding: 2px 8px;
-      border-radius: 4px;
+      padding: 4px 10px;
+      border-radius: 6px;
       font-size: 11px;
       font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 0.3px;
+      letter-spacing: 0.5px;
     }
-    .badge.HIGH { background: var(--high-bg); color: var(--high); }
-    .badge.MEDIUM { background: var(--medium-bg); color: var(--medium); }
-    .badge.LOW { background: var(--low-bg); color: var(--low); }
-    .badge.rule { background: var(--accent-glow); color: var(--accent2); }
-    .badge.system { background: rgba(148,163,184,0.08); color: var(--text2); }
-    .badge.breach { background: rgba(248,113,113,0.15); color: var(--breach); border: 1px solid var(--breach); }
-    .badge.fallback { background: rgba(245,158,11,0.1); color: var(--medium); }
+    .badge.HIGH { background: var(--high-bg); color: var(--high); box-shadow: inset 0 0 0 1px rgba(253, 176, 138, 0.2); }
+    .badge.MEDIUM { background: var(--medium-bg); color: var(--medium); box-shadow: inset 0 0 0 1px rgba(245, 213, 118, 0.2); }
+    .badge.LOW { background: var(--low-bg); color: var(--low); box-shadow: inset 0 0 0 1px rgba(137, 226, 168, 0.2); }
+    .badge.rule { background: var(--accent-glow); color: var(--accent2); box-shadow: inset 0 0 0 1px rgba(122, 157, 250, 0.2); }
+    .badge.system { background: var(--surface2); color: var(--text2); border: 1px solid var(--border); }
+    .badge.breach { background: rgba(248,113,113,0.15); color: var(--breach); border: 1px solid rgba(248,113,113,0.3); }
+    .badge.fallback { background: var(--medium-bg); color: var(--medium); border: 1px solid rgba(245, 213, 118, 0.3); }
 
-    .violation-field { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text2); }
-    .violation-explanation { font-size: 13px; color: var(--text2); margin-top: 6px; line-height: 1.5; }
-    .violation-section { font-size: 11px; color: var(--text3); margin-top: 4px; font-style: italic; }
-    .violation-time { font-size: 11px; color: var(--text3); margin-left: auto; white-space: nowrap; }
+    .violation-field { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text2); background: var(--bg); padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border); }
+    .violation-explanation { font-size: 14px; color: var(--text); margin-top: 8px; line-height: 1.6; font-weight: 400;}
+    .violation-section { font-size: 12px; color: var(--text3); margin-top: 8px; display: flex; align-items: center; gap: 6px; }
 
-    /* ---- Filters ---- */
-    .filters {
-      display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+    .violation-time { font-size: 12px; color: var(--text3); margin-left: auto; font-weight: 500;}
+
+    /* ---- Filters & Actions ---- */
+    .filters-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 14px 16px;
+      padding: 16px 20px;
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+      gap: 16px;
     }
-    .filters label { font-size: 12px; color: var(--text3); margin-right: 4px; }
-    .filters select, .filters input {
-      background: var(--surface2);
+
+    .filters-group {
+      display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
+    }
+
+    .filter-item {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .filter-item label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text3); }
+    .filter-item select, .filter-item input {
+      background: var(--bg);
       border: 1px solid var(--border);
       color: var(--text);
       border-radius: var(--radius-sm);
-      padding: 6px 10px;
+      padding: 8px 12px;
       font-size: 13px;
       font-family: inherit;
       outline: none;
-      cursor: pointer;
+      transition: all 0.2s;
     }
-    .filters select:focus, .filters input:focus { border-color: var(--accent); }
+    .filter-item select:focus, .filter-item input:focus { border-color: var(--accent2); box-shadow: 0 0 0 2px var(--accent-glow); }
+
     .btn {
-      padding: 7px 14px;
+      padding: 8px 16px;
       border: none;
       border-radius: var(--radius-sm);
       font-size: 13px;
-      font-weight: 500;
+      font-weight: 600;
       cursor: pointer;
       font-family: inherit;
-      transition: all 0.15s;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
     }
-    .btn-primary { background: var(--accent); color: #fff; }
-    .btn-primary:hover { background: var(--accent2); }
-    .btn-secondary { background: var(--surface2); color: var(--text2); border: 1px solid var(--border); }
-    .btn-secondary:hover { border-color: var(--border2); color: var(--text); }
-    .btn-verify { background: transparent; color: var(--accent2); border: 1px solid var(--accent); }
-    .btn-verify:hover { background: var(--accent-glow); }
-    .btn-danger { background: var(--high-bg); color: var(--high); border: 1px solid var(--high); font-size: 12px; padding: 4px 10px; }
-    .btn-warn { background: var(--medium-bg); color: var(--medium); border: 1px solid var(--medium); font-size: 12px; padding: 4px 10px; }
-    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-primary { background: var(--accent2); color: #000; }
+    .btn-primary:hover { background: #8baaff; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(122, 157, 250, 0.25); }
+    .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+    .btn-secondary:hover { background: var(--surface3); border-color: var(--border2); }
+    .btn-verify { background: var(--low-bg); color: var(--low); border: 1px solid rgba(137,226,168,0.3); }
+    .btn-verify:hover { background: rgba(137,226,168,0.2); }
+    .btn-danger { background: var(--high-bg); color: var(--high); border: 1px solid rgba(253,176,138,0.3); font-size: 12px; padding: 6px 12px; }
+    .btn-danger:hover { background: rgba(253,176,138,0.25); }
+    .btn-warn { background: var(--medium-bg); color: var(--medium); border: 1px solid rgba(245,213,118,0.3); font-size: 12px; padding: 6px 12px; }
+    .btn-warn:hover { background: rgba(245,213,118,0.25); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+    .btn-icon { width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 8px; }
 
     /* ---- Audit table ---- */
+    .table-container {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+    }
     .table-wrap { overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    thead tr { background: var(--surface2); }
-    th { padding: 10px 14px; text-align: left; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text3); border-bottom: 1px solid var(--border); white-space: nowrap; }
-    td { padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
-    tr:hover td { background: var(--surface2); }
-    .mono { font-family: 'JetBrains Mono', monospace; font-size: 11px; }
-    .status-badge {
-      display: inline-flex; align-items: center; gap: 4px;
-      padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;
+    thead tr { background: var(--bg); border-bottom: 1px solid var(--border2); }
+    th {
+      padding: 14px 20px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text3);
+      white-space: nowrap;
     }
-    .status-badge.OPEN { background: rgba(148,163,184,0.1); color: var(--open); }
-    .status-badge.ACKNOWLEDGED { background: var(--medium-bg); color: var(--medium); }
-    .status-badge.RESOLVED { background: var(--low-bg); color: var(--resolved); }
+    td {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+      color: var(--text2);
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--surface2); color: var(--text); }
+
+    .mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+
+    .status-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+    .status-badge.OPEN { background: rgba(122, 157, 250, 0.15); color: var(--accent2); border: 1px solid rgba(122, 157, 250, 0.3); }
+    .status-badge.ACKNOWLEDGED { background: var(--medium-bg); color: var(--medium); border: 1px solid rgba(245, 213, 118, 0.3); }
+    .status-badge.RESOLVED { background: var(--low-bg); color: var(--low); border: 1px solid rgba(137, 226, 168, 0.3); }
 
     /* ---- Integrity panel ---- */
     .integrity-panel {
@@ -243,6 +431,8 @@
       align-items: center;
       gap: 16px;
       flex-wrap: wrap;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow-sm);
     }
     .integrity-result {
       font-size: 14px;
@@ -259,202 +449,632 @@
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0.6);
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(4px);
       z-index: 200;
+      opacity: 0;
+      transition: opacity 0.3s ease;
     }
-    .drawer-overlay.open { display: block; }
+    .drawer-overlay.open { display: block; opacity: 1; }
     .drawer {
       position: fixed;
       right: 0; top: 0; bottom: 0;
-      width: min(520px, 100vw);
+      width: min(560px, 100vw);
       background: var(--surface);
-      border-left: 1px solid var(--border);
-      padding: 24px;
+      border-left: 1px solid var(--border2);
+      padding: 32px;
       overflow-y: auto;
       z-index: 201;
       transform: translateX(100%);
-      transition: transform 0.25s ease;
+      transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: -10px 0 30px rgba(0,0,0,0.3);
     }
     .drawer.open { transform: translateX(0); }
-    .drawer h3 { font-size: 16px; font-weight: 700; margin-bottom: 16px; }
-    .drawer-close { float: right; cursor: pointer; color: var(--text3); font-size: 20px; line-height: 1; }
-    .drawer-close:hover { color: var(--text); }
-    .drawer-field { margin-bottom: 14px; }
-    .drawer-field .lbl { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
-    .drawer-field .val { font-size: 13px; color: var(--text); }
-    .drawer-field .val.mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; word-break: break-all; }
-    .drawer-field .explanation-text { font-size: 13px; color: var(--text2); line-height: 1.6; }
-    .drawer-actions { display: flex; gap: 8px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+
+    .drawer-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .drawer-header h3 { font-size: 18px; font-weight: 600; color: var(--text); }
+    .drawer-close {
+      cursor: pointer;
+      color: var(--text2);
+      font-size: 20px;
+      width: 32px; height: 32px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 8px;
+      background: var(--surface2);
+      transition: all 0.2s;
+    }
+    .drawer-close:hover { color: var(--text); background: var(--border); }
+
+    .drawer-field { margin-bottom: 20px; }
+    .drawer-field .lbl { font-size: 11px; color: var(--text3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .drawer-field .val { font-size: 14px; color: var(--text); background: var(--bg); padding: 12px 16px; border-radius: var(--radius-sm); border: 1px solid var(--border); }
+    .drawer-field .val.mono { font-family: 'JetBrains Mono', monospace; font-size: 13px; word-break: break-all; }
+    .drawer-field .explanation-text { font-size: 14px; color: var(--text); line-height: 1.6; }
+    .drawer-actions { display: flex; gap: 12px; margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--border); }
+
+    /* ---- Investigation chat (drawer) ---- */
+    .investigate-panel { margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--border); }
+    .investigate-panel h4 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text3); font-weight: 600; margin-bottom: 12px; }
+    .investigate-log { display: flex; flex-direction: column; gap: 10px; max-height: 260px; overflow-y: auto; margin-bottom: 12px; }
+    .investigate-turn { font-size: 13px; line-height: 1.5; padding: 10px 12px; border-radius: var(--radius-sm); }
+    .investigate-turn.user { background: var(--surface2); color: var(--text); align-self: flex-end; max-width: 90%; border: 1px solid var(--border); }
+    .investigate-turn.assistant { background: var(--accent-glow); color: var(--text); }
+    .investigate-turn.assistant.fallback { border: 1px dashed var(--medium); background: var(--medium-bg); }
+    .investigate-suggestions { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .investigate-suggestions button { font-size: 11px; padding: 4px 10px; background: var(--surface2); border: 1px solid var(--border); border-radius: 999px; color: var(--text2); cursor: pointer; font-family: inherit; transition: all 0.2s; }
+    .investigate-suggestions button:hover { border-color: var(--accent2); color: var(--text); }
+    .investigate-input-row { display: flex; gap: 8px; }
+    .investigate-input-row input { flex: 1; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: var(--radius-sm); padding: 10px 12px; font-size: 13px; font-family: inherit; outline: none; transition: all 0.2s; }
+    .investigate-input-row input:focus { border-color: var(--accent2); box-shadow: 0 0 0 2px var(--accent-glow); }
 
     /* ---- Empty state ---- */
     .empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
       text-align: center;
-      padding: 60px 20px;
-      color: var(--text3);
-      font-size: 14px;
+      padding: 80px 20px;
+      color: var(--text2);
+      background: var(--surface);
+      border: 1px dashed var(--border2);
+      border-radius: var(--radius);
     }
-    .empty .icon { font-size: 40px; margin-bottom: 12px; }
+    .empty .icon { font-size: 48px; margin-bottom: 16px; opacity: 0.5; }
+    .empty h4 { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+    .empty p { font-size: 13px; color: var(--text3); max-width: 300px; }
 
     /* ---- Toast ---- */
     .toast {
       position: fixed;
-      bottom: 24px;
-      right: 24px;
+      bottom: 32px;
+      right: 32px;
       background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 12px 18px;
-      font-size: 13px;
+      border: 1px solid var(--border2);
+      border-left: 4px solid var(--accent2);
+      border-radius: var(--radius-sm);
+      padding: 16px 24px;
+      font-size: 14px;
+      font-weight: 500;
+      box-shadow: var(--shadow-md);
       z-index: 300;
       opacity: 0;
-      transform: translateY(10px);
-      transition: all 0.25s;
+      transform: translateY(20px);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
       pointer-events: none;
+      display: flex;
+      align-items: center;
+      gap: 12px;
     }
     .toast.show { opacity: 1; transform: translateY(0); }
-    .toast.success { border-color: var(--low); color: var(--low); }
-    .toast.error { border-color: var(--high); color: var(--high); }
+    .toast.success { border-left-color: var(--low); color: var(--text); }
+    .toast.error { border-left-color: var(--high); color: var(--text); }
 
-    /* ---- Org selector ---- */
-    .org-selector { display: flex; align-items: center; gap: 8px; }
-    .org-selector label { font-size: 12px; color: var(--text3); }
-    .org-selector select {
-      background: var(--surface2);
+    /* ---- Overview tab (severity/status breakdown, leaderboards) ---- */
+    .overview-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 900px) { .overview-grid { grid-template-columns: 1fr; } }
+
+    .overview-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      box-shadow: var(--shadow-sm);
+    }
+    .overview-card h3 { font-size: 13px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 18px; }
+
+    .progress-item { margin-bottom: 16px; }
+    .progress-item:last-child { margin-bottom: 0; }
+    .progress-item-header { display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; color: var(--text2); margin-bottom: 8px; letter-spacing: 0.3px; }
+    .progress-track { height: 6px; background: var(--surface2); border-radius: 999px; overflow: hidden; }
+    .progress-fill { height: 100%; border-radius: 999px; transition: width 0.4s ease; }
+
+    .leaderboard-list { display: flex; flex-direction: column; gap: 12px; }
+    .leaderboard-row { display: grid; grid-template-columns: 110px 1fr auto; align-items: center; gap: 12px; }
+    .leaderboard-name { font-size: 12px; color: var(--text2); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .leaderboard-track { height: 6px; background: var(--surface2); border-radius: 999px; overflow: hidden; }
+    .leaderboard-fill { height: 100%; background: var(--accent2); border-radius: 999px; }
+    .leaderboard-count { font-size: 12px; font-weight: 700; color: var(--text); min-width: 24px; text-align: right; }
+
+    /* ---- Add Organization modal ---- */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 210;
+    }
+    .modal-overlay.open { display: block; }
+    .modal {
+      display: none;
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: min(760px, 94vw);
+      max-height: 88vh;
+      overflow-y: auto;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      z-index: 211;
+      box-shadow: var(--shadow-md);
+    }
+    .modal.open { display: block; }
+    .modal h3 { font-size: 18px; font-weight: 700; margin-bottom: 4px; color: var(--text); }
+    .modal .modal-sub { font-size: 12px; color: var(--text3); margin-bottom: 20px; }
+    .modal .modal-sub code { background: var(--surface2); padding: 1px 5px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; }
+    .modal-close {
+      float: right; cursor: pointer; color: var(--text2); font-size: 18px;
+      width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+      border-radius: 8px; background: var(--surface2); transition: all 0.2s;
+    }
+    .modal-close:hover { color: var(--text); background: var(--border); }
+    .form-section { margin-bottom: 20px; }
+    .form-section-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .form-section-title h4 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text3); font-weight: 600; }
+    .form-section-title .hint { font-size: 11px; color: var(--text3); }
+    .form-row {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 8px;
+      align-items: center;
+    }
+    .form-row.fields-row { grid-template-columns: repeat(6, 1fr) 28px; }
+    .form-row.identifiers-row { grid-template-columns: 1fr 1.4fr 130px 28px; }
+    .form-row.linkage-row { grid-template-columns: 2fr 1fr 28px; }
+    .form-row input, .form-row select {
+      background: var(--bg);
       border: 1px solid var(--border);
       color: var(--text);
       border-radius: var(--radius-sm);
-      padding: 6px 10px;
-      font-size: 13px;
+      padding: 8px 10px;
+      font-size: 12px;
       font-family: inherit;
       outline: none;
-      cursor: pointer;
-      min-width: 140px;
+      width: 100%;
+      transition: all 0.2s;
     }
-    .org-selector select:focus { border-color: var(--accent); }
+    .form-row input:focus, .form-row select:focus { border-color: var(--accent2); box-shadow: 0 0 0 2px var(--accent-glow); }
+    .row-remove {
+      background: transparent;
+      border: none;
+      color: var(--text3);
+      cursor: pointer;
+      font-size: 14px;
+      width: 28px;
+      text-align: center;
+    }
+    .row-remove:hover { color: var(--high); }
+    .form-add-row { background: none; border: 1px dashed var(--border2); color: var(--text2); border-radius: var(--radius-sm); padding: 6px 12px; font-size: 12px; cursor: pointer; font-family: inherit; transition: all 0.2s; }
+    .form-add-row:hover { border-color: var(--accent2); color: var(--text); }
+    .form-org-id-row { margin-bottom: 20px; }
+    .form-org-id-row label { display: block; font-size: 12px; color: var(--text3); margin-bottom: 8px; font-weight: 500; }
+    .form-org-id-row input { width: 100%; max-width: 320px; }
+    .form-error-box {
+      display: none;
+      background: var(--high-bg);
+      border: 1px solid rgba(239,68,68,0.3);
+      color: var(--high);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      font-size: 12px;
+      margin-bottom: 16px;
+      line-height: 1.6;
+    }
+    .modal-actions { display: flex; gap: 10px; padding-top: 18px; border-top: 1px solid var(--border); }
+
+    /* ---- Simulate Breach tab ---- */
+    .sim-intro { color: var(--text2); font-size: 13px; line-height: 1.6; margin-bottom: 20px; max-width: 900px; }
+    .sim-intro code { background: var(--surface2); padding: 1px 6px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+    .sim-grid { display: grid; grid-template-columns: 1fr 1.2fr; gap: 20px; align-items: start; }
+    @media (max-width: 980px) { .sim-grid { grid-template-columns: 1fr; } }
+    .sim-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+    .sim-panel select {
+      width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text);
+      border-radius: var(--radius-sm); padding: 9px 12px; font-size: 13px; font-family: inherit; outline: none;
+    }
+    .sim-panel select:focus { border-color: var(--accent2); box-shadow: 0 0 0 2px var(--accent-glow); }
+    .sim-textarea {
+      width: 100%; min-height: 220px; margin-top: 10px; resize: vertical;
+      background: var(--bg); border: 1px solid var(--border); color: var(--text);
+      border-radius: var(--radius-sm); padding: 12px; font-size: 12.5px; line-height: 1.6;
+      font-family: 'JetBrains Mono', monospace; outline: none;
+    }
+    .sim-textarea:focus { border-color: var(--accent2); box-shadow: 0 0 0 2px var(--accent-glow); }
+    #simResults .violation-card { margin-bottom: 12px; }
+    #simResults .violation-card:last-child { margin-bottom: 0; }
   </style>
 </head>
 <body>
 
-<header class="header">
-  <div class="header-brand">
-    <div class="logo">⚖️</div>
-    <div>
-      <h1>Veritas</h1>
-      <div class="sub">DPDPA Compliance Monitor</div>
+<div class="app-container">
+
+  <!-- Sidebar Navigation -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo" style="font-family: 'JetBrains Mono', monospace; font-weight: 700;">V</div>
+      <div>
+        <h1>Veritas</h1>
+        <div class="sub">A DPDPA monitoring agent</div>
+      </div>
+    </div>
+
+    <nav class="nav-menu">
+      <div class="nav-item active" id="nav-overview" onclick="showTab('overview')">
+        <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg></span> Overview
+      </div>
+      <div class="nav-item" id="nav-live" onclick="showTab('live')">
+        <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg></span> Live Feed
+      </div>
+      <div class="nav-item" id="nav-audit" onclick="showTab('audit')">
+        <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span> Evidence / Audit
+      </div>
+      <div class="nav-item" id="nav-simulate" onclick="showTab('simulate')">
+        <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6M10 3v5.5L4.5 18a2 2 0 0 0 1.7 3h11.6a2 2 0 0 0 1.7-3L14 8.5V3"/><line x1="8.5" y1="14" x2="15.5" y2="14"/></svg></span> Simulate Breach
+      </div>
+    </nav>
+  </aside>
+
+  <!-- Main Content Area -->
+  <div class="main-wrapper">
+
+    <!-- Topbar -->
+    <header class="topbar">
+      <div class="topbar-title" id="pageTitle">Overview</div>
+
+      <div class="topbar-actions">
+        <div class="org-selector">
+          <label for="orgSelector">Organization</label>
+          <select id="orgSelector" onchange="onOrgChange()">
+            <option value="">Loading…</option>
+          </select>
+        </div>
+        <button class="btn btn-secondary" onclick="openAddOrgModal()"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Add Organization</button>
+        <div class="header-status">
+          <div class="ws-dot connecting" id="wsDot"></div>
+          <span id="wsLabel">Connecting…</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Page Content -->
+    <div class="page-content">
+
+      <!-- ====== OVERVIEW TAB ====== -->
+      <main class="page-section active" id="main-overview">
+        <div class="stats-bar">
+          <div class="stat-card primary">
+            <div class="label">Total Violations</div>
+            <div class="value accent" id="ov-total">0</div>
+            <svg class="bg-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+          </div>
+          <div class="stat-card">
+            <div class="label">Breach Candidates</div>
+            <div class="value breach" id="ov-breach">0</div>
+            <svg class="bg-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          </div>
+          <div class="stat-card">
+            <div class="label">Open Cases</div>
+            <div class="value high" id="ov-open">0</div>
+            <svg class="bg-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>
+          </div>
+          <div class="stat-card">
+            <div class="label">Resolved Cases</div>
+            <div class="value low" id="ov-resolved">0</div>
+            <svg class="bg-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+        </div>
+
+        <div class="overview-grid">
+          <!-- Severity Breakdown -->
+          <div class="overview-card">
+            <h3>Severity Breakdown</h3>
+            <div class="progress-item">
+              <div class="progress-item-header"><span>HIGH</span><span id="ov-sev-high-lbl">0</span></div>
+              <div class="progress-track"><div class="progress-fill" id="ov-sev-high-fill" style="width:0%; background:var(--high)"></div></div>
+            </div>
+            <div class="progress-item">
+              <div class="progress-item-header"><span>MEDIUM</span><span id="ov-sev-med-lbl">0</span></div>
+              <div class="progress-track"><div class="progress-fill" id="ov-sev-med-fill" style="width:0%; background:var(--medium)"></div></div>
+            </div>
+            <div class="progress-item">
+              <div class="progress-item-header"><span>LOW</span><span id="ov-sev-low-lbl">0</span></div>
+              <div class="progress-track"><div class="progress-fill" id="ov-sev-low-fill" style="width:0%; background:var(--low)"></div></div>
+            </div>
+          </div>
+
+          <!-- Status Breakdown -->
+          <div class="overview-card">
+            <h3>Remediation Status</h3>
+            <div class="progress-item">
+              <div class="progress-item-header"><span>OPEN</span><span id="ov-stat-open-lbl">0</span></div>
+              <div class="progress-track"><div class="progress-fill" id="ov-stat-open-fill" style="width:0%; background:var(--open)"></div></div>
+            </div>
+            <div class="progress-item">
+              <div class="progress-item-header"><span>ACKNOWLEDGED</span><span id="ov-stat-ack-lbl">0</span></div>
+              <div class="progress-track"><div class="progress-fill" id="ov-stat-ack-fill" style="width:0%; background:var(--ack)"></div></div>
+            </div>
+            <div class="progress-item">
+              <div class="progress-item-header"><span>RESOLVED</span><span id="ov-stat-res-lbl">0</span></div>
+              <div class="progress-track"><div class="progress-fill" id="ov-stat-res-fill" style="width:0%; background:var(--resolved)"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="overview-grid">
+          <!-- Top Systems -->
+          <div class="overview-card">
+            <h3>Most Violating Systems</h3>
+            <div class="leaderboard-list" id="ov-systems-list">
+              <div class="empty" style="padding:20px; border:none;">No data</div>
+            </div>
+          </div>
+
+          <!-- Top Rules -->
+          <div class="overview-card">
+            <h3>Most Triggered Rules</h3>
+            <div class="leaderboard-list" id="ov-rules-list">
+              <div class="empty" style="padding:20px; border:none;">No data</div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <!-- ====== LIVE FEED TAB ====== -->
+      <main class="page-section" id="main-live">
+        <div class="stats-bar" id="statsBar">
+          <div class="stat-card primary">
+            <div class="label">Total Violations</div>
+            <div class="value accent" id="st-total">0</div>
+            <svg class="bg-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+          </div>
+          <div class="stat-card">
+            <div class="label">High Severity</div>
+            <div class="value high" id="st-high">0</div>
+            <svg class="bg-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>
+          </div>
+          <div class="stat-card">
+            <div class="label">Medium Severity</div>
+            <div class="value medium" id="st-medium">0</div>
+            <svg class="bg-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="7" x2="17" y2="17"/><polyline points="17 7 17 17 7 17"/></svg>
+          </div>
+          <div class="stat-card">
+            <div class="label">Breach Candidates</div>
+            <div class="value breach" id="st-breach">0</div>
+            <svg class="bg-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          </div>
+        </div>
+
+        <div class="section-header">
+          <h2>Violation Stream</h2>
+          <div style="display:flex; align-items:center; gap:14px;">
+            <div class="header-status" style="margin:0;">
+              <div class="ws-dot connected" id="pipelineStatusDot"></div>
+              <span id="pipelineStatusLabel">Pipeline running</span>
+            </div>
+            <button class="btn btn-secondary" id="pipelineToggleBtn" onclick="togglePipeline()">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="pipelineToggleIcon"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+              <span id="pipelineToggleLabel">Pause Live Feed</span>
+            </button>
+            <button class="btn btn-secondary" onclick="clearFeed()">
+              <span>Clear Feed</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="violation-list" id="violationList">
+          <div class="empty" id="liveFeedEmpty">
+            <div class="icon"><svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/></svg></div>
+            <h4>Waiting for violations</h4>
+            <p>Start the pipeline to see real-time events appear here.</p>
+          </div>
+        </div>
+      </main>
+
+      <!-- ====== AUDIT TAB ====== -->
+      <main class="page-section" id="main-audit">
+
+        <!-- Integrity check -->
+        <div class="integrity-panel">
+          <button class="btn btn-verify" onclick="runVerifyChain()"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Verify Evidence Integrity</button>
+          <div class="integrity-result" id="integrityResult"></div>
+          <span style="margin-left:auto;font-size:12px;color:var(--text3);font-weight:500;" id="integrityTime"></span>
+        </div>
+
+        <!-- Filters Bar -->
+        <div class="filters-bar">
+          <div class="filters-group">
+            <div class="filter-item">
+              <label>Source System</label>
+              <input type="text" id="f-system" placeholder="e.g. order-service (blank = all)" />
+            </div>
+            <div class="filter-item">
+              <label>Severity</label>
+              <select id="f-severity">
+                <option value="">All Severities</option>
+                <option value="HIGH">HIGH</option>
+                <option value="MEDIUM">MEDIUM</option>
+                <option value="LOW">LOW</option>
+              </select>
+            </div>
+            <div class="filter-item">
+              <label>Status</label>
+              <select id="f-status">
+                <option value="">All Statuses</option>
+                <option value="OPEN">OPEN</option>
+                <option value="ACKNOWLEDGED">ACKNOWLEDGED</option>
+                <option value="RESOLVED">RESOLVED</option>
+              </select>
+            </div>
+            <div class="filter-item" style="justify-content: flex-end; padding-bottom: 2px;">
+               <button class="btn btn-primary" onclick="loadAuditTable()">Apply Filters</button>
+            </div>
+             <div class="filter-item" style="justify-content: flex-end; padding-bottom: 2px;">
+               <button class="btn btn-secondary" onclick="resetFilters()">Reset</button>
+            </div>
+          </div>
+
+          <div class="filters-group" style="padding-left: 20px; border-left: 1px solid var(--border);">
+            <div class="filter-item">
+               <label>Jump to ID</label>
+               <div style="display: flex; gap: 8px;">
+                 <input type="text" id="violationLookupInput" placeholder="#3 or 3" style="width:100px" onkeydown="if(event.key==='Enter')lookupViolationNumber()" />
+                 <button class="btn btn-secondary" onclick="lookupViolationNumber()">Go</button>
+               </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content: flex-end; margin-bottom: 12px;">
+           <span id="auditCount" style="font-size:13px;color:var(--text3);font-weight:500;"></span>
+        </div>
+
+        <!-- Table -->
+        <div class="table-container">
+          <div class="table-wrap">
+            <table id="auditTable">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Timestamp</th>
+                  <th>Rule</th>
+                  <th>Severity</th>
+                  <th>Field</th>
+                  <th>System</th>
+                  <th>Status</th>
+                  <th style="text-align: center;">Breach</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="auditTbody">
+                <tr>
+                  <td colspan="9">
+                    <div class="empty" style="border:none; padding: 40px;">
+                      <div class="icon"><svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
+                      <h4>No records loaded</h4>
+                      <p>Click "Apply Filters" to load the audit trail.</p>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+
+      <!-- ====== SIMULATE BREACH TAB ====== -->
+      <main class="page-section" id="main-simulate">
+        <div class="sim-intro">
+          <p>Feed a hand-written event straight into the real detection → rule engine → statute-grounded LLM explainer pipeline — the exact same <code>/v1/{org_id}/scan</code> path production traffic uses. Nothing here is mocked or pre-scripted: pick a preset (or paste your own JSON) to show the guardrails firing on demand.</p>
+        </div>
+
+        <div class="sim-grid">
+          <div class="sim-panel">
+            <div class="form-section-title">
+              <h4>Preset Example</h4>
+              <span class="hint">Targets org: <strong id="simOrgTarget">any</strong></span>
+            </div>
+            <select id="simExampleSelect" onchange="loadSimExample()"></select>
+            <div id="simOrgHint" style="font-size:11px; color: var(--medium); margin-top:6px; min-height: 14px;"></div>
+
+            <div class="form-section-title" style="margin-top:18px;">
+              <h4>Scan Request Body</h4>
+              <span class="hint">POST /v1/{org_id}/scan</span>
+            </div>
+            <textarea id="simPayload" class="sim-textarea" spellcheck="false" placeholder='{"text": "..."} or {"fields": {...}, "source_system": "..."}'></textarea>
+
+            <button class="btn btn-primary" id="simRunBtn" onclick="runSimulatedScan()" style="margin-top:14px; width:100%;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              Run Scan
+            </button>
+          </div>
+
+          <div class="sim-panel">
+            <div class="form-section-title">
+              <h4>Result</h4>
+            </div>
+            <div id="simResults">
+              <div class="empty" style="border:none; padding: 40px;">
+                <div class="icon"><svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6M10 3v5.5L4.5 18a2 2 0 0 0 1.7 3h11.6a2 2 0 0 0 1.7-3L14 8.5V3"/><line x1="8.5" y1="14" x2="15.5" y2="14"/></svg></div>
+                <h4>No scan run yet</h4>
+                <p>Pick a preset and click "Run Scan" to see the engine work.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+
     </div>
   </div>
-  <div class="header-status">
-    <div class="org-selector">
-      <label for="orgSelector">Org</label>
-      <select id="orgSelector" onchange="onOrgChange()">
-        <option value="">Loading…</option>
-      </select>
-    </div>
-    <div class="ws-dot connecting" id="wsDot"></div>
-    <span id="wsLabel">Connecting…</span>
-  </div>
-</header>
-
-<nav class="tabs">
-  <div class="tab active" id="tab-live" onclick="showTab('live')">📡 Live Feed</div>
-  <div class="tab" id="tab-audit" onclick="showTab('audit')">🔍 Evidence / Audit</div>
-</nav>
-
-<!-- ====== LIVE FEED TAB ====== -->
-<main class="main active" id="main-live">
-  <div class="stats-bar" id="statsBar">
-    <div class="stat-card"><div class="label">Total Violations</div><div class="value accent" id="st-total">0</div></div>
-    <div class="stat-card"><div class="label">High Severity</div><div class="value high" id="st-high">0</div></div>
-    <div class="stat-card"><div class="label">Medium</div><div class="value medium" id="st-medium">0</div></div>
-    <div class="stat-card"><div class="label">Breach Candidates</div><div class="value breach" id="st-breach">0</div></div>
-    <div class="stat-card"><div class="label">Exposure (E001)</div><div class="value accent" id="st-e001">0</div></div>
-    <div class="stat-card"><div class="label">Purpose (P001)</div><div class="value accent" id="st-p001">0</div></div>
-    <div class="stat-card"><div class="label">Retention (R001)</div><div class="value accent" id="st-r001">0</div></div>
-  </div>
-  <div class="section-header">
-    <h2>Live Violation Stream</h2>
-    <button class="btn btn-secondary" onclick="clearFeed()">Clear</button>
-  </div>
-  <div class="violation-list" id="violationList">
-    <div class="empty" id="liveFeedEmpty"><div class="icon">📡</div>Waiting for violations…<br/><small>Start the pipeline to see events here.</small></div>
-  </div>
-</main>
-
-<!-- ====== AUDIT TAB ====== -->
-<main class="main" id="main-audit">
-  <!-- Integrity check -->
-  <div class="integrity-panel">
-    <button class="btn btn-verify" onclick="runVerifyChain()">🔐 Verify Evidence Integrity</button>
-    <div class="integrity-result" id="integrityResult"></div>
-    <span style="margin-left:auto;font-size:12px;color:var(--text3)" id="integrityTime"></span>
-  </div>
-
-  <!-- Jump-to-violation-number lookup: "tag #N, get the explanation" -->
-  <div class="filters">
-    <label>Jump to</label>
-    <input type="text" id="violationLookupInput" placeholder="#3 or 3" style="width:90px" onkeydown="if(event.key==='Enter')lookupViolationNumber()" />
-    <button class="btn btn-primary" onclick="lookupViolationNumber()">Go</button>
-    <span style="font-size:12px;color:var(--text3)">Look up a violation by its per-org sequential number and see its grounded explanation instantly.</span>
-  </div>
-
-  <!-- Filters -->
-  <div class="filters">
-    <div>
-      <label>Source System</label>
-      <input type="text" id="f-system" placeholder="e.g. order-service (blank = all)" />
-    </div>
-    <div>
-      <label>Severity</label>
-      <select id="f-severity">
-        <option value="">All</option>
-        <option value="HIGH">HIGH</option>
-        <option value="MEDIUM">MEDIUM</option>
-        <option value="LOW">LOW</option>
-      </select>
-    </div>
-    <div>
-      <label>Status</label>
-      <select id="f-status">
-        <option value="">All</option>
-        <option value="OPEN">OPEN</option>
-        <option value="ACKNOWLEDGED">ACKNOWLEDGED</option>
-        <option value="RESOLVED">RESOLVED</option>
-      </select>
-    </div>
-    <button class="btn btn-primary" onclick="loadAuditTable()">Apply</button>
-    <button class="btn btn-secondary" onclick="resetFilters()">Reset</button>
-    <span id="auditCount" style="margin-left:auto;font-size:12px;color:var(--text3)"></span>
-  </div>
-
-  <!-- Table -->
-  <div class="table-wrap">
-    <table id="auditTable">
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Timestamp</th>
-          <th>Rule</th>
-          <th>Severity</th>
-          <th>Field</th>
-          <th>System</th>
-          <th>Status</th>
-          <th>Breach?</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody id="auditTbody">
-        <tr><td colspan="9" class="empty"><div class="icon">🔍</div>Click "Apply" to load audit records.</td></tr>
-      </tbody>
-    </table>
-  </div>
-</main>
+</div>
 
 <!-- ====== DETAIL DRAWER ====== -->
 <div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
 <div class="drawer" id="drawer">
-  <div class="drawer-close" onclick="closeDrawer()">✕</div>
-  <h3>Verdict Detail</h3>
+  <div class="drawer-header">
+    <h3>Verdict Detail</h3>
+    <div class="drawer-close" onclick="closeDrawer()"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div>
+  </div>
   <div id="drawerContent"></div>
+</div>
+
+<!-- ====== ADD ORGANIZATION MODAL ====== -->
+<div class="modal-overlay" id="addOrgOverlay" onclick="closeAddOrgModal()"></div>
+<div class="modal" id="addOrgModal">
+  <div class="modal-close" onclick="closeAddOrgModal()">✕</div>
+  <h3>Add Organization</h3>
+  <div class="modal-sub">Registers a new org config via <code>POST /v1/orgs/{org_id}/config</code> — usable immediately afterward, no restart.</div>
+
+  <div class="form-error-box" id="addOrgErrors"></div>
+
+  <div class="form-org-id-row">
+    <label for="newOrgId">Organization ID (lowercase letters, numbers, underscores only)</label>
+    <input type="text" id="newOrgId" placeholder="e.g. acme_corp" />
+  </div>
+
+  <div class="form-section">
+    <div class="form-section-title">
+      <h4>Fields <span style="color:var(--high)">*</span> (at least one required)</h4>
+      <span class="hint">what PII you collect, why, and for how long</span>
+    </div>
+    <div id="orgFieldsRows"></div>
+    <button type="button" class="form-add-row" onclick="addFieldRow()">+ Add Field</button>
+  </div>
+
+  <div class="form-section">
+    <div class="form-section-title">
+      <h4>Identifiers (optional)</h4>
+      <span class="hint">custom PII shapes beyond name/email/generic phone</span>
+    </div>
+    <div id="orgIdentifiersRows"></div>
+    <button type="button" class="form-add-row" onclick="addIdentifierRow()">+ Add Identifier</button>
+  </div>
+
+  <div class="form-section">
+    <div class="form-section-title">
+      <h4>Linkage Rules (optional)</h4>
+      <span class="hint">comma-separated field names that together are a re-identification risk</span>
+    </div>
+    <div id="orgLinkageRows"></div>
+    <button type="button" class="form-add-row" onclick="addLinkageRow()">+ Add Linkage Rule</button>
+  </div>
+
+  <div class="modal-actions">
+    <button class="btn btn-primary" id="addOrgSubmitBtn" onclick="submitNewOrg()">Create Organization</button>
+    <button class="btn btn-secondary" onclick="closeAddOrgModal()">Cancel</button>
+  </div>
 </div>
 
 <!-- ====== TOAST ====== -->
@@ -468,10 +1088,6 @@ let wsReconnectTimer = null;
 let localViolations = []; // live feed buffer
 const MAX_FEED = 100;
 
-// currentOrgId scopes EVERY API call and the WebSocket connection below.
-// Persisted per-viewer in localStorage purely as a convenience (remembers
-// your last-selected org across reloads) — never trusted as auth, since
-// this dashboard has none (see dashboard/server.py's module docstring).
 let currentOrgId = localStorage.getItem('veritas_org_id') || '';
 
 // ---- Org selector ----
@@ -496,25 +1112,44 @@ async function populateOrgSelector() {
   }
 }
 
-function onOrgChange() {
-  const sel = document.getElementById('orgSelector');
-  currentOrgId = sel.value;
+// Shared "switch the whole UI to this org" logic — used both by the
+// selector's onchange handler AND by the "Add Organization" success path,
+// so the two stay behaviorally identical rather than duplicating steps.
+function activateOrg(orgId) {
+  currentOrgId = orgId;
   localStorage.setItem('veritas_org_id', currentOrgId);
   clearFeed();
   connectWS();
   refreshStats();
+  refreshOverview();
   if (document.getElementById('main-audit').classList.contains('active')) {
     loadAuditTable();
   }
 }
 
+function onOrgChange() {
+  const sel = document.getElementById('orgSelector');
+  activateOrg(sel.value);
+}
+
 // ---- Tab switching ----
 function showTab(name) {
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.main').forEach(m => m.classList.remove('active'));
-  document.getElementById('tab-' + name).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.page-section').forEach(m => m.classList.remove('active'));
+
+  document.getElementById('nav-' + name).classList.add('active');
   document.getElementById('main-' + name).classList.add('active');
+
+  const titleMap = {
+    'overview': 'Overview',
+    'live': 'Live Violation Feed',
+    'audit': 'Evidence & Audit Trail',
+    'simulate': 'Simulate Breach'
+  };
+  document.getElementById('pageTitle').innerText = titleMap[name];
+
   if (name === 'audit') { loadAuditTable(); refreshStats(); }
+  if (name === 'overview') { refreshOverview(); }
 }
 
 // ---- WebSocket ----
@@ -551,28 +1186,26 @@ function connectWS() {
 
 // ---- Live feed ----
 function handleLiveViolation(v) {
-  // Defense in depth: the WS connection is already per-org (see connectWS),
-  // but ignore any stray payload for a different org_id rather than trust
-  // the socket alone (e.g. a message already in flight at the instant of
-  // an org switch).
+  // Defense in depth: the WS connection is already per-org, but ignore any
+  // stray payload for a different org_id rather than trust the socket
+  // alone (e.g. a message already in flight at the instant of an org switch).
   if (v.tenant_id && v.tenant_id !== currentOrgId) return;
   localViolations.unshift(v);
   if (localViolations.length > MAX_FEED) localViolations.pop();
   renderFeed();
   refreshStats();
+  refreshOverview();
 }
 
 function renderFeed() {
   const list = document.getElementById('violationList');
   const empty = document.getElementById('liveFeedEmpty');
-  if (localViolations.length === 0) { empty.style.display = ''; list.innerHTML = ''; list.appendChild(empty); return; }
+  if (localViolations.length === 0) { empty.style.display = 'flex'; list.innerHTML = ''; list.appendChild(empty); return; }
   empty.style.display = 'none';
 
-  // Only prepend newest card instead of re-rendering all
   const v = localViolations[0];
   const card = buildViolationCard(v);
   list.insertBefore(card, list.firstChild);
-  // Trim excess DOM nodes
   while (list.children.length > MAX_FEED) list.removeChild(list.lastChild);
 }
 
@@ -580,8 +1213,10 @@ function buildViolationCard(v) {
   const el = document.createElement('div');
   el.className = `violation-card ${v.severity || ''}`;
   const ts = v.timestamp ? new Date(v.timestamp).toLocaleTimeString() : '';
-  const breach = v.breach_notification_candidate ? `<span class="badge breach">⚠ Breach Candidate</span>` : '';
-  const fallback = v.used_fallback ? `<span class="badge fallback">⚡ Template</span>` : '';
+  const alertIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px; margin-bottom:-2px;"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
+  const breach = v.breach_notification_candidate ? `<span class="badge breach" style="display:inline-flex;align-items:center">${alertIcon} Breach Candidate</span>` : '';
+  const zapIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px; margin-bottom:-2px;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`;
+  const fallback = v.used_fallback ? `<span class="badge fallback" style="display:inline-flex;align-items:center">${zapIcon} Template</span>` : '';
   el.innerHTML = `
     <div class="violation-top">
       <span class="badge ${v.severity}">${v.severity}</span>
@@ -591,8 +1226,8 @@ function buildViolationCard(v) {
       ${breach}${fallback}
       <span class="violation-time">${ts}</span>
     </div>
-    <div class="violation-explanation">${v.explanation || '<em>No explanation</em>'}</div>
-    <div class="violation-section">${v.section_cited || ''}</div>
+    <div class="violation-explanation">${v.explanation || '<em>No explanation generated</em>'}</div>
+    <div class="violation-section"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.7"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg> ${v.section_cited || 'No statute provided'}</div>
   `;
   return el;
 }
@@ -601,12 +1236,12 @@ function clearFeed() {
   localViolations = [];
   const list = document.getElementById('violationList');
   const empty = document.getElementById('liveFeedEmpty');
-  empty.style.display = '';
+  empty.style.display = 'flex';
   list.innerHTML = '';
   list.appendChild(empty);
 }
 
-// ---- Stats ----
+// ---- Stats (Live Feed tab's stat cards) ----
 async function refreshStats() {
   if (!currentOrgId) return;
   try {
@@ -616,10 +1251,62 @@ async function refreshStats() {
     document.getElementById('st-high').textContent = s.by_severity?.HIGH || 0;
     document.getElementById('st-medium').textContent = s.by_severity?.MEDIUM || 0;
     document.getElementById('st-breach').textContent = s.breach_candidates;
-    document.getElementById('st-e001').textContent = s.by_rule?.EXPOSURE_001 || 0;
-    document.getElementById('st-p001').textContent = s.by_rule?.PURPOSE_001 || 0;
-    document.getElementById('st-r001').textContent = s.by_rule?.RETENTION_001 || 0;
   } catch(e) {}
+}
+
+// ---- Overview tab ----
+function setProgress(prefix, value, total) {
+  const lbl = document.getElementById(`${prefix}-lbl`);
+  const fill = document.getElementById(`${prefix}-fill`);
+  if (!lbl || !fill) return;
+  lbl.textContent = value;
+  fill.style.width = `${total > 0 ? Math.round((value / total) * 100) : 0}%`;
+}
+
+function renderLeaderboard(containerId, counts) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const entries = Object.entries(counts || {}).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  if (entries.length === 0) {
+    el.innerHTML = '<div class="empty" style="padding:20px; border:none;">No data</div>';
+    return;
+  }
+  const max = entries[0][1] || 1;
+  el.innerHTML = entries.map(([name, count]) => `
+    <div class="leaderboard-row">
+      <span class="leaderboard-name" title="${name}">${name}</span>
+      <div class="leaderboard-track"><div class="leaderboard-fill" style="width:${Math.round((count / max) * 100)}%"></div></div>
+      <span class="leaderboard-count">${count}</span>
+    </div>
+  `).join('');
+}
+
+async function refreshOverview() {
+  if (!currentOrgId) return;
+  try {
+    const r = await fetch(`/api/${encodeURIComponent(currentOrgId)}/stats`);
+    const s = await r.json();
+
+    document.getElementById('ov-total').textContent = s.total;
+    document.getElementById('ov-breach').textContent = s.breach_candidates;
+    document.getElementById('ov-open').textContent = s.by_status?.OPEN || 0;
+    document.getElementById('ov-resolved').textContent = s.by_status?.RESOLVED || 0;
+
+    const sev = s.by_severity || {};
+    const sevTotal = (sev.HIGH || 0) + (sev.MEDIUM || 0) + (sev.LOW || 0);
+    setProgress('ov-sev-high', sev.HIGH || 0, sevTotal);
+    setProgress('ov-sev-med', sev.MEDIUM || 0, sevTotal);
+    setProgress('ov-sev-low', sev.LOW || 0, sevTotal);
+
+    const stat = s.by_status || {};
+    const statTotal = (stat.OPEN || 0) + (stat.ACKNOWLEDGED || 0) + (stat.RESOLVED || 0);
+    setProgress('ov-stat-open', stat.OPEN || 0, statTotal);
+    setProgress('ov-stat-ack', stat.ACKNOWLEDGED || 0, statTotal);
+    setProgress('ov-stat-res', stat.RESOLVED || 0, statTotal);
+
+    renderLeaderboard('ov-systems-list', s.by_source_system);
+    renderLeaderboard('ov-rules-list', s.by_rule);
+  } catch (e) {}
 }
 
 // ---- Audit table ----
@@ -638,7 +1325,7 @@ async function loadAuditTable() {
     const r = await fetch(`/api/${encodeURIComponent(currentOrgId)}/verdicts?` + params);
     const data = await r.json();
     renderAuditTable(data.verdicts || []);
-    document.getElementById('auditCount').textContent = `${data.count} record${data.count !== 1 ? 's' : ''}`;
+    document.getElementById('auditCount').textContent = `Showing ${data.count} record${data.count !== 1 ? 's' : ''}`;
   } catch(e) {
     showToast('Failed to load audit records', 'error');
   }
@@ -654,28 +1341,31 @@ function resetFilters() {
 function renderAuditTable(rows) {
   const tbody = document.getElementById('auditTbody');
   if (!rows || rows.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="9" class="empty"><div class="icon">🔍</div>No records match the current filters.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9">
+      <div class="empty" style="border:none; padding: 40px;">
+        <div class="icon"><svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
+        <h4>No records found</h4>
+        <p>No audit entries match your current filters.</p>
+      </div>
+    </td></tr>`;
     return;
   }
   tbody.innerHTML = rows.map((v, i) => {
     const ts = v.timestamp ? new Date(v.timestamp).toLocaleString() : '';
-    const breach = v.breach_notification_candidate ? '⚠' : '';
+    const alertIconTable = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
+    const breach = v.breach_notification_candidate ? `<span style="color:var(--breach);display:flex;justify-content:center;">${alertIconTable}</span>` : '-';
     const statusCls = v.remediation_status || 'OPEN';
-    const canAck = statusCls === 'OPEN';
-    const canRes = statusCls === 'ACKNOWLEDGED';
     return `<tr>
-      <td class="mono">#${v.violation_id}</td>
-      <td style="white-space:nowrap;font-size:12px">${ts}</td>
+      <td class="mono" style="color:var(--text)">#${v.violation_id}</td>
+      <td style="font-size:12px">${ts}</td>
       <td><span class="badge rule">${v.rule_id}</span></td>
       <td><span class="badge ${v.severity}">${v.severity}</span></td>
-      <td class="mono">${v.field}</td>
-      <td style="font-size:12px">${v.source_system}</td>
+      <td class="mono" style="color:var(--accent2)">${v.field}</td>
+      <td style="font-size:12px; font-weight:500;">${v.source_system}</td>
       <td><span class="status-badge ${statusCls}">${statusCls}</span></td>
       <td style="text-align:center">${breach}</td>
-      <td style="white-space:nowrap;display:flex;gap:6px">
-        <button class="btn btn-secondary" style="font-size:11px;padding:4px 8px" onclick="openDrawer('${v.verdict_id}')">Detail</button>
-        ${canAck ? `<button class="btn btn-warn" onclick="updateStatus('${v.verdict_id}','ACKNOWLEDGED')">Acknowledge</button>` : ''}
-        ${canRes ? `<button class="btn btn-danger" onclick="updateStatus('${v.verdict_id}','RESOLVED')">Resolve</button>` : ''}
+      <td style="display:flex;gap:8px;">
+        <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 11px;" onclick="openDrawer('${v.verdict_id}')">View Details</button>
       </td>
     </tr>`;
   }).join('');
@@ -693,8 +1383,9 @@ async function updateStatus(verdictId, newStatus) {
       showToast(e.detail || 'Update failed', 'error');
       return;
     }
-    showToast(`Marked ${newStatus}`, 'success');
+    showToast(`Successfully marked as ${newStatus}`, 'success');
     loadAuditTable();
+    refreshOverview();
     if (document.getElementById('drawer').classList.contains('open')) {
       openDrawer(verdictId);
     }
@@ -707,55 +1398,97 @@ async function updateStatus(verdictId, newStatus) {
 async function runVerifyChain() {
   const el = document.getElementById('integrityResult');
   const tEl = document.getElementById('integrityTime');
-  el.innerHTML = '⏳ Verifying…';
+  const loaderIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 2s linear infinite;margin-right:6px;"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="4.93" x2="19.07" y2="7.76"/><style>@keyframes spin{100%{transform:rotate(360deg)}}</style></svg>`;
+  const checkIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`;
+  const xIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`;
+  const alertIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
+
+  el.innerHTML = `${loaderIcon} Verifying hash chain…`;
   el.className = 'integrity-result';
   try {
     const r = await fetch(`/api/${encodeURIComponent(currentOrgId)}/verify-chain`);
     const data = await r.json();
     if (data.valid) {
-      el.innerHTML = '✅ Chain intact — all records verified';
+      el.innerHTML = `${checkIcon} Cryptographic chain intact — all records verified`;
       el.className = 'integrity-result valid';
     } else {
-      el.innerHTML = `❌ Chain broken at record #${data.first_broken_index + 1} — tamper detected`;
+      el.innerHTML = `${xIcon} Chain broken at record #${data.first_broken_index + 1} — tamper detected`;
       el.className = 'integrity-result invalid';
     }
-    tEl.textContent = 'Checked ' + new Date().toLocaleTimeString();
+    tEl.textContent = 'Last checked: ' + new Date().toLocaleTimeString();
   } catch(e) {
-    el.innerHTML = '⚠ Verification failed — server error';
+    el.innerHTML = `${alertIcon} Verification failed — server error`;
     el.className = 'integrity-result invalid';
   }
 }
 
 // ---- Detail drawer ----
+// Per-violation chat history — reset every time the drawer opens for a
+// (possibly different) violation. The server is stateless (see
+// investigation.py); this array is what makes follow-up questions work —
+// it's resent as `history` on every /investigate call.
+let investigateHistory = [];
+let investigateViolationId = null;
+
+const INVESTIGATE_SUGGESTIONS = [
+  'What exactly is the breach here?',
+  'Explain this breach in simple terms.',
+  'Why is this considered a violation?',
+  'How serious is this breach and why?',
+  'Give me step-by-step remediation actions.',
+  'Has this type of breach occurred elsewhere?',
+];
+
 async function openDrawer(verdictId) {
   const r = await fetch(`/api/${encodeURIComponent(currentOrgId)}/verdicts/${verdictId}`);
-  if (!r.ok) { showToast('Failed to load verdict', 'error'); return; }
+  if (!r.ok) { showToast('Failed to load verdict details', 'error'); return; }
   const v = await r.json();
+
+  investigateHistory = [];
+  investigateViolationId = v.violation_id;
 
   const ts = v.timestamp ? new Date(v.timestamp).toLocaleString() : '';
   const canAck = v.remediation_status === 'OPEN';
   const canRes = v.remediation_status === 'ACKNOWLEDGED';
 
   document.getElementById('drawerContent').innerHTML = `
-    <div class="violation-top" style="margin-bottom:16px">
+    <div class="violation-top" style="margin-bottom:24px; padding-bottom:16px; border-bottom:1px dashed var(--border2);">
       <span class="badge rule" style="font-size:13px">#${v.violation_id}</span>
       <span class="badge ${v.severity}">${v.severity}</span>
       <span class="badge rule">${v.rule_id}</span>
-      ${v.breach_notification_candidate ? '<span class="badge breach">⚠ Breach Candidate</span>' : ''}
+      ${v.breach_notification_candidate ? `<span class="badge breach" style="display:inline-flex;align-items:center"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px; margin-bottom:-2px;"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Breach</span>` : ''}
       ${v.used_fallback ? '<span class="badge fallback">⚡ Template Explanation</span>' : ''}
     </div>
-    <div class="drawer-field"><div class="lbl">Field</div><div class="val mono">${v.field}</div></div>
-    <div class="drawer-field"><div class="lbl">Source System</div><div class="val">${v.source_system}</div></div>
-    <div class="drawer-field"><div class="lbl">Timestamp</div><div class="val">${ts}</div></div>
-    <div class="drawer-field"><div class="lbl">Verdict ID</div><div class="val mono" style="font-size:11px">${v.verdict_id}</div></div>
-    <div class="drawer-field"><div class="lbl">Explanation</div><div class="val explanation-text">${v.explanation}</div></div>
-    <div class="drawer-field"><div class="lbl">Statute Citation</div><div class="val" style="font-size:12px;font-style:italic;color:var(--text2)">${v.section_cited}</div></div>
-    <div class="drawer-field"><div class="lbl">Current Status</div><div class="val"><span class="status-badge ${v.remediation_status}">${v.remediation_status}</span></div></div>
-    ${v.remediation_updated_at ? `<div class="drawer-field"><div class="lbl">Status Updated</div><div class="val" style="font-size:12px">${new Date(v.remediation_updated_at).toLocaleString()}</div></div>` : ''}
-    <div class="drawer-field"><div class="lbl">Hash (this org's chain position #${v.violation_id})</div><div class="val mono" style="font-size:10px;color:var(--text3)">${v.row_hash}</div></div>
+    <div class="drawer-field"><div class="lbl">Violating Field</div><div class="val mono">${v.field}</div></div>
+    <div class="drawer-field"><div class="lbl">Source System</div><div class="val" style="font-weight:500;">${v.source_system}</div></div>
+    <div class="drawer-field"><div class="lbl">Timestamp Event</div><div class="val">${ts}</div></div>
+    <div class="drawer-field"><div class="lbl">AI Explanation</div><div class="val explanation-text">${v.explanation}</div></div>
+    <div class="drawer-field"><div class="lbl">Statute Citation</div><div class="val" style="font-size:13px;font-style:italic;color:var(--text2);display:flex;align-items:center;gap:6px;"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.7"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg> ${v.section_cited}</div></div>
+
+    <div style="display:flex; gap:16px; margin-top:24px;">
+      <div class="drawer-field" style="flex:1;"><div class="lbl">Current Status</div><div class="val" style="background:transparent; padding:0; border:none;"><span class="status-badge ${v.remediation_status}">${v.remediation_status}</span></div></div>
+      ${v.remediation_updated_at ? `<div class="drawer-field" style="flex:1;"><div class="lbl">Status Updated</div><div class="val" style="background:transparent; padding:0; border:none; font-size:13px; color:var(--text2);">${new Date(v.remediation_updated_at).toLocaleString()}</div></div>` : ''}
+    </div>
+
+    <div class="drawer-field" style="margin-top:12px;"><div class="lbl">Cryptographic Hash (this org's chain position #${v.violation_id})</div><div class="val mono" style="font-size:11px;color:var(--text3); background: var(--surface2);">${v.row_hash}</div></div>
+
     <div class="drawer-actions">
-      ${canAck ? `<button class="btn btn-warn" onclick="updateStatus('${v.verdict_id}','ACKNOWLEDGED')">Acknowledge</button>` : ''}
-      ${canRes ? `<button class="btn btn-danger" onclick="updateStatus('${v.verdict_id}','RESOLVED')">Mark Resolved</button>` : ''}
+      ${canAck ? `<button class="btn btn-warn" onclick="updateStatus('${v.verdict_id}','ACKNOWLEDGED')">Acknowledge Violation</button>` : ''}
+      ${canRes ? `<button class="btn btn-danger" onclick="updateStatus('${v.verdict_id}','RESOLVED')">Mark as Resolved</button>` : ''}
+      ${!canAck && !canRes ? `<button class="btn btn-secondary" disabled>Fully Resolved</button>` : ''}
+    </div>
+
+    <div class="investigate-panel">
+      <h4>Investigate #${v.violation_id}</h4>
+      <div class="investigate-log" id="investigateLog"></div>
+      <div class="investigate-suggestions">
+        ${INVESTIGATE_SUGGESTIONS.map(q => `<button onclick="askInvestigation(${JSON.stringify(q)})">${q}</button>`).join('')}
+      </div>
+      <div class="investigate-input-row">
+        <input type="text" id="investigateInput" placeholder="Ask anything about violation #${v.violation_id}…"
+               onkeydown="if(event.key==='Enter')askInvestigation()" />
+        <button class="btn btn-primary" onclick="askInvestigation()">Ask</button>
+      </div>
     </div>
   `;
 
@@ -774,13 +1507,13 @@ async function lookupViolationNumber() {
   const raw = document.getElementById('violationLookupInput').value.trim().replace(/^#/, '');
   const n = parseInt(raw, 10);
   if (!raw || isNaN(n) || n < 1) {
-    showToast('Enter a violation number, e.g. 3', 'error');
+    showToast('Enter a valid violation number', 'error');
     return;
   }
   try {
     const r = await fetch(`/api/${encodeURIComponent(currentOrgId)}/violations/${n}`);
     if (!r.ok) {
-      showToast(`No violation #${n} found for ${currentOrgId}`, 'error');
+      showToast(`No violation #${n} found for this org`, 'error');
       return;
     }
     const v = await r.json();
@@ -790,20 +1523,494 @@ async function lookupViolationNumber() {
   }
 }
 
+// ---- Investigation chat ("@N <question>") ----
+function renderInvestigateLog() {
+  const log = document.getElementById('investigateLog');
+  if (!log) return;
+  log.innerHTML = investigateHistory.map(turn => {
+    const cls = turn.role === 'user' ? 'user' : `assistant${turn.fallback ? ' fallback' : ''}`;
+    const label = turn.role === 'user' ? '' : (turn.fallback ? '⚡ fallback — ' : '');
+    return `<div class="investigate-turn ${cls}">${label}${turn.content}</div>`;
+  }).join('');
+  log.scrollTop = log.scrollHeight;
+}
+
+async function askInvestigation(presetQuestion) {
+  const input = document.getElementById('investigateInput');
+  const question = (presetQuestion !== undefined ? presetQuestion : input.value).trim();
+  if (!question || investigateViolationId == null) return;
+  if (input) input.value = '';
+
+  investigateHistory.push({ role: 'user', content: question });
+  renderInvestigateLog();
+
+  try {
+    const r = await fetch(`/v1/${encodeURIComponent(currentOrgId)}/investigate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        violation_id: investigateViolationId,
+        question: question,
+        // Server is stateless (investigation.py) — we resend prior turns
+        // every call so follow-ups ("why is that serious?") stay coherent.
+        history: investigateHistory.slice(0, -1).map(t => ({ role: t.role, content: t.content })),
+      }),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      investigateHistory.push({ role: 'assistant', content: err.detail || 'Request failed.', fallback: true });
+      renderInvestigateLog();
+      return;
+    }
+    const data = await r.json();
+    investigateHistory.push({ role: 'assistant', content: data.answer, fallback: data.used_fallback });
+    renderInvestigateLog();
+  } catch (e) {
+    investigateHistory.push({ role: 'assistant', content: 'Network error — could not reach the investigation assistant.', fallback: true });
+    renderInvestigateLog();
+  }
+}
+
+// ---- Add Organization modal ----
+// Talks only to the EXISTING POST /v1/orgs/{org_id}/config and GET /v1/orgs
+// endpoints — no backend/API/storage changes were needed for this feature,
+// both routes already existed and already worked.
+
+function openAddOrgModal() {
+  document.getElementById('addOrgErrors').style.display = 'none';
+  document.getElementById('addOrgErrors').innerHTML = '';
+  document.getElementById('newOrgId').value = '';
+  document.getElementById('orgFieldsRows').innerHTML = '';
+  document.getElementById('orgIdentifiersRows').innerHTML = '';
+  document.getElementById('orgLinkageRows').innerHTML = '';
+  addFieldRow(); // start with one empty field row, since >=1 field is required
+  document.getElementById('addOrgOverlay').classList.add('open');
+  document.getElementById('addOrgModal').classList.add('open');
+}
+
+function closeAddOrgModal() {
+  document.getElementById('addOrgOverlay').classList.remove('open');
+  document.getElementById('addOrgModal').classList.remove('open');
+}
+
+function addFieldRow() {
+  const row = document.createElement('div');
+  row.className = 'form-row fields-row';
+  row.innerHTML = `
+    <input class="f-field_name" placeholder="field_name" />
+    <input class="f-pii_category" placeholder="pii_category" />
+    <input class="f-declared_purpose" placeholder="declared_purpose" />
+    <input class="f-consent_scope" placeholder="consent_scope" />
+    <input class="f-retention_days" type="number" min="1" placeholder="retention_days" />
+    <input class="f-source_system" placeholder="source_system" />
+    <button type="button" class="row-remove" onclick="this.parentElement.remove()" title="Remove">✕</button>
+  `;
+  document.getElementById('orgFieldsRows').appendChild(row);
+}
+
+function addIdentifierRow() {
+  const row = document.createElement('div');
+  row.className = 'form-row identifiers-row';
+  row.innerHTML = `
+    <input class="i-name" placeholder="name (e.g. employee_id)" />
+    <input class="i-pattern" placeholder="pattern (regex, or indian_phone / indian_pan / indian_aadhaar / uuid)" />
+    <select class="i-validator">
+      <option value="none" selected>validator: none</option>
+      <option value="pan">validator: pan</option>
+      <option value="aadhaar">validator: aadhaar</option>
+    </select>
+    <button type="button" class="row-remove" onclick="this.parentElement.remove()" title="Remove">✕</button>
+  `;
+  document.getElementById('orgIdentifiersRows').appendChild(row);
+}
+
+function addLinkageRow() {
+  const row = document.createElement('div');
+  row.className = 'form-row linkage-row';
+  row.innerHTML = `
+    <input class="l-fields" placeholder="field_a, field_b, field_c (>=2, comma-separated)" />
+    <input class="l-risk" placeholder="risk label" value="LINKAGE_RISK" />
+    <button type="button" class="row-remove" onclick="this.parentElement.remove()" title="Remove">✕</button>
+  `;
+  document.getElementById('orgLinkageRows').appendChild(row);
+}
+
+function buildOrgConfigFromForm() {
+  const org_id = document.getElementById('newOrgId').value.trim();
+
+  const fields = [...document.querySelectorAll('#orgFieldsRows .fields-row')].map(row => ({
+    field_name: row.querySelector('.f-field_name').value.trim(),
+    pii_category: row.querySelector('.f-pii_category').value.trim(),
+    declared_purpose: row.querySelector('.f-declared_purpose').value.trim(),
+    consent_scope: row.querySelector('.f-consent_scope').value.trim(),
+    retention_days: parseInt(row.querySelector('.f-retention_days').value, 10),
+    source_system: row.querySelector('.f-source_system').value.trim(),
+  }));
+
+  const identifiers = [...document.querySelectorAll('#orgIdentifiersRows .identifiers-row')]
+    .map(row => ({
+      name: row.querySelector('.i-name').value.trim(),
+      pattern: row.querySelector('.i-pattern').value.trim(),
+      validator: row.querySelector('.i-validator').value,
+    }))
+    .filter(i => i.name || i.pattern); // drop fully-blank rows silently
+
+  const linkage_rules = [...document.querySelectorAll('#orgLinkageRows .linkage-row')]
+    .map(row => ({
+      fields: row.querySelector('.l-fields').value.split(',').map(s => s.trim()).filter(Boolean),
+      risk: row.querySelector('.l-risk').value.trim() || 'LINKAGE_RISK',
+    }))
+    .filter(l => l.fields.length > 0); // drop fully-blank rows silently
+
+  return { org_id, identifiers, fields, linkage_rules };
+}
+
+// Client-side validation catches obvious mistakes before a round-trip;
+// validate_org_config on the server is still the authoritative check —
+// its real error text is always shown too (see submitNewOrg), never
+// replaced by these client-side messages.
+function validateOrgFormClientSide(config) {
+  const errors = [];
+  if (!config.org_id) {
+    errors.push('Organization ID is required.');
+  } else if (!/^[a-z0-9_]+$/.test(config.org_id)) {
+    errors.push('Organization ID must contain only lowercase letters, numbers, and underscores.');
+  }
+  if (config.fields.length === 0) {
+    errors.push('At least one field is required.');
+  }
+  config.fields.forEach((f, i) => {
+    const n = i + 1;
+    if (!f.field_name) errors.push(`Field #${n}: field_name is required.`);
+    if (!f.pii_category) errors.push(`Field #${n}: pii_category is required.`);
+    if (!f.declared_purpose) errors.push(`Field #${n}: declared_purpose is required.`);
+    if (!f.consent_scope) errors.push(`Field #${n}: consent_scope is required.`);
+    if (!f.source_system) errors.push(`Field #${n}: source_system is required.`);
+    if (!Number.isInteger(f.retention_days) || f.retention_days <= 0) {
+      errors.push(`Field #${n}: retention_days must be a positive whole number.`);
+    }
+  });
+  config.identifiers.forEach((ident, i) => {
+    const n = i + 1;
+    if (!ident.name || !ident.pattern) {
+      errors.push(`Identifier #${n}: both name and pattern are required (or remove this row).`);
+    }
+  });
+  config.linkage_rules.forEach((rule, i) => {
+    const n = i + 1;
+    if (rule.fields.length < 2) {
+      errors.push(`Linkage rule #${n}: needs at least 2 comma-separated field names.`);
+    }
+  });
+  return errors;
+}
+
+function showAddOrgErrors(messages) {
+  const box = document.getElementById('addOrgErrors');
+  box.innerHTML = messages.map(m => `<div>• ${m}</div>`).join('');
+  box.style.display = 'block';
+}
+
+async function submitNewOrg() {
+  const config = buildOrgConfigFromForm();
+  const clientErrors = validateOrgFormClientSide(config);
+  if (clientErrors.length > 0) {
+    showAddOrgErrors(clientErrors);
+    return;
+  }
+  document.getElementById('addOrgErrors').style.display = 'none';
+
+  const submitBtn = document.getElementById('addOrgSubmitBtn');
+  submitBtn.disabled = true;
+  const originalLabel = submitBtn.textContent;
+  submitBtn.textContent = 'Creating…';
+
+  try {
+    const r = await fetch(`/v1/orgs/${encodeURIComponent(config.org_id)}/config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config),
+    });
+    const data = await r.json();
+
+    if (r.ok && data.status === 'ok') {
+      closeAddOrgModal();
+      showToast(`Organization "${config.org_id}" created`, 'success');
+      // Switch straight to the new org, then refresh the selector so it
+      // both lists the new org AND shows it selected — same activation
+      // path the existing selector uses, so nothing about org-switching
+      // behaves differently for a newly-created org vs. an existing one.
+      activateOrg(config.org_id);
+      await populateOrgSelector();
+    } else {
+      // Real error text from validate_org_config (via org_config.store.
+      // upload_org_config) — never replaced with a generic message.
+      showAddOrgErrors(data.errors && data.errors.length ? data.errors : ['Unknown error creating organization.']);
+    }
+  } catch (e) {
+    showAddOrgErrors(['Network error — could not reach the server.']);
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = originalLabel;
+  }
+}
+
 // ---- Toast ----
 function showToast(msg, type='success') {
   const el = document.getElementById('toast');
-  el.textContent = msg;
+  const checkIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+  const alertIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
+  const icon = type === 'success' ? checkIcon : alertIcon;
+  el.innerHTML = `<span style="display:flex;align-items:center;">${icon}</span> ${msg}`;
   el.className = `toast show ${type}`;
   setTimeout(() => { el.className = 'toast'; }, 3000);
 }
 
-// ---- Init ----
+// ---- Pipeline pause/resume (Live Feed's "Pause/Resume" button) ----
+// Global, not per-org: there is exactly one set of synthetic generators
+// per run_pipeline.py process (see pipeline_control.py). Polled so the
+// button stays correct even if paused/resumed from another tab.
+let pipelineRunning = true;
+
+function updatePipelineToggleUI() {
+  const dot = document.getElementById('pipelineStatusDot');
+  const label = document.getElementById('pipelineStatusLabel');
+  const btnLabel = document.getElementById('pipelineToggleLabel');
+  const icon = document.getElementById('pipelineToggleIcon');
+  if (pipelineRunning) {
+    dot.className = 'ws-dot connected';
+    label.textContent = 'Pipeline running';
+    btnLabel.textContent = 'Pause Live Feed';
+    icon.innerHTML = '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
+  } else {
+    dot.className = 'ws-dot';
+    label.textContent = 'Pipeline paused';
+    btnLabel.textContent = 'Resume Live Feed';
+    icon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"/>';
+  }
+}
+
+async function togglePipeline() {
+  const btn = document.getElementById('pipelineToggleBtn');
+  btn.disabled = true;
+  try {
+    const action = pipelineRunning ? 'pause' : 'resume';
+    const r = await fetch(`/v1/pipeline/${action}`, { method: 'POST' });
+    const data = await r.json();
+    pipelineRunning = data.running;
+  } catch (e) {
+    // leave state as-is; next poll will resync
+  }
+  updatePipelineToggleUI();
+  btn.disabled = false;
+}
+
+async function refreshPipelineStatus() {
+  try {
+    const r = await fetch('/v1/pipeline/status');
+    const data = await r.json();
+    pipelineRunning = data.running;
+    updatePipelineToggleUI();
+  } catch (e) {}
+}
+
+// ---- Simulate Breach tab ----
+// Every example is a valid POST /v1/{org_id}/scan body — run through the
+// real detect_event -> evaluate_event -> explain_verdict path, no mocking.
+// "org" pins an example to the org whose registered config actually makes
+// it fire the intended rule (retention/linkage rely on that org's
+// registry entries); exposure/purpose fire for any org via /scan's own
+// unregistered-field/raw-log-text handling (see api/integration.py).
+const SIM_EXAMPLES = {
+  exposure: {
+    label: 'Exposure — raw PAN + phone pasted into a log line',
+    org: null,
+    body: () => ({
+      text: '[2026-08-22T09:14:02Z] DEBUG order-service: fetched customer record {name: "Rohan Verma", phone: "9876543210", pan: "ABCDE1234F"}'
+    })
+  },
+  purpose: {
+    label: 'Purpose Limitation — raw phone leaked into a marketing event',
+    org: null,
+    body: () => ({
+      fields: {
+        hashed_customer_id: 'hcid_9f2a1b7e3c',
+        campaign_segment: 'dormant_30d',
+        event_type: 'push_notification',
+        phone: '9123456780'
+      },
+      source_system: 'marketing-analytics'
+    })
+  },
+  retention: {
+    label: 'Retention — delivery-partner record kept 240 days (>180-day limit)',
+    org: 'blinkit',
+    body: () => ({
+      fields: {
+        name: 'Suresh K.',
+        aadhaar: '5521 8890 3347',
+        onboarded_at: new Date(Date.now() - 240 * 24 * 60 * 60 * 1000).toISOString(),
+        partner_id: 'DP-4471'
+      },
+      source_system: 'delivery-partner-service'
+    })
+  },
+  linkage: {
+    label: 'Linkage — student name + school + DOB re-identify a minor',
+    org: 'edtech_co',
+    body: () => ({
+      fields: {
+        student_name: 'Ananya Bhat',
+        school_name: 'Delhi Public School RK Puram',
+        dob: '2011-03-14'
+      },
+      source_system: 'support_ticket_system'
+    })
+  }
+};
+
+function populateSimExamples() {
+  const sel = document.getElementById('simExampleSelect');
+  sel.innerHTML = '<option value="">— Custom JSON (edit below) —</option>' +
+    Object.entries(SIM_EXAMPLES).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('');
+}
+
+function loadSimExample() {
+  const key = document.getElementById('simExampleSelect').value;
+  const ta = document.getElementById('simPayload');
+  const hint = document.getElementById('simOrgHint');
+  const target = document.getElementById('simOrgTarget');
+  if (!key) { hint.textContent = ''; target.textContent = 'any'; return; }
+
+  const ex = SIM_EXAMPLES[key];
+  ta.value = JSON.stringify(ex.body(), null, 2);
+  target.textContent = ex.org || 'any';
+
+  if (ex.org && ex.org !== currentOrgId) {
+    const orgSel = document.getElementById('orgSelector');
+    const hasOrg = Array.from(orgSel.options).some(o => o.value === ex.org);
+    if (hasOrg) {
+      hint.textContent = `Switching the organization selector to "${ex.org}" — this example is only registered to fire against that org's config.`;
+      orgSel.value = ex.org;
+      activateOrg(ex.org);
+    } else {
+      hint.textContent = `This example targets org "${ex.org}", which isn't registered here — running it against "${currentOrgId}" will still exercise detection, but may not classify the same way.`;
+    }
+  } else {
+    hint.textContent = '';
+  }
+}
+
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.innerText = s;
+  return d.innerHTML;
+}
+
+async function runSimulatedScan() {
+  const btn = document.getElementById('simRunBtn');
+  const out = document.getElementById('simResults');
+  const raw = document.getElementById('simPayload').value.trim();
+
+  if (!currentOrgId) {
+    out.innerHTML = '<div class="form-error-box" style="display:block">Select an organization first.</div>';
+    return;
+  }
+  if (!raw) {
+    out.innerHTML = '<div class="form-error-box" style="display:block">Pick a preset or paste a scan request JSON body first.</div>';
+    return;
+  }
+  let body;
+  try {
+    body = JSON.parse(raw);
+  } catch (e) {
+    out.innerHTML = `<div class="form-error-box" style="display:block">Invalid JSON: ${escapeHtml(e.message)}</div>`;
+    return;
+  }
+
+  btn.disabled = true;
+  out.innerHTML = '<div class="empty" style="border:none; padding:30px;"><p>Running through detection → rule engine → statute-grounded LLM explainer…</p></div>';
+
+  try {
+    const r = await fetch(`/v1/${encodeURIComponent(currentOrgId)}/scan`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      out.innerHTML = `<div class="form-error-box" style="display:block">${escapeHtml(data.detail || 'Scan failed.')}</div>`;
+      return;
+    }
+    renderSimResults(data);
+    refreshStats();
+    refreshOverview();
+  } catch (e) {
+    out.innerHTML = `<div class="form-error-box" style="display:block">Network error: ${escapeHtml(e.message)}</div>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function renderSimResults(data) {
+  const out = document.getElementById('simResults');
+
+  const entitiesHtml = (data.entities || []).map(e =>
+    `<span class="badge system">${escapeHtml(e.entity_type)} · ${escapeHtml(e.field)} · ${escapeHtml(e.validation_status)}</span>`
+  ).join(' ');
+
+  if (!data.verdicts || data.verdicts.length === 0) {
+    out.innerHTML = `
+      <div class="drawer-field"><div class="lbl">Entities Detected</div><div style="display:flex;gap:6px;flex-wrap:wrap;">${entitiesHtml || '<span style="color:var(--text3);font-size:12px;">None</span>'}</div></div>
+      <div class="empty" style="border:none; padding:24px 0;">
+        <p>No policy violation triggered for this payload${data.contains_pii ? ' — PII was detected but did not breach any configured rule for this org.' : '.'}</p>
+      </div>`;
+    return;
+  }
+
+  const verdictsHtml = data.verdicts.map(v => `
+    <div class="violation-card ${v.severity}">
+      <div class="violation-top">
+        <span class="badge ${v.severity}">${v.severity}</span>
+        <span class="badge rule">${v.rule_id}</span>
+        <span class="badge system">${v.source_system}</span>
+        <span class="violation-field">${v.field}</span>
+        ${v.breach_notification_candidate ? '<span class="badge breach">Breach Candidate</span>' : ''}
+        ${v.violation_id != null ? `<span class="badge rule">#${String(v.violation_id).padStart(2, '0')}</span>` : ''}
+      </div>
+      <div class="violation-explanation">${v.explanation || '<em>No explanation generated</em>'}</div>
+      <div class="violation-section">${v.section_cited || 'No statute provided'}</div>
+      <div style="margin-top:10px;font-size:11px;color:var(--text3);">
+        ${v.stored_in_evidence_store && v.violation_id != null
+          ? `Stored in the Evidence Store as Violation #${v.violation_id} — open the Audit tab and ask "@${v.violation_id} what exactly is the breach here?" in the investigation panel.`
+          : 'Not stored in the Evidence Store.'}
+      </div>
+    </div>
+  `).join('');
+
+  const maskedHtml = data.masked_text
+    ? `<div class="drawer-field"><div class="lbl">Masked Text</div><div class="val mono">${escapeHtml(data.masked_text)}</div></div>`
+    : (data.masked_fields
+      ? `<div class="drawer-field"><div class="lbl">Masked Fields</div><div class="val mono">${escapeHtml(JSON.stringify(data.masked_fields, null, 2))}</div></div>`
+      : '');
+
+  out.innerHTML = `
+    <div class="drawer-field"><div class="lbl">Entities Detected</div><div style="display:flex;gap:6px;flex-wrap:wrap;">${entitiesHtml || '<span style="color:var(--text3);font-size:12px;">None</span>'}</div></div>
+    ${maskedHtml}
+    <div class="drawer-field"><div class="lbl">Verdicts (${data.verdicts.length})</div>${verdictsHtml}</div>
+  `;
+}
+
+// ---- Initialization ----
 (async function init() {
   await populateOrgSelector();
   connectWS();
   refreshStats();
-  setInterval(refreshStats, 5000);
+  refreshOverview();
+  populateSimExamples();
+  refreshPipelineStatus();
+  setInterval(() => { refreshStats(); refreshOverview(); }, 5000);
+  setInterval(refreshPipelineStatus, 5000);
 })();
 </script>
 </body>

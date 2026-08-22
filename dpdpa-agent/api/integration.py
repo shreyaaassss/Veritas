@@ -21,9 +21,12 @@ logic duplication between them:
 
   Both A1 and A2 funnel through the SAME `_process_event()` helper below,
   which calls the exact same detect_event() / evaluate_event() /
-  explain_verdict() / EvidenceStore.append() functions Stream mode's
-  run_pipeline.py has always used — untouched, per this phase's explicit
-  "do not touch detection/rule-engine logic" instruction.
+  EvidenceStore.append() functions Stream mode's run_pipeline.py has
+  always used — untouched, per this phase's explicit "do not touch
+  detection/rule-engine logic" instruction. Explanation is now
+  build_deferred_explanation() (zero-cost template), not a per-verdict
+  LLM call — see _process_event()'s docstring and llm_explainer/
+  explainer.py's "AUTOMATIC EXPLANATION REMOVED" note.
 
   A3's CLI PoC (veritas_scan_cli.py, repo root) calls THIS module's /scan
   route over real HTTP — it does not import or reimplement anything here.
@@ -32,6 +35,11 @@ logic duplication between them:
   (explicit non-goal exception: Phase 5 depends on being able to register
   an org live during a demo, so a minimal version is in scope; no auth, no
   diffing, no rollback UI, exactly as instructed).
+
+  Also: POST /v1/{org_id}/investigate — the "@N <question>" breach
+  investigation endpoint. See investigation.py for the actual Q&A logic
+  (context retrieval + grounded LLM call); this route is a thin adapter
+  that parses the request shape and delegates.
 
 WRITE-TO-EVIDENCE-STORE DECISION (Part A2.5, stated explicitly per the
 plan's request): /scan WRITES to the Evidence Store whenever it produces a
@@ -53,12 +61,14 @@ from uuid import uuid4
 from fastapi import APIRouter, Body, HTTPException
 from pydantic import BaseModel, Field, model_validator
 
+import pipeline_control
 from config_loader import OrgConfigNotFoundError, load_org_config
 from dashboard.live_feed import publish as publish_live_feed
 from detection.engine import detect_event
 from detection.models import DetectedEvent, MatchedEntity
 from evidence_store.store import get_store
-from llm_explainer.explainer import ExplainedVerdict, explain_verdict
+from investigation import investigate, parse_reference
+from llm_explainer.explainer import ExplainedVerdict, build_deferred_explanation
 from masking import mask_fields, mask_text
 from org_config.store import list_registered_orgs, upload_org_config as store_upload_org_config
 from registry.loader import reload_org_config
@@ -115,23 +125,36 @@ async def _process_event(event: Event, *, write_to_store: bool) -> Dict[str, Any
     feed) per verdict. Both /events and /scan call this with their own
     synthesized Event and nothing else — this is what "one engine, three
     integration points" means concretely.
+
+    NO AUTOMATIC LLM CALL: "explain" here is build_deferred_explanation()
+    — a zero-cost deterministic template, not a real per-verdict LLM call.
+    At real traffic volumes (thousands of violations), calling the LLM
+    once per verdict automatically is an unbounded cost for explanation
+    text that may never be read. The real, statute-grounded explanation
+    now happens on demand, once per question, via investigation.py's
+    "@N <question>" endpoint (POST /v1/{org_id}/investigate) — see that
+    module. See llm_explainer/explainer.py's "AUTOMATIC EXPLANATION
+    REMOVED" docstring note for the full rationale.
     """
     detected: DetectedEvent = detect_event(event)
     verdicts: List[Verdict] = evaluate_event(detected)
 
     store = get_store() if write_to_store else None
-    explained_and_stored: List[tuple[ExplainedVerdict, bool]] = []
+    explained_and_stored: List[tuple[ExplainedVerdict, bool, Optional[int]]] = []
 
     for v in verdicts:
-        explained = explain_verdict(v)
+        explained = build_deferred_explanation(v)
         stored = False
+        violation_id: Optional[int] = None
         if store is not None:
             try:
                 store.append(explained)
                 stored = True
+                row = store.get_by_verdict_id(event.tenant_id, str(v.verdict_id))
+                violation_id = row["violation_id"] if row else None
             except Exception as exc:
                 logger.error("Failed to store verdict %s: %s", v.verdict_id, exc)
-        explained_and_stored.append((explained, stored))
+        explained_and_stored.append((explained, stored, violation_id))
 
         # Same live-feed payload shape run_pipeline.py's Stream-mode
         # broadcaster already builds (see dashboard/live_feed.py) — so a
@@ -148,16 +171,21 @@ async def _process_event(event: Event, *, write_to_store: bool) -> Dict[str, Any
     return {"detected": detected, "explained": explained_and_stored}
 
 
-def _verdict_summary(explained: ExplainedVerdict, stored: bool) -> Dict[str, Any]:
+def _verdict_summary(explained: ExplainedVerdict, stored: bool, violation_id: Optional[int]) -> Dict[str, Any]:
     """
     JSON-safe verdict summary for API responses. Deliberately does NOT
     include any raw PII value — Verdict never carried raw matched text to
     begin with (only field NAMES, categories, and registry metadata), so
     this is safe to return/log as-is.
+
+    violation_id is the per-tenant sequential number (see evidence_store/
+    store.py) — None only if the write to the Evidence Store failed
+    (stored=False), since that's the one thing that assigns it.
     """
     v = explained.verdict
     return {
         "verdict_id": str(v.verdict_id),
+        "violation_id": violation_id,
         "rule_id": v.rule_id.value,
         "severity": v.severity.value,
         "field": v.field,
@@ -224,7 +252,7 @@ async def ingest_event(org_id: str, req: IngestEventRequest) -> Dict[str, Any]:
         "event_id": str(event.event_id),
         "contains_pii": detected.contains_pii,
         "entities": [_entity_summary(m) for m in detected.matched_entities],
-        "verdicts": [_verdict_summary(ev, stored) for ev, stored in result["explained"]],
+        "verdicts": [_verdict_summary(ev, stored, vid) for ev, stored, vid in result["explained"]],
     }
 
 
@@ -316,9 +344,9 @@ async def scan(org_id: str, req: ScanRequest) -> Dict[str, Any]:
     explained_and_stored = result["explained"]
 
     all_matches = detected.matched_entities
-    verdict_summaries = [_verdict_summary(ev, stored) for ev, stored in explained_and_stored]
+    verdict_summaries = [_verdict_summary(ev, stored, vid) for ev, stored, vid in explained_and_stored]
     linkage_risks = [
-        s for s, (ev, _) in zip(verdict_summaries, explained_and_stored)
+        s for s, (ev, _, _) in zip(verdict_summaries, explained_and_stored)
         if ev.verdict.rule_id == RuleId.LINKAGE_001
     ]
 
@@ -335,6 +363,34 @@ async def scan(org_id: str, req: ScanRequest) -> Dict[str, Any]:
     if req.fields:
         response["masked_fields"] = mask_fields(req.fields, all_matches)
     return response
+
+
+# ---------------------------------------------------------------------------
+# Pipeline pause/resume (dashboard's "Pause/Resume Live Feed" button)
+# ---------------------------------------------------------------------------
+# Process-global, not per-org: there is exactly one set of synthetic
+# generators (ingestion/log_generator.py + api_generator.py) per
+# run_pipeline.py process, same as the org selector's Blinkit-only
+# synthetic traffic. See pipeline_control.py for the thread-safety note on
+# why this is a threading.Event, not an asyncio.Event. A no-op (but
+# harmless) toggle when only dashboard.server is running standalone with
+# no generators attached.
+
+@router.post("/pipeline/pause")
+async def pause_pipeline() -> Dict[str, Any]:
+    pipeline_control.pause()
+    return {"running": pipeline_control.is_running()}
+
+
+@router.post("/pipeline/resume")
+async def resume_pipeline() -> Dict[str, Any]:
+    pipeline_control.resume()
+    return {"running": pipeline_control.is_running()}
+
+
+@router.get("/pipeline/status")
+async def pipeline_status() -> Dict[str, Any]:
+    return {"running": pipeline_control.is_running()}
 
 
 # ---------------------------------------------------------------------------
@@ -372,3 +428,56 @@ async def upload_org_config_endpoint(org_id: str, config: Dict[str, Any] = Body(
         reload_org_config(org_id)
         logger.info("Registered/updated org config for org_id=%r, reloaded into rule engine cache.", org_id)
     return result
+
+
+# ---------------------------------------------------------------------------
+# Breach investigation — "@N <question>" (see investigation.py)
+# ---------------------------------------------------------------------------
+
+class InvestigateRequest(BaseModel):
+    """
+    Two equivalent ways to ask:
+      - `text`: the raw utterance exactly as an auditor would type it,
+        e.g. "@01 What exactly is the breach here?" — the '@N' reference
+        is parsed out of it server-side (investigation.parse_reference).
+      - `violation_id` + `question`: the same thing, already split, for
+        programmatic callers that already know the number.
+    `history`: optional prior turns for this SAME violation's thread —
+    [{"role": "user"|"assistant", "content": "..."}, ...] — the caller
+    (e.g. the dashboard) re-sends this every call; the server itself is
+    stateless (see investigation.py's module docstring for why).
+    """
+    text: Optional[str] = None
+    violation_id: Optional[int] = None
+    question: Optional[str] = None
+    history: List[Dict[str, str]] = Field(default_factory=list)
+
+
+@router.post("/{org_id}/investigate")
+async def investigate_endpoint(org_id: str, req: InvestigateRequest) -> Dict[str, Any]:
+    """
+    Layer 2+3 of the breach investigation system: resolve the '@N'
+    reference to its full stored breach record, then answer the
+    auditor's question grounded in that record. See investigation.py for
+    the actual retrieval/LLM/guardrail logic — this route only adapts
+    the two accepted request shapes and validates org_id exists.
+    """
+    _require_org_config(org_id)
+
+    if req.text:
+        violation_id, question = parse_reference(req.text)
+        if violation_id is None:
+            raise HTTPException(
+                status_code=400,
+                detail="No '@N' violation reference found in 'text' (e.g. '@01 what happened?').",
+            )
+    elif req.violation_id is not None and req.question:
+        violation_id, question = req.violation_id, req.question
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="Provide either 'text' (e.g. '@01 what happened?') or both 'violation_id' and 'question'.",
+        )
+
+    result = investigate(org_id, violation_id, question, history=req.history)
+    return result.model_dump()

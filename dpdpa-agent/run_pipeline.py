@@ -21,14 +21,21 @@ Pipeline topology (mirrors the Phase 0 system flow diagram):
   Rule Engine (evaluate_from_queue → VerdictFanout.push_many)
        ↓  two parallel queues
   ┌────┴─────────────────┐
-  LLM Explainer          Evidence Store (direct, not via LLM queue)
-  (explain_from_queue)        ↑
-       ↓  out_queue       │
-  Evidence Store       via broadcaster_task
+  Explanation            Evidence Store (direct, not via LLM queue)
+  (defer_explanation_from_queue —   ↑
+   deterministic template, NO   │
+   automatic LLM call — see  via broadcaster_task
+   llm_explainer/explainer.py)
+       ↓  out_queue
+  Evidence Store
   (store_from_queue)
        ↓
   Dashboard WebSocket broadcaster
   (broadcast_from_queue)
+
+Real, statute-grounded LLM explanations now happen ONLY on demand, one
+call per human-asked question, via investigation.py's "@N <question>"
+endpoint (POST /v1/{org_id}/investigate) — not automatically per verdict.
 
 Run with uvicorn serving the FastAPI dashboard on --port (default 8000).
 Open http://localhost:8000 in a browser to see the live dashboard.
@@ -67,7 +74,7 @@ from evidence_store.store import get_store
 from ingestion.api_generator import api_generator
 from ingestion.config import IngestionConfig
 from ingestion.log_generator import log_generator
-from llm_explainer.explainer import explain_from_queue, ExplainedVerdict
+from llm_explainer.explainer import defer_explanation_from_queue, ExplainedVerdict
 from registry.loader import load_registry
 from rules.fanout import VerdictFanout
 from schemas.models import Verdict
@@ -180,8 +187,11 @@ async def run_pipeline(
         asyncio.create_task(detect_from_queue(raw_queue, detected_queue, max_events=max_events), name="detection"),
         # Rule Engine
         asyncio.create_task(evaluate_from_queue(detected_queue, fanout, max_events=max_events), name="rule_engine"),
-        # LLM Explainer
-        asyncio.create_task(explain_from_queue(fanout.llm_explainer_queue, explained_queue, max_verdicts=None), name="llm_explainer"),
+        # Explanation — deferred/template only, no automatic LLM call per
+        # verdict (see llm_explainer/explainer.py's "AUTOMATIC EXPLANATION
+        # REMOVED" note). Real, statute-grounded explanations now happen
+        # on demand via the "@N <question>" investigation endpoint.
+        asyncio.create_task(defer_explanation_from_queue(fanout.llm_explainer_queue, explained_queue, max_verdicts=None), name="explainer"),
         # Evidence Store + Broadcaster
         asyncio.create_task(broadcast_from_queue(explained_queue, store, max_items=None), name="broadcaster"),
     ]

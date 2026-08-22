@@ -28,6 +28,23 @@ ONE-WAY DATA FLOW:
   LLM output only annotates the ExplainedVerdict wrapper — no write access
   to registry, no ability to re-trigger Phase 4, no mutations to any
   Phase 0-4 data structure.
+
+AUTOMATIC EXPLANATION REMOVED FROM THE LIVE PATH (post-Phase 8 change):
+  explain_verdict() — the real, per-verdict LLM call — USED to run
+  automatically for every single detected violation (run_pipeline.py's
+  Stream mode, and api/integration.py's /events and /scan). At demo
+  volumes (a handful of verdicts) that's fine; at real volumes (e.g. a
+  feed producing thousands of violations) that's an unbounded, uncapped
+  LLM bill for explanation text nobody may ever read. Per explicit
+  instruction, the live/scan path no longer calls explain_verdict() at
+  all — it uses build_deferred_explanation() below instead, which is
+  zero-cost and zero-network (same deterministic template as the
+  LLM-failure fallback). The real, statute-grounded, per-question LLM
+  call now only happens on demand, exactly once per question a human
+  actually asks, via investigation.py's "@N <question>" endpoint —
+  see that module. explain_verdict()/explain_from_queue() themselves are
+  UNCHANGED and still fully tested; they're simply no longer wired into
+  the automatic detection path.
 """
 
 from __future__ import annotations
@@ -277,7 +294,45 @@ def explain_verdict(verdict: Verdict) -> ExplainedVerdict:
 
 
 # ---------------------------------------------------------------------------
-# Queue consumer — Phase 4's fanout → this module
+# Deferred (no-LLM) explanation — the live/scan path's default now
+# ---------------------------------------------------------------------------
+
+def build_deferred_explanation(verdict: Verdict) -> ExplainedVerdict:
+    """
+    Zero-cost, zero-network ExplainedVerdict for the automatic detection
+    path — see this module's "AUTOMATIC EXPLANATION REMOVED" docstring
+    note. Deliberately reuses _build_fallback()'s exact template rather
+    than inventing a second one: it's already guaranteed never to crash,
+    and every existing consumer (dashboard's "Template" badge, Evidence
+    Store schema, investigation.py's breach-record context) already
+    handles used_fallback=True correctly, so no downstream changes were
+    needed to introduce this.
+    """
+    return _build_fallback(verdict, verdict.rule_id.value)
+
+
+async def defer_explanation_from_queue(
+    in_queue,
+    out_queue,
+    max_verdicts: int | None = None,
+) -> None:
+    """
+    Same queue-consumer shape as explain_from_queue below, but builds
+    every ExplainedVerdict with build_deferred_explanation() instead of
+    explain_verdict() — no LLM call, no network I/O, per verdict. This is
+    what run_pipeline.py's Stream mode actually runs now.
+    """
+    processed = 0
+    while max_verdicts is None or processed < max_verdicts:
+        verdict: Verdict = await in_queue.get()
+        explained = build_deferred_explanation(verdict)
+        await out_queue.put(explained)
+        processed += 1
+
+
+# ---------------------------------------------------------------------------
+# Queue consumer — Phase 4's fanout → this module (real LLM call per item;
+# no longer wired into the automatic live/scan path — see module docstring)
 # ---------------------------------------------------------------------------
 
 async def explain_from_queue(

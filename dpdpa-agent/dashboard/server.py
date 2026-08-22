@@ -50,7 +50,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from api.integration import router as integration_router
-from dashboard.live_feed import broadcaster_task, get_live_feed_queue, register_client, unregister_client
+from dashboard.live_feed import broadcaster_task, get_live_feed_queue, register_client, set_server_loop, unregister_client
 from evidence_store.store import get_store
 
 logger = logging.getLogger("dashboard.server")
@@ -207,6 +207,10 @@ async def get_stats(org_id: str):
 
 @app.on_event("startup")
 async def startup_event():
+    # Record which loop actually owns the WebSocket clients/broadcaster —
+    # see dashboard/live_feed.py's "CROSS-THREAD FIX" note. Required for
+    # run_pipeline.py's cross-thread publish() calls to reach this server.
+    set_server_loop(asyncio.get_running_loop())
     asyncio.create_task(broadcaster_task())
     logger.info("Dashboard server started. Tenant-scoped WebSocket broadcaster running.")
 

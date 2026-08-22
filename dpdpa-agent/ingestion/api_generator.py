@@ -34,6 +34,7 @@ import random
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional, Tuple
 
+import pipeline_control
 from ingestion.config import IngestionConfig
 from ingestion.fixtures import (
     CAMPAIGN_SEGMENTS,
@@ -225,6 +226,10 @@ async def api_generator(
     vector_toggle = 0  # alternates marketing vs delivery-partner emission
 
     while max_events is None or emitted < max_events:
+        if not pipeline_control.is_running():
+            await asyncio.sleep(0.3)
+            continue
+
         if vector_toggle % 2 == 0:
             source_system = _MARKETING_SOURCE
             is_violation = r.random() < cfg.api_marketing_purpose_violation_rate

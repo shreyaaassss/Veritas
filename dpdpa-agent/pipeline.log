@@ -1,0 +1,1142 @@
+2026-08-22 10:49:33,396 INFO pipeline: Dashboard available at http://localhost:8000
+2026-08-22 10:49:34,053 INFO dashboard.server: Dashboard server started. Tenant-scoped WebSocket broadcaster running.
+2026-08-22 10:49:34,900 INFO pipeline: Loading compliance registry…
+2026-08-22 10:49:34,924 INFO pipeline: Registry loaded: 15 entries
+2026-08-22 10:49:34,957 INFO pipeline: \U0001f680 Pipeline running. Open http://localhost:8000 in your browser.
+2026-08-22 10:49:35,809 INFO dashboard.server: WebSocket client connected for org_id='blinkit'.
+2026-08-22 10:49:36,290 INFO presidio-analyzer: Created NLP engine: spacy. Loaded models: ['en']
+2026-08-22 10:49:36,291 INFO detection.analyzer_engine: Using spaCy model: en_core_web_sm
+2026-08-22 10:49:36,292 INFO presidio-analyzer: registry not provided, creating default.
+2026-08-22 10:49:36,392 INFO presidio-analyzer: Loaded recognizer: CreditCardRecognizer
+2026-08-22 10:49:36,393 INFO presidio-analyzer: Loaded recognizer: CreditCardRecognizer
+2026-08-22 10:49:36,393 INFO presidio-analyzer: Loaded recognizer: CreditCardRecognizer
+2026-08-22 10:49:36,394 INFO presidio-analyzer: Loaded recognizer: CreditCardRecognizer
+2026-08-22 10:49:36,394 INFO presidio-analyzer: Loaded recognizer: UsBankRecognizer
+2026-08-22 10:49:36,395 INFO presidio-analyzer: Loaded recognizer: UsLicenseRecognizer
+2026-08-22 10:49:36,395 INFO presidio-analyzer: Loaded recognizer: UsItinRecognizer
+2026-08-22 10:49:36,396 INFO presidio-analyzer: Loaded recognizer: UsPassportRecognizer
+2026-08-22 10:49:36,396 INFO presidio-analyzer: Loaded recognizer: UsSsnRecognizer
+2026-08-22 10:49:36,397 INFO presidio-analyzer: Loaded recognizer: NhsRecognizer
+2026-08-22 10:49:36,397 INFO presidio-analyzer: Loaded recognizer: EsNifRecognizer
+2026-08-22 10:49:36,397 INFO presidio-analyzer: Loaded recognizer: EsNieRecognizer
+2026-08-22 10:49:36,398 INFO presidio-analyzer: Loaded recognizer: ItDriverLicenseRecognizer
+2026-08-22 10:49:36,399 INFO presidio-analyzer: Loaded recognizer: ItFiscalCodeRecognizer
+2026-08-22 10:49:36,400 INFO presidio-analyzer: Loaded recognizer: ItVatCodeRecognizer
+2026-08-22 10:49:36,401 INFO presidio-analyzer: Loaded recognizer: ItIdentityCardRecognizer
+2026-08-22 10:49:36,401 INFO presidio-analyzer: Loaded recognizer: ItPassportRecognizer
+2026-08-22 10:49:36,402 INFO presidio-analyzer: Loaded recognizer: PlPeselRecognizer
+2026-08-22 10:49:36,402 INFO presidio-analyzer: Loaded recognizer: CryptoRecognizer
+2026-08-22 10:49:36,403 INFO presidio-analyzer: Loaded recognizer: DateRecognizer
+2026-08-22 10:49:36,403 INFO presidio-analyzer: Loaded recognizer: EmailRecognizer
+2026-08-22 10:49:36,404 INFO presidio-analyzer: Loaded recognizer: IbanRecognizer
+2026-08-22 10:49:36,405 INFO presidio-analyzer: Loaded recognizer: IpRecognizer
+2026-08-22 10:49:36,406 INFO presidio-analyzer: Loaded recognizer: MedicalLicenseRecognizer
+2026-08-22 10:49:36,406 INFO presidio-analyzer: Loaded recognizer: MacAddressRecognizer
+2026-08-22 10:49:36,407 INFO presidio-analyzer: Loaded recognizer: PhoneRecognizer
+2026-08-22 10:49:36,408 INFO presidio-analyzer: Loaded recognizer: UrlRecognizer
+2026-08-22 10:49:36,408 WARNING presidio-analyzer: Recognizer not added to registry because language is not supported by registry - CreditCardRecognizer supported languages: es, registry supported languages: en
+2026-08-22 10:49:36,408 WARNING presidio-analyzer: Recognizer not added to registry because language is not supported by registry - CreditCardRecognizer supported languages: it, registry supported languages: en
+2026-08-22 10:49:36,408 WARNING presidio-analyzer: Recognizer not added to registry because language is not supported by registry - CreditCardRecognizer supported languages: pl, registry supported languages: en
+2026-08-22 10:49:36,409 WARNING presidio-analyzer: Recognizer not added to registry because language is not supported by registry - EsNifRecognizer supported languages: es, registry supported languages: en
+2026-08-22 10:49:36,409 WARNING presidio-analyzer: Recognizer not added to registry because language is not supported by registry - EsNieRecognizer supported languages: es, registry supported languages: en
+2026-08-22 10:49:36,409 WARNING presidio-analyzer: Recognizer not added to registry because language is not supported by registry - ItDriverLicenseRecognizer supported languages: it, registry supported languages: en
+2026-08-22 10:49:36,409 WARNING presidio-analyzer: Recognizer not added to registry because language is not supported by registry - ItFiscalCodeRecognizer supported languages: it, registry supported languages: en
+2026-08-22 10:49:36,409 WARNING presidio-analyzer: Recognizer not added to registry because language is not supported by registry - ItVatCodeRecognizer supported languages: it, registry supported languages: en
+2026-08-22 10:49:36,409 WARNING presidio-analyzer: Recognizer not added to registry because language is not supported by registry - ItIdentityCardRecognizer supported languages: it, registry supported languages: en
+2026-08-22 10:49:36,409 WARNING presidio-analyzer: Recognizer not added to registry because language is not supported by registry - ItPassportRecognizer supported languages: it, registry supported languages: en
+2026-08-22 10:49:36,409 WARNING presidio-analyzer: Recognizer not added to registry because language is not supported by registry - PlPeselRecognizer supported languages: pl, registry supported languages: en
+2026-08-22 10:49:36,409 INFO presidio-analyzer: Loaded recognizer: SpacyRecognizer
+2026-08-22 10:49:36,410 INFO presidio-analyzer: Loaded recognizer: AadhaarRecognizer
+2026-08-22 10:49:36,410 INFO presidio-analyzer: Loaded recognizer: PANRecognizer
+2026-08-22 10:49:36,410 INFO presidio-analyzer: Loaded recognizer: IndianPhoneRecognizer
+2026-08-22 10:49:36,410 INFO presidio-analyzer: Loaded recognizer: AadhaarRecognizer
+2026-08-22 10:49:36,410 INFO presidio-analyzer: Loaded recognizer: PANRecognizer
+2026-08-22 10:49:36,410 INFO presidio-analyzer: Loaded recognizer: IndianPhoneRecognizer
+2026-08-22 10:49:36,410 INFO detection.analyzer_engine: AnalyzerEngine built with 3 custom recognizers registered (IN_AADHAAR, IN_PAN, IN_PHONE).
+2026-08-22 10:49:36,546 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:36,678 INFO pipeline: Rule engine produced 2 verdict(s) for event 942977a7-e4f8-45e0-ac33-c2644789aed4
+2026-08-22 10:49:36,861 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:49:36,861 INFO pipeline: Rule engine produced 2 verdict(s) for event 42d36a23-74d1-4aaa-b528-aa67d088cfb7
+2026-08-22 10:49:37,766 INFO dashboard.server: WebSocket client connected for org_id='acme_bank'.
+2026-08-22 10:49:37,817 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:37,844 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:37,849 INFO pipeline: Rule engine produced 2 verdict(s) for event d4460349-904f-4ad5-91df-03321c8d57de
+2026-08-22 10:49:38,370 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:38,375 INFO pipeline: Rule engine produced 1 verdict(s) for event 4ffc745d-1a70-4385-af10-bcdb94fea625
+2026-08-22 10:49:39,868 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:49:39,869 INFO pipeline: Rule engine produced 2 verdict(s) for event 428f9ccf-8034-4114-a377-21be44c31d19
+2026-08-22 10:49:39,947 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:39,980 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:39,986 INFO pipeline: Rule engine produced 3 verdict(s) for event 8b822dcd-8acc-4ec0-b49f-e67290ca7f2d
+2026-08-22 10:49:40,977 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:41,006 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:41,010 INFO pipeline: Rule engine produced 3 verdict(s) for event 17514ab9-ae0b-4d54-8d8c-227a156861a9
+2026-08-22 10:49:41,403 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:41,407 INFO pipeline: Rule engine produced 1 verdict(s) for event 24d837fc-43e6-4d08-b494-b77f289f2e27
+2026-08-22 10:49:41,977 INFO pipeline: Rule engine produced 2 verdict(s) for event 27b1bde8-6049-4165-902a-1ce204015b76
+2026-08-22 10:49:42,870 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:49:42,871 INFO pipeline: Rule engine produced 2 verdict(s) for event 599290bc-04c5-46f2-950c-be3896436454
+2026-08-22 10:49:42,945 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:42,969 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:42,969 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:42,973 INFO pipeline: Rule engine produced 2 verdict(s) for event 92ab9a12-3b10-4cc1-ba8e-26e845d9cb30
+2026-08-22 10:49:43,975 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:44,000 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:44,000 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:44,000 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:44,005 INFO pipeline: Rule engine produced 2 verdict(s) for event eebde528-6324-4ac8-bc08-e09007a2aac4
+2026-08-22 10:49:44,373 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:44,378 INFO pipeline: Rule engine produced 1 verdict(s) for event e459522b-979b-4e2b-b915-2d5a43c11d12
+2026-08-22 10:49:44,938 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:44,957 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:45,896 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:49:45,897 INFO pipeline: Rule engine produced 2 verdict(s) for event 1942f75f-373a-43b9-80d3-88c86a9e22cd
+2026-08-22 10:49:46,012 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:46,018 INFO pipeline: Rule engine produced 3 verdict(s) for event 599ea1dc-aa03-474c-8216-817cdecc7780
+2026-08-22 10:49:47,010 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:47,035 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:47,036 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:47,041 INFO pipeline: Rule engine produced 4 verdict(s) for event c929a9f8-018a-4e13-b34b-a0f5e40b49e4
+2026-08-22 10:49:48,038 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:48,044 INFO pipeline: Rule engine produced 2 verdict(s) for event d0d2708f-5339-484c-a204-902357252e6b
+2026-08-22 10:49:48,919 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:49:48,920 INFO pipeline: Rule engine produced 2 verdict(s) for event 88d17fee-20fc-4e5c-b0b8-7cea37d4a376
+2026-08-22 10:49:49,057 INFO pipeline: Rule engine produced 4 verdict(s) for event 7749ba7f-dbe4-46bc-834f-3113189da9d7
+2026-08-22 10:49:50,058 INFO pipeline: Rule engine produced 5 verdict(s) for event d807ab03-d05b-478e-8e3e-fccd638a6d89
+2026-08-22 10:49:50,380 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:50,415 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:50,420 INFO pipeline: Rule engine produced 1 verdict(s) for event be057ef7-ac38-4644-b0c3-e12343e7c63e
+2026-08-22 10:49:51,046 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:51,050 INFO pipeline: Rule engine produced 2 verdict(s) for event ee8fa7d2-78cc-44dd-acaa-d275a687317d
+2026-08-22 10:49:51,960 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:51,977 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:49:51,978 INFO pipeline: Rule engine produced 3 verdict(s) for event 6652fd2d-1c86-40de-a512-90cd01b0d7ee
+2026-08-22 10:49:52,036 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:53,374 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:53,404 INFO pipeline: Rule engine produced 1 verdict(s) for event 8e12e253-0aa0-439a-b86d-bb2bcdb17e5d
+2026-08-22 10:49:54,047 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:54,073 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:54,073 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:54,073 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:54,077 INFO pipeline: Rule engine produced 2 verdict(s) for event 3349f769-3fb4-4351-ae7a-a1af92d58730
+2026-08-22 10:49:54,953 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:49:54,954 INFO pipeline: Rule engine produced 2 verdict(s) for event 64e1213f-55b6-494f-a2e1-f6aeb4a68c9b
+2026-08-22 10:49:56,123 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:56,128 INFO pipeline: Rule engine produced 3 verdict(s) for event 21268535-5aaa-483a-b4bf-9be7a671a1de
+2026-08-22 10:49:57,076 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:57,096 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:57,097 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:57,097 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:57,101 INFO pipeline: Rule engine produced 2 verdict(s) for event 12a87700-e9dd-4a69-8dbc-4594bb285299
+2026-08-22 10:49:57,963 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:49:57,964 INFO pipeline: Rule engine produced 2 verdict(s) for event 9f48cf8e-98b4-42f5-af89-ef57be5493e8
+2026-08-22 10:49:58,088 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:58,118 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:58,118 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:58,124 INFO pipeline: Rule engine produced 3 verdict(s) for event 8a55f8ec-1bb0-4d8f-888d-325abbbb743e
+2026-08-22 10:49:59,436 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:49:59,439 INFO pipeline: Rule engine produced 1 verdict(s) for event 35f2e38e-4b76-4e73-a2cd-1d3497e1d18b
+2026-08-22 10:50:00,115 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:00,139 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:00,140 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:00,144 INFO pipeline: Rule engine produced 3 verdict(s) for event 3e73cda5-376a-4a36-8d90-198d64a51554
+2026-08-22 10:50:00,973 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:50:00,974 INFO pipeline: Rule engine produced 2 verdict(s) for event 8882111d-a46b-40f3-a98b-372ab8fcb770
+2026-08-22 10:50:01,114 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:01,133 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:01,164 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:01,164 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:01,170 INFO pipeline: Rule engine produced 3 verdict(s) for event 055dbc79-9ce3-4b77-82a4-46570c75afdb
+2026-08-22 10:50:02,138 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:02,173 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:02,182 INFO pipeline: Rule engine produced 4 verdict(s) for event b2b35b3b-4e26-482d-9f55-561ae34d4685
+2026-08-22 10:50:03,172 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:03,176 INFO pipeline: Rule engine produced 2 verdict(s) for event 6deb718d-46b5-486e-b306-a0c56bde5078
+2026-08-22 10:50:04,019 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:50:04,020 INFO rules.engine: Unregistered field with PII detected: field='onboarded_at' source_system='delivery-partner-service' entity_type='PHONE_NUMBER' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:50:04,021 INFO pipeline: Rule engine produced 4 verdict(s) for event 5b940d40-21df-4ebc-ade2-51129e9f24bd
+2026-08-22 10:50:05,124 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:05,481 INFO pipeline: Rule engine produced 1 verdict(s) for event ba331bd9-57f2-4aaf-b987-922397412111
+2026-08-22 10:50:06,200 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:06,204 INFO pipeline: Rule engine produced 2 verdict(s) for event 42fb8457-2e4c-4dd9-8595-610fb6972a2d
+2026-08-22 10:50:07,024 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:50:07,025 INFO rules.engine: Unregistered field with PII detected: field='onboarded_at' source_system='delivery-partner-service' entity_type='PHONE_NUMBER' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:50:07,025 INFO pipeline: Rule engine produced 3 verdict(s) for event 5c7e38cd-dd8c-424e-8a1f-dbf1efa9a900
+2026-08-22 10:50:07,181 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:07,207 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:07,207 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:07,213 INFO pipeline: Rule engine produced 3 verdict(s) for event 18896491-504f-42f6-865d-3092e368cdcf
+2026-08-22 10:50:08,222 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:08,226 INFO pipeline: Rule engine produced 2 verdict(s) for event b7f97578-eae9-494d-8481-583a473bc9d8
+2026-08-22 10:50:08,496 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:08,500 INFO pipeline: Rule engine produced 2 verdict(s) for event 2dc4d7c8-8195-424d-a3d1-8c2b46da478c
+2026-08-22 10:50:09,181 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:09,200 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:09,242 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:09,243 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:09,250 INFO pipeline: Rule engine produced 2 verdict(s) for event cf85f567-a879-4278-ad07-53603ef65ccb
+2026-08-22 10:50:10,067 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:50:10,068 INFO rules.engine: Unregistered field with PII detected: field='onboarded_at' source_system='delivery-partner-service' entity_type='PHONE_NUMBER' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:50:10,069 INFO pipeline: Rule engine produced 4 verdict(s) for event 4d4650e8-00ed-44d0-835f-5b7c567cd316
+2026-08-22 10:50:10,245 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:10,245 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:10,250 INFO pipeline: Rule engine produced 2 verdict(s) for event 7c70fa15-d935-4702-bac3-12d500bf66dd
+2026-08-22 10:50:11,260 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:11,266 INFO pipeline: Rule engine produced 3 verdict(s) for event 71bde8d8-d27c-4760-bf4a-f5aef3e0724c
+2026-08-22 10:50:12,251 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:12,256 INFO pipeline: Rule engine produced 4 verdict(s) for event 1e137a69-6cbe-49a8-8b7d-aed193ef1ef8
+2026-08-22 10:50:13,016 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:50:13,017 INFO pipeline: Rule engine produced 2 verdict(s) for event 0e8dee24-ac40-47f1-adbd-f04c60c9f557
+2026-08-22 10:50:14,268 INFO pipeline: Rule engine produced 2 verdict(s) for event 30e3d8fd-ee51-40f3-a209-0504bdc4e48b
+2026-08-22 10:50:15,243 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:15,270 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:15,270 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:15,275 INFO pipeline: Rule engine produced 3 verdict(s) for event 8958f127-0a3b-4401-a371-9d61b3f9f372
+2026-08-22 10:50:16,077 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:50:16,078 INFO pipeline: Rule engine produced 3 verdict(s) for event 1b0cdf85-9596-430c-85a3-47dc7a96dbd1
+2026-08-22 10:50:16,290 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:16,290 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:16,295 INFO pipeline: Rule engine produced 2 verdict(s) for event 6be556ce-1e07-4b65-b769-8fa5c8ae50a2
+2026-08-22 10:50:17,321 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:17,329 INFO pipeline: Rule engine produced 2 verdict(s) for event ecc925c6-6f13-434c-aa46-3ea619cfe5c6
+2026-08-22 10:50:17,541 INFO pipeline: Rule engine produced 1 verdict(s) for event c240a67d-19ea-4809-a09d-ca4713ac40e6
+2026-08-22 10:50:18,297 INFO pipeline: Rule engine produced 2 verdict(s) for event e17ad34d-da2a-4db1-9dd8-e9a295e1641f
+2026-08-22 10:50:19,059 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:50:19,060 INFO pipeline: Rule engine produced 2 verdict(s) for event 0e0c2a7e-43d5-4f6b-853d-a35716eb8387
+2026-08-22 10:50:19,307 INFO pipeline: Rule engine produced 3 verdict(s) for event 7e410cfc-c594-43ac-937a-d815a229785f
+2026-08-22 10:50:20,320 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:20,326 INFO pipeline: Rule engine produced 2 verdict(s) for event 40c8ab45-dc64-489b-87b9-e88915f9a360
+2026-08-22 10:50:20,546 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:20,551 INFO pipeline: Rule engine produced 1 verdict(s) for event fa3264bc-abaa-4712-ac6f-219d0eed475f
+2026-08-22 10:50:22,110 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:50:22,111 INFO pipeline: Rule engine produced 2 verdict(s) for event dc60f1e9-4381-40d7-8297-9e23cac72d15
+2026-08-22 10:50:22,262 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:23,670 INFO pipeline: Rule engine produced 3 verdict(s) for event 2a8b7839-5b24-4a56-aed6-fc986d41fd6e
+2026-08-22 10:50:25,473 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:50:25,475 INFO pipeline: Rule engine produced 2 verdict(s) for event fff7b028-dda6-405c-bbc5-b038a97e6612
+2026-08-22 10:50:25,784 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:25,795 INFO pipeline: Rule engine produced 2 verdict(s) for event 1aa79838-6819-44b6-8843-b4f4d68e046b
+2026-08-22 10:50:26,714 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:26,771 INFO pipeline: Rule engine produced 4 verdict(s) for event e0719391-1486-4a1d-8fdf-d74a9f2d132d
+2026-08-22 10:50:27,040 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:27,048 INFO pipeline: Rule engine produced 1 verdict(s) for event 5e7cd2cd-ccda-4d50-9af5-a5b7e0210081
+2026-08-22 10:50:27,624 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:27,634 INFO pipeline: Rule engine produced 3 verdict(s) for event e5045c9a-4d35-499a-ab8a-c600be26dad4
+2026-08-22 10:50:28,517 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:50:28,518 INFO pipeline: Rule engine produced 2 verdict(s) for event d23d9b62-35eb-430e-81f7-e59df6ee60a0
+2026-08-22 10:50:28,668 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:28,676 INFO pipeline: Rule engine produced 3 verdict(s) for event d702cee2-ec8a-446a-8b98-851f4cc91944
+2026-08-22 10:50:29,540 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:29,862 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:29,889 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:29,893 INFO pipeline: Rule engine produced 1 verdict(s) for event 786474e0-662e-4313-98d7-1dce457b2fe6
+2026-08-22 10:50:31,485 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:50:31,486 INFO pipeline: Rule engine produced 2 verdict(s) for event 4bc8a355-7255-45a9-9dce-b0eaef3f996d
+2026-08-22 10:50:31,612 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:31,663 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:31,663 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:31,672 INFO pipeline: Rule engine produced 2 verdict(s) for event 70a4cd2c-134f-4ead-808e-840348cfe568
+2026-08-22 10:50:32,939 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:32,943 INFO pipeline: Rule engine produced 1 verdict(s) for event 5a6eb42f-466f-42bd-bab0-7002e533160a
+2026-08-22 10:50:33,656 INFO pipeline: Rule engine produced 2 verdict(s) for event daa3bc34-a3c4-4421-bf8a-f5a78e424cba
+2026-08-22 10:50:34,495 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:50:34,496 INFO pipeline: Rule engine produced 3 verdict(s) for event 2f367014-45cf-4d1b-bbad-223c921f7690
+2026-08-22 10:50:34,656 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:34,657 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:34,667 INFO pipeline: Rule engine produced 3 verdict(s) for event 53d0b21d-46c7-41c3-8c2b-22c6181348e1
+2026-08-22 10:50:35,623 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:35,650 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:35,650 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:35,656 INFO pipeline: Rule engine produced 2 verdict(s) for event 59868bfd-323c-42c2-9a91-66dc84d857e1
+2026-08-22 10:50:35,930 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:35,936 INFO pipeline: Rule engine produced 1 verdict(s) for event 37bbbe5f-4ab9-453d-9ce0-1d5c3d715458
+2026-08-22 10:50:36,769 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:36,777 INFO pipeline: Rule engine produced 4 verdict(s) for event 539e9f1b-8d32-47b3-8218-520663f18cc4
+2026-08-22 10:50:37,524 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:50:37,526 INFO pipeline: Rule engine produced 3 verdict(s) for event 3bbd784b-b3c4-44a9-a8b1-35f0a81d68b5
+2026-08-22 10:50:38,960 INFO pipeline: Rule engine produced 1 verdict(s) for event 4b422d4e-c869-4402-b846-225d01827231
+2026-08-22 10:50:39,639 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:39,666 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:39,703 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:39,703 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:39,711 INFO pipeline: Rule engine produced 2 verdict(s) for event 63cdd395-8a32-42df-a4b0-b2409d60479a
+2026-08-22 10:50:40,639 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:50:40,640 INFO rules.engine: Unregistered field with PII detected: field='onboarded_at' source_system='delivery-partner-service' entity_type='PHONE_NUMBER' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:50:40,642 INFO pipeline: Rule engine produced 3 verdict(s) for event 4bf94862-1d5a-4c07-94f0-3f927f657024
+2026-08-22 10:50:40,814 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:40,827 INFO pipeline: Rule engine produced 3 verdict(s) for event edd4147b-1287-428f-ae51-9bfc19449a75
+2026-08-22 10:50:42,150 INFO pipeline: Rule engine produced 3 verdict(s) for event e3bd9f7a-e11e-4dab-9823-4df9f0c57213
+2026-08-22 10:50:42,410 INFO pipeline: Rule engine produced 1 verdict(s) for event 00de92a5-d546-4bd3-9c15-8c94634f2cb3
+2026-08-22 10:50:42,771 INFO pipeline: Rule engine produced 3 verdict(s) for event cdc5d768-877a-43b9-ab55-0ce106b11d55
+2026-08-22 10:50:43,862 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:50:43,863 INFO pipeline: Rule engine produced 2 verdict(s) for event 247d389d-6287-4db5-b009-71a8258838f6
+2026-08-22 10:50:43,909 WARNING presidio-analyzer: Entity FAC is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:43,937 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:43,966 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:44,012 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:44,012 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:44,020 INFO pipeline: Rule engine produced 2 verdict(s) for event aa73d976-444d-4ee7-b236-46707382292d
+2026-08-22 10:50:44,934 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:44,971 INFO pipeline: Rule engine produced 3 verdict(s) for event df8a38b5-3922-45a3-b2af-dd850ecb1961
+2026-08-22 10:50:45,863 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:45,869 INFO pipeline: Rule engine produced 1 verdict(s) for event e0a5c292-c2e5-4ddc-a66b-5ff9dc2c0feb
+2026-08-22 10:50:45,927 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:45,983 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:45,983 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:45,988 INFO pipeline: Rule engine produced 3 verdict(s) for event 80611937-59e6-4395-a160-b1b4cf003367
+2026-08-22 10:50:47,367 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:50:47,368 INFO pipeline: Rule engine produced 3 verdict(s) for event a3176789-046d-4122-8d57-7316d8936223
+2026-08-22 10:50:48,857 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:48,863 INFO pipeline: Rule engine produced 1 verdict(s) for event 9378206b-f318-4ba8-a3ad-c1b1e9c57bbe
+2026-08-22 10:50:49,967 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:49,999 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:50,004 INFO pipeline: Rule engine produced 2 verdict(s) for event 5ed14db6-76d6-41bd-8682-6a0425165122
+2026-08-22 10:50:50,404 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:50:50,405 INFO pipeline: Rule engine produced 2 verdict(s) for event d3bc1272-247a-4196-b9fc-a3c2f34204ee
+2026-08-22 10:50:52,988 INFO pipeline: Rule engine produced 1 verdict(s) for event bbb0e253-574e-4d72-8864-34b535c866e5
+2026-08-22 10:50:53,435 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:50:53,436 INFO pipeline: Rule engine produced 3 verdict(s) for event 3328152d-d50b-4346-8aad-6aca2726fadd
+2026-08-22 10:50:54,011 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:54,063 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:54,064 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:54,071 INFO pipeline: Rule engine produced 3 verdict(s) for event b82b1a9e-24f9-48be-8af9-318cf58e4d70
+2026-08-22 10:50:54,838 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:54,887 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:54,891 INFO pipeline: Rule engine produced 1 verdict(s) for event 34e4f5f8-797f-4c5e-a1bd-a91de9b75e8b
+2026-08-22 10:50:55,011 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:55,060 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:55,069 INFO pipeline: Rule engine produced 4 verdict(s) for event 3cfc043e-1c46-43c2-bcc4-e2126423f7d4
+2026-08-22 10:50:55,987 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:56,061 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:56,067 INFO pipeline: Rule engine produced 2 verdict(s) for event 12111db7-4470-427b-8775-ac9009364fb8
+2026-08-22 10:50:56,429 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:50:56,430 INFO pipeline: Rule engine produced 2 verdict(s) for event 74483864-313e-4410-8f77-bd7e81ac3482
+2026-08-22 10:50:57,004 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:57,081 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:57,081 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:57,094 INFO pipeline: Rule engine produced 3 verdict(s) for event 6a7f50aa-9d32-4cd6-8a29-d59c1a13dbdf
+2026-08-22 10:50:58,030 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:58,062 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:58,062 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:58,063 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:58,068 INFO pipeline: Rule engine produced 2 verdict(s) for event bb5fcf15-1a64-4d9c-8909-3dbebf60d588
+2026-08-22 10:50:59,065 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:59,106 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:59,106 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:59,107 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:59,115 INFO pipeline: Rule engine produced 2 verdict(s) for event 2459d059-ca67-4dd3-b353-0934a70600c8
+2026-08-22 10:50:59,479 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:50:59,495 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:50:59,497 INFO pipeline: Rule engine produced 4 verdict(s) for event 5526b64d-3825-4f36-86eb-854b3434662f
+2026-08-22 10:51:00,861 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:00,905 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:00,913 INFO pipeline: Rule engine produced 1 verdict(s) for event 8253f419-c4df-4504-8a8e-2702a15f4103
+2026-08-22 10:51:01,046 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:01,100 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:01,107 INFO pipeline: Rule engine produced 2 verdict(s) for event a02cb066-0090-44e4-beda-a64e2c4c8036
+2026-08-22 10:51:02,409 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:51:02,410 INFO rules.engine: Unregistered field with PII detected: field='onboarded_at' source_system='delivery-partner-service' entity_type='PHONE_NUMBER' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:51:02,410 INFO pipeline: Rule engine produced 3 verdict(s) for event dda344c0-2fda-4695-9941-45340ed590d5
+2026-08-22 10:51:03,103 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:03,130 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:03,130 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:03,135 INFO pipeline: Rule engine produced 3 verdict(s) for event d15c9354-35ed-41f4-927d-028da383055c
+2026-08-22 10:51:03,919 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:03,924 INFO pipeline: Rule engine produced 1 verdict(s) for event aaec2c02-b68d-4389-a68e-f2147fb2c3d7
+2026-08-22 10:51:04,100 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:04,159 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:04,167 INFO pipeline: Rule engine produced 2 verdict(s) for event 3b1448e1-21f6-4f13-b4c3-4f2a0d672f5e
+2026-08-22 10:51:05,147 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:05,191 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:05,192 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:05,199 INFO pipeline: Rule engine produced 2 verdict(s) for event 06141245-235e-47f8-9ca2-131d56d1ddc1
+2026-08-22 10:51:05,499 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:51:05,501 INFO rules.engine: Unregistered field with PII detected: field='onboarded_at' source_system='delivery-partner-service' entity_type='PHONE_NUMBER' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:51:05,502 INFO pipeline: Rule engine produced 3 verdict(s) for event ce565622-3687-4ec1-a5b5-18da60a59d7f
+2026-08-22 10:51:06,138 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:06,161 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:06,208 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:06,208 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:06,216 INFO pipeline: Rule engine produced 2 verdict(s) for event f9bfe7b8-cc8a-4a4d-855e-dff86b71523e
+2026-08-22 10:51:07,039 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:07,045 INFO pipeline: Rule engine produced 1 verdict(s) for event f5cb49ff-227b-4db3-be64-3ae289c36a7a
+2026-08-22 10:51:07,202 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:07,202 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:07,212 INFO pipeline: Rule engine produced 2 verdict(s) for event caf4568f-ae33-4595-b8a1-e9a9986f8eb0
+2026-08-22 10:51:08,405 INFO pipeline: Rule engine produced 3 verdict(s) for event 90139be0-1559-4b45-aedb-3faa58d9faa2
+2026-08-22 10:51:08,587 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:51:08,587 INFO rules.engine: Unregistered field with PII detected: field='onboarded_at' source_system='delivery-partner-service' entity_type='PHONE_NUMBER' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:51:08,588 INFO pipeline: Rule engine produced 4 verdict(s) for event 4658b3b0-9dcd-4868-8b6a-5ec9384ccbe3
+2026-08-22 10:51:10,235 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:10,244 INFO pipeline: Rule engine produced 4 verdict(s) for event abe96c6d-716e-41e3-b5e5-146073967534
+2026-08-22 10:51:11,215 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:11,270 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:11,282 INFO pipeline: Rule engine produced 3 verdict(s) for event 68b34a54-db7c-4f5e-baec-15596ffb0883
+2026-08-22 10:51:11,616 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:11,631 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:51:11,632 INFO pipeline: Rule engine produced 3 verdict(s) for event a21ae9ed-cf00-4b0c-b7bd-f1aa3b1f535e
+2026-08-22 10:51:12,224 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:12,271 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:12,271 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:12,280 INFO pipeline: Rule engine produced 2 verdict(s) for event 2b568a50-bc5d-469c-8bce-496009d27625
+2026-08-22 10:51:13,223 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:13,263 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:13,264 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:13,270 INFO pipeline: Rule engine produced 4 verdict(s) for event 083a2f8a-2c57-4724-9fd1-f0a1625f7e76
+2026-08-22 10:51:14,257 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:14,262 INFO pipeline: Rule engine produced 2 verdict(s) for event 364a3cc8-69a2-4b06-b302-0f723c14b36c
+2026-08-22 10:51:14,567 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:14,567 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:14,577 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:51:14,577 INFO pipeline: Rule engine produced 3 verdict(s) for event 5599392b-4f1f-47d4-99dc-1e2c02f75c32
+2026-08-22 10:51:15,332 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:15,333 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:15,341 INFO pipeline: Rule engine produced 3 verdict(s) for event 1b4761ea-ee9a-4247-a2e2-313f859c81d2
+2026-08-22 10:51:16,073 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:16,080 INFO pipeline: Rule engine produced 1 verdict(s) for event 10b18182-c471-4322-8b0d-4df0a2fe9b1b
+2026-08-22 10:51:16,251 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:16,300 INFO pipeline: Rule engine produced 3 verdict(s) for event 9029b163-9ab2-4554-a182-c8bc29976f47
+2026-08-22 10:51:17,303 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:17,309 INFO pipeline: Rule engine produced 4 verdict(s) for event a6db6142-9ca2-41d2-8e18-dde0b0162b19
+2026-08-22 10:51:17,588 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:51:17,589 INFO pipeline: Rule engine produced 2 verdict(s) for event 7631437e-2212-48d0-8d53-b5715669f94f
+2026-08-22 10:51:18,321 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:18,328 INFO pipeline: Rule engine produced 3 verdict(s) for event 8e008183-013b-458e-a51c-b61cdafcb1c5
+2026-08-22 10:51:19,050 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:19,054 INFO pipeline: Rule engine produced 1 verdict(s) for event 10d0144e-bbcb-45c0-9788-fe774d8494be
+2026-08-22 10:51:19,328 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:19,337 INFO pipeline: Rule engine produced 3 verdict(s) for event 935fc12d-92bc-4ac0-b370-5536a72d65d4
+2026-08-22 10:51:20,260 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:20,289 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:20,295 INFO pipeline: Rule engine produced 2 verdict(s) for event 49abb061-9563-4a02-b210-00097c69721d
+2026-08-22 10:51:20,624 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:51:20,625 INFO pipeline: Rule engine produced 2 verdict(s) for event e2241e1b-4331-44eb-b06b-9916007986dc
+2026-08-22 10:51:21,275 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:22,349 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:22,357 INFO pipeline: Rule engine produced 5 verdict(s) for event df9388b0-29e1-4935-8e3d-5beef1bb23c6
+2026-08-22 10:51:23,327 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:23,381 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:23,381 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:23,391 INFO pipeline: Rule engine produced 2 verdict(s) for event 3f6b6c6f-9cb9-4c31-b88a-70f8a8df2d26
+2026-08-22 10:51:23,710 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:51:23,712 INFO pipeline: Rule engine produced 2 verdict(s) for event 11a86934-1394-4e85-a46c-6b73408d4207
+2026-08-22 10:51:24,378 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:24,386 INFO pipeline: Rule engine produced 2 verdict(s) for event a4446354-a59c-43e6-a6d9-8034c46bf6ce
+2026-08-22 10:51:25,415 INFO pipeline: Rule engine produced 4 verdict(s) for event 3cdcf909-dde9-4efe-a46f-f0136bcd208a
+2026-08-22 10:51:26,379 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:26,388 INFO pipeline: Rule engine produced 2 verdict(s) for event 45d7d1e9-dfe8-4c6e-bfbc-ab721de96740
+2026-08-22 10:51:26,727 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:51:26,728 INFO pipeline: Rule engine produced 2 verdict(s) for event 0afd6915-2960-4f3c-a57e-f3dc347af5a8
+2026-08-22 10:51:27,391 INFO pipeline: Rule engine produced 3 verdict(s) for event 90197012-8e6d-4fdd-b441-6611feb92357
+2026-08-22 10:51:28,172 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:28,183 INFO pipeline: Rule engine produced 1 verdict(s) for event 3dcc948e-bcae-4674-b030-a72aebb46d56
+2026-08-22 10:51:28,423 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:28,432 INFO pipeline: Rule engine produced 3 verdict(s) for event 5219ded8-bd46-456d-82f9-976d28046730
+2026-08-22 10:51:29,383 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:29,428 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:29,437 INFO pipeline: Rule engine produced 3 verdict(s) for event 4b36b0f4-1b12-4996-88c3-7aad8b62d373
+2026-08-22 10:51:29,753 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:51:29,754 INFO pipeline: Rule engine produced 2 verdict(s) for event 5c55a032-ba0d-472b-a912-f0ac06a4dac8
+2026-08-22 10:51:30,360 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:30,440 INFO pipeline: Rule engine produced 2 verdict(s) for event f8be918e-9f5f-48c9-8b05-ebe3e1189402
+2026-08-22 10:51:31,181 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:31,188 INFO pipeline: Rule engine produced 1 verdict(s) for event 797c9cb4-a9e1-4c35-b5ed-a43f30d66a64
+2026-08-22 10:51:31,442 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:31,451 INFO pipeline: Rule engine produced 3 verdict(s) for event f33f3314-0eae-4afd-ab1c-baa0078ddca8
+2026-08-22 10:51:32,439 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:32,457 INFO pipeline: Rule engine produced 3 verdict(s) for event 66cc73f5-5d32-4a1c-bd16-9f35ca824925
+2026-08-22 10:51:32,706 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:51:32,707 INFO pipeline: Rule engine produced 2 verdict(s) for event 5f773401-8595-488c-aec7-80986f2b1866
+2026-08-22 10:51:33,371 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:33,425 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:33,433 INFO pipeline: Rule engine produced 3 verdict(s) for event 21e152f3-a104-4231-867a-d997b772c7e9
+2026-08-22 10:51:34,202 INFO pipeline: Rule engine produced 1 verdict(s) for event 4ac010a4-89ef-403a-8277-f0c05b734cd0
+2026-08-22 10:51:35,394 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:35,448 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:35,456 INFO pipeline: Rule engine produced 2 verdict(s) for event 94252a60-2113-4f09-919e-66738400b961
+2026-08-22 10:51:35,733 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:35,753 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:51:35,754 INFO pipeline: Rule engine produced 3 verdict(s) for event 0a863c5c-9386-4242-bfce-c77a4621aa5f
+2026-08-22 10:51:37,208 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:37,214 INFO pipeline: Rule engine produced 1 verdict(s) for event 0d952696-0ee3-481f-8826-111487b7fdc9
+2026-08-22 10:51:37,445 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:37,490 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:37,490 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:37,496 INFO pipeline: Rule engine produced 3 verdict(s) for event 64c98efc-f777-46ce-bc53-7babf7de10a7
+2026-08-22 10:51:38,494 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:38,500 INFO pipeline: Rule engine produced 2 verdict(s) for event 2dc9ebb4-9e7f-4fe2-9d3d-f168f9223eaa
+2026-08-22 10:51:38,733 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:51:38,734 INFO pipeline: Rule engine produced 3 verdict(s) for event c7c21b45-08e2-4854-9d77-92dddcde7ddf
+2026-08-22 10:51:39,472 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:39,509 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:39,518 INFO pipeline: Rule engine produced 3 verdict(s) for event 069398a0-d683-46da-88f3-2aef2bae9c1f
+2026-08-22 10:51:40,122 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:40,538 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:40,548 INFO pipeline: Rule engine produced 2 verdict(s) for event 96dccafc-4aea-4b38-9c65-62b36cb54be1
+2026-08-22 10:51:41,496 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:41,502 INFO pipeline: Rule engine produced 3 verdict(s) for event 9a35200d-ade7-4845-a2a6-1e3d5f6f5e70
+2026-08-22 10:51:41,781 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:51:41,782 INFO pipeline: Rule engine produced 3 verdict(s) for event 4316d932-69dc-47dc-b03d-3fa519942440
+2026-08-22 10:51:42,470 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:42,538 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:42,538 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:42,546 INFO pipeline: Rule engine produced 3 verdict(s) for event 12c3be2e-06ec-464a-b93d-561e6af531c7
+2026-08-22 10:51:43,243 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:43,248 INFO pipeline: Rule engine produced 1 verdict(s) for event b1935e8e-9f1d-4de6-a2ee-3a30c291111a
+2026-08-22 10:51:44,491 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:44,528 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:44,535 INFO pipeline: Rule engine produced 4 verdict(s) for event ca836524-b835-45f6-b34a-2620c9a4c607
+2026-08-22 10:51:44,810 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:44,826 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:51:44,827 INFO pipeline: Rule engine produced 4 verdict(s) for event 9c5cd511-ccf0-4b84-9225-387c32ac0302
+2026-08-22 10:51:45,525 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:45,525 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:45,530 INFO pipeline: Rule engine produced 2 verdict(s) for event 565a39e9-cbc7-4b4f-acb8-eb07570403d8
+2026-08-22 10:51:46,372 INFO pipeline: Rule engine produced 1 verdict(s) for event e7d8c33a-916a-4c74-a019-f9dccb5fd45c
+2026-08-22 10:51:47,505 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:47,573 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:47,574 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:47,581 INFO pipeline: Rule engine produced 3 verdict(s) for event 0a7cf507-3923-47fc-a682-d15339dbf9dd
+2026-08-22 10:51:47,794 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:51:47,795 INFO pipeline: Rule engine produced 2 verdict(s) for event 31d97c4b-828f-4d9a-9687-ad9886ec4eef
+2026-08-22 10:51:49,511 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:49,566 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:49,571 INFO pipeline: Rule engine produced 2 verdict(s) for event 7fbb9a46-e6a5-4111-b83f-7a940df8cda8
+2026-08-22 10:51:50,874 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:51:50,875 INFO pipeline: Rule engine produced 4 verdict(s) for event a8a85c99-a1fa-4978-aacf-a76145c9f7f5
+2026-08-22 10:51:51,558 INFO pipeline: Rule engine produced 2 verdict(s) for event dd107d5b-f7ea-43b6-9f0b-8d2605a5e2fa
+2026-08-22 10:51:52,313 INFO pipeline: Rule engine produced 1 verdict(s) for event d76c5169-a8ef-419d-8c58-3b717ae45db5
+2026-08-22 10:51:52,509 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:53,883 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:51:53,884 INFO pipeline: Rule engine produced 2 verdict(s) for event e2f3d27c-8df0-419d-9167-75a6c2a98f4f
+2026-08-22 10:51:55,304 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:55,309 INFO pipeline: Rule engine produced 1 verdict(s) for event 0e57bba6-b3e7-4067-9d10-d65eb6656381
+2026-08-22 10:51:56,589 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:56,640 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:56,641 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:56,647 INFO pipeline: Rule engine produced 2 verdict(s) for event cef73fdb-5f60-488e-b472-9ded0e39bc36
+2026-08-22 10:51:56,880 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:51:56,881 INFO pipeline: Rule engine produced 2 verdict(s) for event 13062b6d-4206-43d6-aa02-77b14d88e499
+2026-08-22 10:51:57,537 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:58,331 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:58,335 INFO pipeline: Rule engine produced 1 verdict(s) for event b11adbe3-b005-4337-8e70-b08c22662fd5
+2026-08-22 10:51:58,622 INFO pipeline: Rule engine produced 2 verdict(s) for event 2ef5a1a6-9279-4e5b-a067-faa5e3c383cd
+2026-08-22 10:51:59,628 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:59,628 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:51:59,633 INFO pipeline: Rule engine produced 2 verdict(s) for event edef6c51-376b-49ed-a396-bf6d7e166290
+2026-08-22 10:51:59,883 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:51:59,884 INFO pipeline: Rule engine produced 2 verdict(s) for event f4911e49-4681-4605-98c9-deec83dc9227
+2026-08-22 10:52:01,353 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:01,359 INFO pipeline: Rule engine produced 1 verdict(s) for event 402ee534-3b80-4628-ba59-81a78be06964
+2026-08-22 10:52:01,593 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:01,617 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:01,651 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:01,652 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:01,658 INFO pipeline: Rule engine produced 4 verdict(s) for event afbaef25-5cec-4165-906e-2de30c7eeace
+2026-08-22 10:52:02,665 INFO pipeline: Rule engine produced 2 verdict(s) for event 68954de8-9d12-4219-a02c-293b5b797b5c
+2026-08-22 10:52:02,876 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:52:02,877 INFO rules.engine: Unregistered field with PII detected: field='onboarded_at' source_system='delivery-partner-service' entity_type='PHONE_NUMBER' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:52:02,877 INFO pipeline: Rule engine produced 3 verdict(s) for event 53b79acc-a2ed-42c5-ba03-ec35b1dfa634
+2026-08-22 10:52:03,635 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:03,674 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:03,674 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:03,680 INFO pipeline: Rule engine produced 3 verdict(s) for event d663d8bc-e40f-48d9-9491-f8eefa64f527
+2026-08-22 10:52:04,374 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:04,379 INFO pipeline: Rule engine produced 1 verdict(s) for event 636b0c25-f778-452b-8c68-afd873635bbe
+2026-08-22 10:52:04,617 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:05,689 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:05,696 INFO pipeline: Rule engine produced 3 verdict(s) for event 57d59b5c-8a7d-4ad2-9411-856848463780
+2026-08-22 10:52:05,969 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:52:05,970 INFO rules.engine: Unregistered field with PII detected: field='onboarded_at' source_system='delivery-partner-service' entity_type='PHONE_NUMBER' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:52:05,970 INFO pipeline: Rule engine produced 3 verdict(s) for event 15939d6c-f61b-4d00-af2d-b37b7aeebafd
+2026-08-22 10:52:06,871 INFO pipeline: Rule engine produced 3 verdict(s) for event f392ab3f-865a-4180-81f5-0ad0969c70c7
+2026-08-22 10:52:07,373 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:07,378 INFO pipeline: Rule engine produced 1 verdict(s) for event 528a9f60-f5e1-4096-852b-bde4fefb8687
+2026-08-22 10:52:07,659 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:07,684 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:07,717 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:07,718 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:07,725 INFO pipeline: Rule engine produced 3 verdict(s) for event 24b42a64-c03b-4433-8618-d60d589b17d0
+2026-08-22 10:52:08,924 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:52:08,925 INFO pipeline: Rule engine produced 2 verdict(s) for event 8dc86a9f-0cc6-4734-b70c-36fa1309fcc2
+2026-08-22 10:52:09,718 INFO pipeline: Rule engine produced 2 verdict(s) for event 66105a67-e18e-43bc-a53d-4dd897f79ef6
+2026-08-22 10:52:10,431 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:10,438 INFO pipeline: Rule engine produced 1 verdict(s) for event 0c0eda23-a116-425f-883c-ed1cb50e8263
+2026-08-22 10:52:10,733 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:10,741 INFO pipeline: Rule engine produced 3 verdict(s) for event 232e7610-39d1-467f-8dee-dc529ec35108
+2026-08-22 10:52:11,794 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:11,804 INFO pipeline: Rule engine produced 3 verdict(s) for event 3bf8e83e-5aff-4765-a0c8-c355758f1b0e
+2026-08-22 10:52:12,016 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:52:12,017 INFO pipeline: Rule engine produced 3 verdict(s) for event b5484b91-d302-47db-a273-4489ddd774d3
+2026-08-22 10:52:12,792 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:12,821 INFO pipeline: Rule engine produced 3 verdict(s) for event d7341690-8fd7-4081-86ba-cd200bb05b56
+2026-08-22 10:52:13,827 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:13,828 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:13,839 INFO pipeline: Rule engine produced 2 verdict(s) for event 0a541e27-91b8-4035-afb0-c545b07008fc
+2026-08-22 10:52:14,749 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:14,787 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:14,792 INFO pipeline: Rule engine produced 2 verdict(s) for event f78459b7-56af-4745-9333-76cff16b0558
+2026-08-22 10:52:15,021 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:52:15,022 INFO pipeline: Rule engine produced 3 verdict(s) for event 857d0a52-6a97-40a3-87c6-e80293b5427a
+2026-08-22 10:52:15,780 INFO pipeline: Rule engine produced 2 verdict(s) for event c73846fb-5922-4924-a1de-11e02772a5d5
+2026-08-22 10:52:16,425 INFO pipeline: Rule engine produced 1 verdict(s) for event 32303312-0040-4731-ba58-08f7292a31c1
+2026-08-22 10:52:16,792 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:16,797 INFO pipeline: Rule engine produced 2 verdict(s) for event a757d204-593c-4593-9426-0c6af4c88db0
+2026-08-22 10:52:17,786 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:17,791 INFO pipeline: Rule engine produced 2 verdict(s) for event 75e0da68-e9d6-41db-a4f3-9cb7167c0aac
+2026-08-22 10:52:17,954 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:17,954 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:17,967 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:52:17,968 INFO pipeline: Rule engine produced 3 verdict(s) for event 196cb5c0-0816-4d0f-8ec7-f750c9781e88
+2026-08-22 10:52:18,751 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:18,809 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:18,817 INFO pipeline: Rule engine produced 3 verdict(s) for event d1e99be4-52d0-4945-8b95-ffdbd18f2ff6
+2026-08-22 10:52:19,422 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:19,425 INFO pipeline: Rule engine produced 1 verdict(s) for event 2ed6a63d-0fbe-46c8-af30-d04ce306ea65
+2026-08-22 10:52:19,757 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:19,805 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:19,809 INFO pipeline: Rule engine produced 2 verdict(s) for event b0e940d6-12bc-4bc7-b4d4-567d5ec18242
+2026-08-22 10:52:20,753 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:20,977 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:20,977 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:20,986 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:52:20,987 INFO pipeline: Rule engine produced 3 verdict(s) for event 844d7400-bb45-4cd1-bf34-db5a3500f588
+2026-08-22 10:52:21,795 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:21,830 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:21,830 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:21,836 INFO pipeline: Rule engine produced 3 verdict(s) for event 7ddccc94-40ea-4149-bd2f-2cb30e527011
+2026-08-22 10:52:22,457 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:22,461 INFO pipeline: Rule engine produced 1 verdict(s) for event 8a424e1d-8064-432d-a220-f47b2efeb1d7
+2026-08-22 10:52:22,859 INFO pipeline: Rule engine produced 3 verdict(s) for event 8960ddf9-2400-4e83-b352-401e037bbdad
+2026-08-22 10:52:23,796 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:23,820 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:23,820 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:23,826 INFO pipeline: Rule engine produced 3 verdict(s) for event e3f6a859-9510-44e1-ae73-caa11b1b8517
+2026-08-22 10:52:23,973 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:52:23,974 INFO pipeline: Rule engine produced 2 verdict(s) for event 20e7c3d0-8743-4a5c-a0bf-a16345c64cd9
+2026-08-22 10:52:25,856 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:25,860 INFO pipeline: Rule engine produced 5 verdict(s) for event 00bb2368-d48c-4a97-a3c4-f9527948907a
+2026-08-22 10:52:27,030 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:27,040 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:52:27,041 INFO pipeline: Rule engine produced 3 verdict(s) for event b9778cab-846c-4b18-83d8-9608afcf0d41
+2026-08-22 10:52:27,857 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:27,861 INFO pipeline: Rule engine produced 2 verdict(s) for event b88c48f2-f9fe-4d4c-a74e-7c3e5e3914e9
+2026-08-22 10:52:28,454 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:28,487 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:28,492 INFO pipeline: Rule engine produced 1 verdict(s) for event 371fba7e-4ce5-4d53-9f92-b271f5adb099
+2026-08-22 10:52:28,885 INFO pipeline: Rule engine produced 3 verdict(s) for event 097f1e2b-1bb0-4987-965a-db3cf070348f
+2026-08-22 10:52:29,993 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:52:29,994 INFO pipeline: Rule engine produced 2 verdict(s) for event 7ac3a3c5-b158-4f86-86b0-1ce2587a0934
+2026-08-22 10:52:31,484 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:31,488 INFO pipeline: Rule engine produced 1 verdict(s) for event 40553c02-8275-4a73-bfcc-6a7c18f32fd4
+2026-08-22 10:52:32,869 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:32,913 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:32,919 INFO pipeline: Rule engine produced 3 verdict(s) for event 33717703-95f9-47ad-a6a7-16860187a24d
+2026-08-22 10:52:33,037 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:52:33,038 INFO pipeline: Rule engine produced 2 verdict(s) for event defc3b86-3d8f-4a6f-8bda-c5545c8f3709
+2026-08-22 10:52:33,877 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:33,922 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:33,923 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:33,929 INFO pipeline: Rule engine produced 2 verdict(s) for event d2d7c82a-1517-4094-85b1-4f9193ac7751
+2026-08-22 10:52:34,921 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:34,925 INFO pipeline: Rule engine produced 2 verdict(s) for event c9791418-8131-4217-9b84-58758790d5b9
+2026-08-22 10:52:35,918 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:35,922 INFO pipeline: Rule engine produced 3 verdict(s) for event d6f06893-9354-4e5a-a3d7-d031ceebba37
+2026-08-22 10:52:36,013 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:52:36,014 INFO pipeline: Rule engine produced 2 verdict(s) for event 3a943876-2a2d-4505-b12a-808237a7f2d2
+2026-08-22 10:52:36,968 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:36,973 INFO pipeline: Rule engine produced 3 verdict(s) for event ff5a078f-f00a-402f-9acd-748501a56690
+2026-08-22 10:52:37,949 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:37,949 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:37,954 INFO pipeline: Rule engine produced 3 verdict(s) for event 6fb1cc52-9d6a-4433-898f-6c9c5b823f8f
+2026-08-22 10:52:38,915 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:38,931 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:38,961 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:38,961 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:38,967 INFO pipeline: Rule engine produced 3 verdict(s) for event 43b77b93-8ff3-4aaa-9b4b-df4baee0a19a
+2026-08-22 10:52:39,103 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:52:39,104 INFO pipeline: Rule engine produced 2 verdict(s) for event 50d9f261-7f93-477d-b499-336a82045455
+2026-08-22 10:52:39,926 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:39,951 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:39,952 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:39,957 INFO pipeline: Rule engine produced 3 verdict(s) for event 12fb2181-54b1-4a14-95b6-cc826b9b68fd
+2026-08-22 10:52:40,589 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:40,594 INFO pipeline: Rule engine produced 1 verdict(s) for event d7a261d1-bc00-4044-94f6-f42ad83cc380
+2026-08-22 10:52:40,992 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:40,996 INFO pipeline: Rule engine produced 2 verdict(s) for event 5610dbb5-b553-48c9-b6b8-c3dba11395ff
+2026-08-22 10:52:42,104 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:52:42,105 INFO pipeline: Rule engine produced 2 verdict(s) for event b00915fb-82aa-4180-8bd8-fa4f655a587b
+2026-08-22 10:52:42,966 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:42,990 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:42,990 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:42,995 INFO pipeline: Rule engine produced 2 verdict(s) for event a7b201a3-24dd-4fc2-a125-befd1f11a55a
+2026-08-22 10:52:43,572 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:43,576 INFO pipeline: Rule engine produced 1 verdict(s) for event 7bc90539-ca94-4ef6-8696-49d0cb43ac11
+2026-08-22 10:52:43,947 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:43,961 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:43,981 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:43,981 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:43,981 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:43,985 INFO pipeline: Rule engine produced 2 verdict(s) for event 0f9bced3-cf9c-4662-b783-da7b7969eeaf
+2026-08-22 10:52:45,006 INFO pipeline: Rule engine produced 2 verdict(s) for event afe507ef-56ce-4507-ae62-4ddcdfefa7b4
+2026-08-22 10:52:45,129 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:52:45,130 INFO pipeline: Rule engine produced 2 verdict(s) for event ab8b9bb0-b77b-4e90-8e44-014ad5fd10e7
+2026-08-22 10:52:46,033 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:46,039 INFO pipeline: Rule engine produced 3 verdict(s) for event 11bc3156-1ce3-4ccc-9d50-050e47a2ae18
+2026-08-22 10:52:47,021 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:47,026 INFO pipeline: Rule engine produced 2 verdict(s) for event f70537cd-e007-4b97-b304-ef365d41529a
+2026-08-22 10:52:48,028 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:48,035 INFO pipeline: Rule engine produced 4 verdict(s) for event f0cdb1dc-49f4-48e4-9f47-62beacb583b4
+2026-08-22 10:52:48,149 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:52:48,150 INFO pipeline: Rule engine produced 2 verdict(s) for event e57e2776-ca00-4a21-b788-25f8905a0266
+2026-08-22 10:52:49,038 INFO pipeline: Rule engine produced 2 verdict(s) for event 9531c67c-e0cc-4b07-95b8-8b1ca69e4a05
+2026-08-22 10:52:49,613 INFO pipeline: Rule engine produced 2 verdict(s) for event b4692efd-c0ef-45e0-b3a3-6c31b7cfd0ee
+2026-08-22 10:52:50,004 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:50,025 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:50,057 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:50,057 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:50,063 INFO pipeline: Rule engine produced 4 verdict(s) for event c7306423-fd64-476f-a099-7b88be34a66f
+2026-08-22 10:52:51,065 INFO pipeline: Rule engine produced 2 verdict(s) for event 83905428-80c1-4345-82ba-61bccb75614f
+2026-08-22 10:52:51,220 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:52:51,221 INFO pipeline: Rule engine produced 4 verdict(s) for event 28975b3b-5e51-46e4-b5b6-ee6a070fa430
+2026-08-22 10:52:52,064 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:52,069 INFO pipeline: Rule engine produced 2 verdict(s) for event 5e57be20-aeb4-4ac4-a331-30ff993b07eb
+2026-08-22 10:52:52,651 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:52,655 INFO pipeline: Rule engine produced 1 verdict(s) for event 76e39f18-899f-4e48-8bf2-a916794afd1a
+2026-08-22 10:52:54,095 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:54,095 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:54,101 INFO pipeline: Rule engine produced 3 verdict(s) for event 4c661607-2545-4e41-86b8-2fe626e5968a
+2026-08-22 10:52:54,238 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:52:54,239 INFO pipeline: Rule engine produced 2 verdict(s) for event dd0d6f5c-a195-4c5b-95b0-31228da63a47
+2026-08-22 10:52:55,677 INFO pipeline: Rule engine produced 1 verdict(s) for event 99063e2e-cf47-48de-9e0b-a55957ad9f2b
+2026-08-22 10:52:56,038 WARNING presidio-analyzer: Entity FAC is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:56,099 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:56,105 INFO pipeline: Rule engine produced 3 verdict(s) for event bd7599b6-e908-44d4-9677-5eaf4454aacf
+2026-08-22 10:52:57,233 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:52:57,233 INFO pipeline: Rule engine produced 2 verdict(s) for event 954e3cd2-4760-4d74-9de9-f9df193a5dff
+2026-08-22 10:52:58,077 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:58,094 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:58,117 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:58,117 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:58,123 INFO pipeline: Rule engine produced 2 verdict(s) for event 23c4d357-727a-425d-887f-1254fd602483
+2026-08-22 10:52:59,145 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:59,145 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:59,145 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:52:59,151 INFO pipeline: Rule engine produced 2 verdict(s) for event 7d264293-d248-4d08-a563-271aebb7c971
+2026-08-22 10:53:00,218 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:53:00,218 INFO pipeline: Rule engine produced 2 verdict(s) for event 395c1f3f-a516-495a-a31c-dfe5aacfd1a0
+2026-08-22 10:53:01,168 INFO pipeline: Rule engine produced 3 verdict(s) for event 1e131ae5-e8b0-4cf9-b584-3bc21413f3c2
+2026-08-22 10:53:01,705 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:01,708 INFO pipeline: Rule engine produced 1 verdict(s) for event b3ffcc7e-d436-417d-897a-f0835c5d6576
+2026-08-22 10:53:02,163 INFO pipeline: Rule engine produced 2 verdict(s) for event 54d5da7c-dc3a-4092-948e-3db10c6d1e52
+2026-08-22 10:53:03,189 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:03,194 INFO pipeline: Rule engine produced 3 verdict(s) for event 4c6edd32-3d5e-42f3-adf0-d380365f26f4
+2026-08-22 10:53:03,307 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:53:03,307 INFO pipeline: Rule engine produced 2 verdict(s) for event 62b53f4f-ac97-46c8-b1c4-2ecd7f3a09cb
+2026-08-22 10:53:04,285 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:04,292 INFO pipeline: Rule engine produced 2 verdict(s) for event 1bab5299-ced8-4d6a-8fdc-4dc1ab67166b
+2026-08-22 10:53:04,775 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:04,778 INFO pipeline: Rule engine produced 1 verdict(s) for event 722cde6c-a0ca-4757-a54f-3efaf4ba0a86
+2026-08-22 10:53:05,201 INFO pipeline: Rule engine produced 4 verdict(s) for event 443ab970-bde9-4d3f-ba3d-18820149a02f
+2026-08-22 10:53:06,174 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:06,198 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:06,198 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:06,202 INFO pipeline: Rule engine produced 2 verdict(s) for event ed7c76cc-ff82-498f-818b-444febc6bf01
+2026-08-22 10:53:06,315 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:53:06,316 INFO rules.engine: Unregistered field with PII detected: field='onboarded_at' source_system='delivery-partner-service' entity_type='PHONE_NUMBER' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:53:06,316 INFO pipeline: Rule engine produced 3 verdict(s) for event 036a3799-1a9e-4848-97c1-0ca4eaed2724
+2026-08-22 10:53:07,227 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:07,233 INFO pipeline: Rule engine produced 3 verdict(s) for event 0d825df3-08a9-4f41-b32e-4c3e38330f5e
+2026-08-22 10:53:08,219 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:08,224 INFO pipeline: Rule engine produced 4 verdict(s) for event e998bce8-6954-4d1d-b2a8-9d274b35ff00
+2026-08-22 10:53:09,346 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:53:09,347 INFO rules.engine: Unregistered field with PII detected: field='onboarded_at' source_system='delivery-partner-service' entity_type='PHONE_NUMBER' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:53:09,347 INFO pipeline: Rule engine produced 3 verdict(s) for event dc10c85e-ac00-45ab-a8b5-25cdd7708f2f
+2026-08-22 10:53:10,182 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:10,214 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:10,218 INFO pipeline: Rule engine produced 4 verdict(s) for event 525a6032-bf6f-43fd-94e3-c10235eebb96
+2026-08-22 10:53:10,795 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:10,825 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:10,830 INFO pipeline: Rule engine produced 1 verdict(s) for event 26e391ea-def8-41a1-9ef0-96e5ac998f11
+2026-08-22 10:53:11,258 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:11,259 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:11,265 INFO pipeline: Rule engine produced 2 verdict(s) for event ef5fc741-bbfa-45d2-ac8b-fd52460b0d85
+2026-08-22 10:53:12,217 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:12,245 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:12,245 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:12,249 INFO pipeline: Rule engine produced 4 verdict(s) for event e4bb36a7-313b-4353-a01d-3f460481d88c
+2026-08-22 10:53:12,376 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:53:12,377 INFO pipeline: Rule engine produced 2 verdict(s) for event a9849940-54a2-41d4-98e9-fafebb0815a6
+2026-08-22 10:53:13,233 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:13,237 INFO pipeline: Rule engine produced 2 verdict(s) for event d7edbebf-0613-4399-b65e-891c0fe0a3fa
+2026-08-22 10:53:15,251 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:15,280 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:15,285 INFO pipeline: Rule engine produced 2 verdict(s) for event 57b47f39-7ece-4600-8629-778adf99f66c
+2026-08-22 10:53:15,409 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:53:15,410 INFO pipeline: Rule engine produced 2 verdict(s) for event 98d74fd8-ba60-4a05-8f21-d409c779b46f
+2026-08-22 10:53:16,231 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:16,285 INFO pipeline: Rule engine produced 2 verdict(s) for event aaa7162d-20dd-46ed-80e6-8d2266c4f08b
+2026-08-22 10:53:16,867 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:16,913 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:16,918 INFO pipeline: Rule engine produced 1 verdict(s) for event d900bbd2-e612-49e7-b59a-4601dc4f4dab
+2026-08-22 10:53:18,279 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:18,311 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:18,317 INFO pipeline: Rule engine produced 2 verdict(s) for event 292e6833-ee96-4001-9fc6-6420506362f0
+2026-08-22 10:53:18,442 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:53:18,443 INFO pipeline: Rule engine produced 2 verdict(s) for event bc68ba0e-e368-4f12-8126-339d5a9f9d31
+2026-08-22 10:53:19,915 INFO pipeline: Rule engine produced 1 verdict(s) for event b223c092-60b3-490c-9949-71f446626a7f
+2026-08-22 10:53:20,284 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:20,316 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:20,316 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:20,321 INFO pipeline: Rule engine produced 3 verdict(s) for event ae4807c2-f0c0-432c-af93-158340cb41fb
+2026-08-22 10:53:21,282 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:21,304 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:21,308 INFO pipeline: Rule engine produced 2 verdict(s) for event 96ee67bd-b346-4414-9f73-975b060d6415
+2026-08-22 10:53:21,417 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:53:21,417 INFO pipeline: Rule engine produced 2 verdict(s) for event 02a59241-290d-4544-b3d6-d61a20bb13a5
+2026-08-22 10:53:22,312 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:22,342 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:22,348 INFO pipeline: Rule engine produced 3 verdict(s) for event 8495ef1e-c5c2-4cac-8972-380adcb2c3cf
+2026-08-22 10:53:23,289 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:23,334 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:23,340 INFO pipeline: Rule engine produced 3 verdict(s) for event 633e874f-3f00-4be0-80fc-973f31b3c96f
+2026-08-22 10:53:24,351 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:24,352 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:24,356 INFO pipeline: Rule engine produced 2 verdict(s) for event e4bb4c85-0221-4cc4-bb2b-019a44e441d4
+2026-08-22 10:53:24,495 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:53:24,495 INFO pipeline: Rule engine produced 2 verdict(s) for event 9d0a8c76-2778-47fb-9304-94f732878ea0
+2026-08-22 10:53:25,333 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:25,365 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:25,371 INFO pipeline: Rule engine produced 3 verdict(s) for event 7665da3f-b119-4049-9ab3-0e1a1bc3f5d2
+2026-08-22 10:53:25,943 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:26,373 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:26,379 INFO pipeline: Rule engine produced 3 verdict(s) for event d24fe269-e3a6-41b6-b468-2bdf71887265
+2026-08-22 10:53:27,351 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:27,390 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:27,391 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:27,396 INFO pipeline: Rule engine produced 4 verdict(s) for event 5f5d8180-c67f-46d3-8912-0abe98da77dc
+2026-08-22 10:53:27,543 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:53:27,543 INFO pipeline: Rule engine produced 2 verdict(s) for event 3ce8435e-6354-490b-a6ec-77011433414e
+2026-08-22 10:53:28,377 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:28,382 INFO pipeline: Rule engine produced 2 verdict(s) for event c21af949-e35f-44a8-81b1-8e84898b0c36
+2026-08-22 10:53:28,969 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:29,000 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:29,004 INFO pipeline: Rule engine produced 1 verdict(s) for event 03c66c48-d810-4ffb-b937-9b504ec4fc36
+2026-08-22 10:53:30,566 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:53:30,569 INFO pipeline: Rule engine produced 3 verdict(s) for event 8aa27303-d7f5-477c-833b-aa9814f8de3c
+2026-08-22 10:53:31,398 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:31,398 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:31,405 INFO pipeline: Rule engine produced 2 verdict(s) for event 50559ab6-a89e-444a-8c6f-248e2923b8c6
+2026-08-22 10:53:32,046 INFO pipeline: Rule engine produced 1 verdict(s) for event e06e5d44-b0a5-4085-a45b-5c6395c58623
+2026-08-22 10:53:32,418 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:32,423 INFO pipeline: Rule engine produced 2 verdict(s) for event 2bbeffb6-d651-434f-b5e1-001add578e9f
+2026-08-22 10:53:33,379 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:33,433 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:33,433 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:33,439 INFO pipeline: Rule engine produced 3 verdict(s) for event b4c9a8d2-7e66-4310-8ac6-c38b899b0e6b
+2026-08-22 10:53:33,592 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:53:33,593 INFO pipeline: Rule engine produced 2 verdict(s) for event cd43455c-75d7-4f22-875e-48e25303375d
+2026-08-22 10:53:35,036 INFO pipeline: Rule engine produced 1 verdict(s) for event 55fb7554-6f8d-471d-b03f-2bab350bf701
+2026-08-22 10:53:36,412 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:36,455 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:36,461 INFO pipeline: Rule engine produced 2 verdict(s) for event 8b16f245-bd54-430f-89d3-4fec71ee8976
+2026-08-22 10:53:36,589 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:53:36,590 INFO pipeline: Rule engine produced 2 verdict(s) for event b87b41b0-fc4e-4b70-8912-c35f9580b5b3
+2026-08-22 10:53:37,493 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:37,493 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:37,500 INFO pipeline: Rule engine produced 2 verdict(s) for event bf0adff4-848c-44a4-aaa8-ce03cf8ca8ea
+2026-08-22 10:53:38,532 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:38,537 INFO pipeline: Rule engine produced 1 verdict(s) for event 5ebe83f7-9dc0-4039-b325-7090592b8a3e
+2026-08-22 10:53:39,594 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:53:39,595 INFO pipeline: Rule engine produced 2 verdict(s) for event 50da11d0-b081-4f23-87c2-421b90043103
+2026-08-22 10:53:39,648 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:39,688 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:39,692 INFO pipeline: Rule engine produced 2 verdict(s) for event c2000f15-1de8-4e0d-9ddf-5af4575f09d5
+2026-08-22 10:53:40,656 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:40,656 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:40,660 INFO pipeline: Rule engine produced 3 verdict(s) for event 7e1136f3-d40d-4eb1-95a9-841d4fafc4a7
+2026-08-22 10:53:41,071 INFO pipeline: Rule engine produced 1 verdict(s) for event dafa514e-1a46-44bd-9982-bc160b872098
+2026-08-22 10:53:41,638 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:41,654 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:41,684 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:41,684 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:41,684 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:41,692 INFO pipeline: Rule engine produced 4 verdict(s) for event 47d44f9d-1540-4eb1-adf2-4a67cce5d280
+2026-08-22 10:53:42,595 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:53:42,596 INFO pipeline: Rule engine produced 2 verdict(s) for event cf8c4f13-beb1-4e65-8125-e2dabb8d7a91
+2026-08-22 10:53:42,695 INFO pipeline: Rule engine produced 2 verdict(s) for event 613dbca2-1c6d-44b7-ba2d-56a417818139
+2026-08-22 10:53:43,661 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:43,676 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:43,700 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:43,700 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:43,706 INFO pipeline: Rule engine produced 4 verdict(s) for event afb504f0-8595-422b-865b-1d869f1db2e6
+2026-08-22 10:53:44,104 INFO pipeline: Rule engine produced 1 verdict(s) for event c03dd5de-fa45-40e0-aeb3-454cd8406766
+2026-08-22 10:53:44,738 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:44,744 INFO pipeline: Rule engine produced 2 verdict(s) for event 91af2d6f-aac1-4f8a-807b-ada68c0e6916
+2026-08-22 10:53:45,610 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:53:45,611 INFO pipeline: Rule engine produced 2 verdict(s) for event 4caec165-4bc0-4521-ac94-432b88353ab6
+2026-08-22 10:53:45,753 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:45,759 INFO pipeline: Rule engine produced 2 verdict(s) for event 09c04160-f0a7-4e4b-88c6-f9947659aa40
+2026-08-22 10:53:46,727 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:46,733 INFO pipeline: Rule engine produced 2 verdict(s) for event 3bce2fce-43ba-47fa-ab72-490229a0ee99
+2026-08-22 10:53:47,078 INFO pipeline: Rule engine produced 1 verdict(s) for event 301fc595-4761-421c-81f3-f4ccdc198ce9
+2026-08-22 10:53:47,732 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:47,762 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:47,768 INFO pipeline: Rule engine produced 4 verdict(s) for event 0d80a1b7-2a9f-4dc3-85e8-dc3715c62d78
+2026-08-22 10:53:48,644 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:53:48,645 INFO pipeline: Rule engine produced 2 verdict(s) for event 6a190f19-d9a3-4d30-ab46-1599b4adf089
+2026-08-22 10:53:48,739 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:48,765 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:48,766 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:48,771 INFO pipeline: Rule engine produced 2 verdict(s) for event b30be694-62ad-438a-936b-1152e551e770
+2026-08-22 10:53:49,761 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:49,795 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:49,796 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:49,800 INFO pipeline: Rule engine produced 2 verdict(s) for event 2a369c49-57e4-418a-8717-4a7c5d4211d6
+2026-08-22 10:53:50,128 INFO pipeline: Rule engine produced 1 verdict(s) for event e0474a48-b599-43f9-8c49-093ec2b95059
+2026-08-22 10:53:51,646 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:53:51,647 INFO pipeline: Rule engine produced 2 verdict(s) for event e5bfb0a8-256e-472c-9dd8-246aa1b10ca6
+2026-08-22 10:53:51,762 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:51,791 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:51,791 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:51,798 INFO pipeline: Rule engine produced 3 verdict(s) for event e0452b16-4940-4645-8a3e-35f6930a03ec
+2026-08-22 10:53:52,754 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:53,072 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:53,139 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:53,139 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:53,143 INFO pipeline: Rule engine produced 1 verdict(s) for event 275c6015-f5df-476c-bef5-fd59ccffbe6c
+2026-08-22 10:53:53,821 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:53,827 INFO pipeline: Rule engine produced 3 verdict(s) for event 7a67cea8-6902-4574-98b2-f8aca756349f
+2026-08-22 10:53:54,664 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:53:54,665 INFO pipeline: Rule engine produced 2 verdict(s) for event a4bd5db1-81e7-430a-a17d-5c02ac6fb283
+2026-08-22 10:53:56,165 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:56,225 INFO pipeline: Rule engine produced 1 verdict(s) for event a58d1f6b-3760-48c4-83a7-505659458165
+2026-08-22 10:53:56,870 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:56,877 INFO pipeline: Rule engine produced 3 verdict(s) for event 89cd9fbb-6fd9-491e-9484-5510875746ab
+2026-08-22 10:53:57,716 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:53:57,717 INFO pipeline: Rule engine produced 2 verdict(s) for event e756ded3-df7d-40e5-88dc-4e399097f938
+2026-08-22 10:53:57,808 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:57,840 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:57,841 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:57,845 INFO pipeline: Rule engine produced 2 verdict(s) for event ae4339f4-f1a7-479d-94ed-91d56f8cddc4
+2026-08-22 10:53:58,881 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:58,887 INFO pipeline: Rule engine produced 3 verdict(s) for event ac765150-4033-4050-a657-9da97ad688a7
+2026-08-22 10:53:59,168 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:59,173 INFO pipeline: Rule engine produced 1 verdict(s) for event b87dff2b-d789-46bf-8b9c-2a4ca5f2ff56
+2026-08-22 10:53:59,864 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:59,928 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:59,929 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:53:59,936 INFO pipeline: Rule engine produced 2 verdict(s) for event c844063d-30bc-40f4-ad7e-c22f170c5a80
+2026-08-22 10:54:00,970 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:54:00,970 INFO pipeline: Rule engine produced 2 verdict(s) for event 66d6ab6b-2ff3-4dd7-84a5-e77f2e6057e6
+2026-08-22 10:54:01,044 WARNING presidio-analyzer: Entity LAW is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:02,022 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:02,138 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:02,144 INFO pipeline: Rule engine produced 2 verdict(s) for event ea87770f-273d-49a9-a823-4a240e25401b
+2026-08-22 10:54:03,410 INFO pipeline: Rule engine produced 2 verdict(s) for event 906cf600-4532-4acf-8670-6f3180da1afa
+2026-08-22 10:54:03,853 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:54:03,855 INFO rules.engine: Unregistered field with PII detected: field='onboarded_at' source_system='delivery-partner-service' entity_type='PHONE_NUMBER' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:54:03,856 INFO pipeline: Rule engine produced 4 verdict(s) for event ce828b24-a3bf-4118-9b93-da139b02cf20
+2026-08-22 10:54:04,117 INFO pipeline: Rule engine produced 3 verdict(s) for event f90e5638-956d-4ebe-97c9-73f8de638edb
+2026-08-22 10:54:05,062 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:05,085 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:05,085 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:05,090 INFO pipeline: Rule engine produced 3 verdict(s) for event 56784d40-15b6-44e2-b465-e33655f80923
+2026-08-22 10:54:06,097 INFO pipeline: Rule engine produced 2 verdict(s) for event 343499f9-2c1a-4581-96ae-6c9d13fdc1ec
+2026-08-22 10:54:06,803 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:54:06,804 INFO rules.engine: Unregistered field with PII detected: field='onboarded_at' source_system='delivery-partner-service' entity_type='PHONE_NUMBER' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:54:06,804 INFO pipeline: Rule engine produced 3 verdict(s) for event ba61a05f-6021-4652-83ff-c60090f4c1fb
+2026-08-22 10:54:07,351 INFO httpx2: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-08-22 10:54:08,225 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:08,254 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:08,259 INFO pipeline: Rule engine produced 1 verdict(s) for event e8e8af09-1088-4ec4-abfb-1d1416b3076e
+2026-08-22 10:54:09,838 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:09,850 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:54:09,851 INFO rules.engine: Unregistered field with PII detected: field='onboarded_at' source_system='delivery-partner-service' entity_type='PHONE_NUMBER' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:54:09,851 INFO pipeline: Rule engine produced 4 verdict(s) for event 1543eb6a-2779-4f60-998e-8297434822ae
+2026-08-22 10:54:10,149 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:10,150 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:10,156 INFO pipeline: Rule engine produced 3 verdict(s) for event dc9b1b8b-dbb5-4fc9-8473-3d4c481c01f7
+2026-08-22 10:54:11,287 INFO pipeline: Rule engine produced 1 verdict(s) for event dcdd7e94-8496-4445-b7ee-2ac0f27d68bb
+2026-08-22 10:54:12,102 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:12,123 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:12,123 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:12,128 INFO pipeline: Rule engine produced 2 verdict(s) for event 017c3f10-a486-4689-96d1-9c2c50451959
+2026-08-22 10:54:12,878 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:54:12,879 INFO pipeline: Rule engine produced 2 verdict(s) for event 29cc4c13-e91a-43f7-9d30-86587cabdf30
+2026-08-22 10:54:14,117 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:14,142 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:14,147 INFO pipeline: Rule engine produced 2 verdict(s) for event d8616625-2490-4a89-a81c-3de566e0acb0
+2026-08-22 10:54:14,201 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:14,248 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:15,138 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:15,142 INFO pipeline: Rule engine produced 3 verdict(s) for event c29697b4-3fff-460a-bf6a-62bc0fd09a06
+2026-08-22 10:54:15,785 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:54:15,786 INFO pipeline: Rule engine produced 2 verdict(s) for event 20502c22-a2fc-4e43-93df-1fbb08850390
+2026-08-22 10:54:16,131 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:16,132 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:16,134 INFO pipeline: Rule engine produced 3 verdict(s) for event 58b7a301-ba59-4f19-bbf9-d7845f3a4c78
+2026-08-22 10:54:17,125 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:17,147 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:17,151 INFO pipeline: Rule engine produced 2 verdict(s) for event e7f0edc2-7379-4c76-8c3f-f2ed9d113285
+2026-08-22 10:54:18,143 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:18,170 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:18,170 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:18,175 INFO pipeline: Rule engine produced 3 verdict(s) for event 706c868e-7994-4117-aeb3-2e887a8cfe17
+2026-08-22 10:54:18,803 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:18,812 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:54:18,813 INFO pipeline: Rule engine produced 3 verdict(s) for event 0ab1ad75-17e0-4363-a839-3e72930a599e
+2026-08-22 10:54:19,133 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:19,166 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:19,170 INFO pipeline: Rule engine produced 3 verdict(s) for event 47e976af-b1b0-411f-bcd5-db5f37ce886d
+2026-08-22 10:54:20,268 INFO pipeline: Rule engine produced 2 verdict(s) for event 42af9e8e-9212-4eb8-921f-98a49cea9c83
+2026-08-22 10:54:21,179 INFO pipeline: Rule engine produced 3 verdict(s) for event 20d5a32e-5c08-4ce5-a96f-2dace3dc1aba
+2026-08-22 10:54:21,806 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:54:21,807 INFO pipeline: Rule engine produced 3 verdict(s) for event 04fd42d8-1b37-4e5a-a7e3-02017c01c17a
+2026-08-22 10:54:22,160 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:22,172 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:22,191 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:22,191 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:22,191 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:22,194 INFO pipeline: Rule engine produced 3 verdict(s) for event e68c914e-4af0-48f9-b021-1e9234c3e9cf
+2026-08-22 10:54:23,172 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:23,190 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:23,190 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:23,190 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:23,194 INFO pipeline: Rule engine produced 3 verdict(s) for event c1ee3ad2-bf38-48d7-bb80-701e07866f9a
+2026-08-22 10:54:23,271 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:23,294 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:23,299 INFO pipeline: Rule engine produced 1 verdict(s) for event 1521a70a-418a-450f-b3bf-08ab3095859f
+2026-08-22 10:54:24,196 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:24,196 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:24,200 INFO pipeline: Rule engine produced 2 verdict(s) for event 5576cd4c-8d30-4658-84d0-02665dfbe3b5
+2026-08-22 10:54:24,809 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:54:24,810 INFO pipeline: Rule engine produced 2 verdict(s) for event d0add81b-ce91-40be-98da-54c2351dafa5
+2026-08-22 10:54:25,206 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:25,211 INFO pipeline: Rule engine produced 4 verdict(s) for event a6187895-3390-42b5-9a05-bd343bdd1a4d
+2026-08-22 10:54:26,225 INFO pipeline: Rule engine produced 3 verdict(s) for event 91156917-c0a4-4c91-8f65-95eec27f1419
+2026-08-22 10:54:26,299 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:26,303 INFO pipeline: Rule engine produced 1 verdict(s) for event 1874d098-f44b-464d-a073-e44fdcc18f8d
+2026-08-22 10:54:27,204 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:27,219 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:27,221 INFO pipeline: Rule engine produced 2 verdict(s) for event 9ea7210c-d218-4c9f-9783-fb694dede566
+2026-08-22 10:54:27,807 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:54:27,807 INFO pipeline: Rule engine produced 2 verdict(s) for event 192519a1-4ccf-42f0-872c-b5c678b55da9
+2026-08-22 10:54:29,246 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:29,250 INFO pipeline: Rule engine produced 3 verdict(s) for event cf62764e-6e6c-48dd-b041-667efdcf0cf8
+2026-08-22 10:54:29,304 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:29,306 INFO pipeline: Rule engine produced 1 verdict(s) for event c1a07b4c-af20-4559-bcff-7298b70d0ee6
+2026-08-22 10:54:30,874 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:54:30,875 INFO pipeline: Rule engine produced 2 verdict(s) for event 3d55edf6-1321-4a8e-a714-fe44f0da0f6e
+2026-08-22 10:54:31,231 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:32,242 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:32,259 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:32,259 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:32,262 INFO pipeline: Rule engine produced 4 verdict(s) for event ed3ea4d1-54e4-4988-9cac-6b3d764b4af5
+2026-08-22 10:54:33,252 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:33,270 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:33,301 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:33,301 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:33,301 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:33,306 INFO pipeline: Rule engine produced 2 verdict(s) for event 6dc72ab6-9f9e-4cff-b24f-52b24a83cadc
+2026-08-22 10:54:33,829 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:54:33,830 INFO pipeline: Rule engine produced 2 verdict(s) for event 12b6f63e-7ada-48a0-b0e6-835ddfb51dc1
+2026-08-22 10:54:35,306 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:35,310 INFO pipeline: Rule engine produced 2 verdict(s) for event 8ff72bfc-b826-432e-9a5f-063877fde6e5
+2026-08-22 10:54:35,382 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:35,385 INFO pipeline: Rule engine produced 1 verdict(s) for event 5fe8c56b-c620-469a-b913-b9b48bf753eb
+2026-08-22 10:54:36,906 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:54:36,907 INFO pipeline: Rule engine produced 2 verdict(s) for event f6b787cc-fd76-4e37-ac8e-9e323f7c64be
+2026-08-22 10:54:37,295 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:37,298 INFO pipeline: Rule engine produced 3 verdict(s) for event 55a33e5f-7a92-4e4e-818b-02859df8fba7
+2026-08-22 10:54:38,300 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:38,304 INFO pipeline: Rule engine produced 3 verdict(s) for event 5f85f3da-23e4-44af-b424-634ea329a56b
+2026-08-22 10:54:38,386 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:38,391 INFO pipeline: Rule engine produced 1 verdict(s) for event ac1e836a-3178-4482-9f67-64d1bb346350
+2026-08-22 10:54:39,279 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:39,293 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:39,315 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:39,315 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:39,319 INFO pipeline: Rule engine produced 3 verdict(s) for event ca952f0d-44b2-44fe-b510-5beccfe160a1
+2026-08-22 10:54:39,889 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:54:39,889 INFO pipeline: Rule engine produced 2 verdict(s) for event 071695de-b929-4ad5-94af-44bc2acd596f
+2026-08-22 10:54:40,279 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:40,304 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:40,307 INFO pipeline: Rule engine produced 3 verdict(s) for event a021b4ac-7d82-486c-a1e7-860c89bac719
+2026-08-22 10:54:41,329 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:41,333 INFO pipeline: Rule engine produced 3 verdict(s) for event 692a21bd-bc35-4951-bf4e-79d7859d0268
+2026-08-22 10:54:41,404 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:41,408 INFO pipeline: Rule engine produced 1 verdict(s) for event a96d9421-7ed4-4828-8ea6-7e5bb3ecc11f
+2026-08-22 10:54:42,330 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:42,330 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:42,333 INFO pipeline: Rule engine produced 3 verdict(s) for event 5ba00b29-af38-4bec-9df8-b72a84af55a0
+2026-08-22 10:54:42,936 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:54:42,936 INFO pipeline: Rule engine produced 2 verdict(s) for event bf2ea14a-e761-414d-9ed2-e48bd2bb8d3e
+2026-08-22 10:54:43,342 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:43,371 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:43,377 INFO pipeline: Rule engine produced 4 verdict(s) for event bd8c87d1-0181-4f9f-8a62-8d81f635fbdf
+2026-08-22 10:54:44,342 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:44,367 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:44,367 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:44,367 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:44,371 INFO pipeline: Rule engine produced 3 verdict(s) for event 4cfd57fd-c715-406a-bbb2-4bfadfb18ea2
+2026-08-22 10:54:44,459 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:44,465 INFO pipeline: Rule engine produced 1 verdict(s) for event 3160a7be-dbe1-4f8f-ae56-023d6bda8598
+2026-08-22 10:54:45,390 INFO pipeline: Rule engine produced 2 verdict(s) for event 2694622b-0e73-4b3a-83b1-d1456ca7d8ca
+2026-08-22 10:54:45,953 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:54:45,954 INFO pipeline: Rule engine produced 2 verdict(s) for event d49c3e0b-a66d-4a9f-a738-639f526aaeb3
+2026-08-22 10:54:46,333 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:46,357 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:46,362 INFO pipeline: Rule engine produced 1 verdict(s) for event 1a789285-15f8-4f76-af5d-3ac942b7b662
+2026-08-22 10:54:47,374 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:47,408 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:47,413 INFO pipeline: Rule engine produced 3 verdict(s) for event 5921e63b-5a80-4f80-a485-73b7c061d09d
+2026-08-22 10:54:47,481 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:47,506 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:47,509 INFO pipeline: Rule engine produced 1 verdict(s) for event 33be0854-8a57-4238-9edc-bf2d92ecbbc2
+2026-08-22 10:54:48,355 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:48,994 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:54:48,994 INFO pipeline: Rule engine produced 2 verdict(s) for event 2584bd1d-c9d7-4252-944b-1b6345f8f471
+2026-08-22 10:54:49,407 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:49,411 INFO pipeline: Rule engine produced 3 verdict(s) for event c214ad5b-98ce-462e-8ab2-a4eb80558ded
+2026-08-22 10:54:50,367 WARNING presidio-analyzer: Entity FAC is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:50,410 INFO pipeline: Rule engine produced 2 verdict(s) for event 557cf6e7-1f66-4d7c-b063-a140d311c834
+2026-08-22 10:54:50,615 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:50,620 INFO pipeline: Rule engine produced 1 verdict(s) for event 070b3214-4335-4b71-8c3f-507be4083c46
+2026-08-22 10:54:51,367 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:51,381 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:52,118 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:52,127 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:54:52,128 INFO pipeline: Rule engine produced 4 verdict(s) for event 7efd0769-2eb5-43e7-8428-b3ddac4c665a
+2026-08-22 10:54:53,549 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:53,565 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:53,565 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:53,568 INFO pipeline: Rule engine produced 3 verdict(s) for event 7cc33b2e-e14e-458a-85e2-eb7be6d923b6
+2026-08-22 10:54:53,791 INFO pipeline: Rule engine produced 1 verdict(s) for event 4e14d9b5-e9ba-48e3-95bf-3dac73975571
+2026-08-22 10:54:54,546 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:54,558 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:54,558 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:54,561 INFO pipeline: Rule engine produced 2 verdict(s) for event 554e3903-748d-4670-b745-e3f5c3e6f62e
+2026-08-22 10:54:55,132 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:54:55,132 INFO pipeline: Rule engine produced 2 verdict(s) for event 66a9c12d-6de7-4487-a942-9af739de65c2
+2026-08-22 10:54:55,552 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:55,568 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:55,571 INFO pipeline: Rule engine produced 3 verdict(s) for event 7342611e-c9e6-4621-834c-7724a2b72485
+2026-08-22 10:54:56,572 WARNING presidio-analyzer: Entity PRODUCT is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:56,576 INFO pipeline: Rule engine produced 2 verdict(s) for event 04b62434-3d85-40a4-aa6d-7af6a1835254
+2026-08-22 10:54:56,667 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:56,670 INFO pipeline: Rule engine produced 1 verdict(s) for event 4a32d049-bc92-437c-add3-bd23efa467fd
+2026-08-22 10:54:58,173 INFO rules.engine: Unregistered field with PII detected: field='name' source_system='delivery-partner-service' entity_type='PERSON' — classifying as PURPOSE_001 per documented policy (see rules/engine.py Design Decision #2).
+2026-08-22 10:54:58,173 INFO pipeline: Rule engine produced 2 verdict(s) for event 08d47bdf-b11a-4eb9-b785-2b6fd083bcf9
+2026-08-22 10:54:58,588 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:58,610 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:58,612 INFO pipeline: Rule engine produced 2 verdict(s) for event 27ad7126-bf4d-4ab8-8d34-3c4bfd9bb0ec
+2026-08-22 10:54:59,627 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:59,627 WARNING presidio-analyzer: Entity WORK_OF_ART is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:59,631 INFO pipeline: Rule engine produced 3 verdict(s) for event e06ca088-12b4-4385-b2e2-1d80a4fdd103
+2026-08-22 10:54:59,879 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:59,894 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:54:59,896 INFO pipeline: Rule engine produced 1 verdict(s) for event 2ba2b099-2e75-4acb-81a1-36bc6bdd738d
+2026-08-22 10:55:00,614 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:55:00,638 WARNING presidio-analyzer: Entity CARDINAL is not mapped to a Presidio entity, but keeping anyway. Add to `NerModelConfiguration.labels_to_ignore` to remove.
+2026-08-22 10:55:00,643 INFO pipeline: Rule engine produced 2 verdict(s) for event 1cd90367-86ed-4a36-83e5-2d269f203eca

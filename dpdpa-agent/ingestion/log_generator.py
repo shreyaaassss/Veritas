@@ -31,6 +31,7 @@ import random
 from datetime import datetime, timezone
 from typing import Dict, Optional
 
+import pipeline_control
 from ingestion.config import IngestionConfig
 from ingestion.fixtures import (
     fake_address,
@@ -113,6 +114,10 @@ async def log_generator(
 
     emitted = 0
     while max_events is None or emitted < max_events:
+        if not pipeline_control.is_running():
+            await asyncio.sleep(0.3)
+            continue
+
         source_system = r.choice(LOG_SOURCE_SYSTEMS)
 
         is_violation = r.random() < cfg.log_exposure_violation_rate
