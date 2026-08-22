@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -12,7 +12,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 
   <style>
-    :root {
+    :root, [data-theme="dark"] {
       --bg: #000000;
       --canvas: #050505;
       --sidebar: #080808;
@@ -30,9 +30,20 @@
       --shadow-dropdown: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 16px 36px -4px rgba(0,0,0,0.8);
       
       --text: #ededed;
+      --text-headings: #ffffff;
       --text-muted: #888888;
       --text-subtle: #555555;
       --text-inverse: #000000;
+
+      --btn-primary-bg: #ffffff;
+      --btn-primary-text: #000000;
+      --btn-primary-hover: #e6e6e6;
+
+      --drawer-bg: #090909;
+      --modal-bg: #0a0a0a;
+      --input-bg: #000000;
+      --track-bg: rgba(255, 255, 255, 0.06);
+      --code-bg: #000000;
 
       /* Vercel Action & Severity Palette */
       --accent: #ffffff;
@@ -62,6 +73,62 @@
       --radius-xs: 4px;
     }
 
+    [data-theme="light"] {
+      --bg: #ffffff;
+      --canvas: #fafafa;
+      --sidebar: #f7f7f8;
+      --surface: #ffffff;
+      --surface-hover: #f4f4f5;
+      --surface-active: #ebebeb;
+      
+      --border: rgba(0, 0, 0, 0.08);
+      --border-strong: rgba(0, 0, 0, 0.15);
+      --border-subtle: rgba(0, 0, 0, 0.04);
+
+      --shadow-border: 0 0 0 1px var(--border);
+      --shadow-border-strong: 0 0 0 1px var(--border-strong);
+      --shadow-card: 0 0 0 1px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0,0,0,0.03), 0 12px 24px -8px rgba(0,0,0,0.05);
+      --shadow-dropdown: 0 0 0 1px rgba(0, 0, 0, 0.1), 0 16px 36px -4px rgba(0,0,0,0.12);
+      
+      --text: #171717;
+      --text-headings: #000000;
+      --text-muted: #666666;
+      --text-subtle: #999999;
+      --text-inverse: #ffffff;
+
+      --btn-primary-bg: #000000;
+      --btn-primary-text: #ffffff;
+      --btn-primary-hover: #222222;
+
+      --drawer-bg: #ffffff;
+      --modal-bg: #ffffff;
+      --input-bg: #fafafa;
+      --track-bg: rgba(0, 0, 0, 0.06);
+      --code-bg: #f4f4f5;
+
+      /* Vercel Action & Severity Palette */
+      --accent: #000000;
+      --accent-blue: #0070f3;
+      --accent-blue-hover: #0060df;
+      --accent-blue-glow: rgba(0, 112, 243, 0.1);
+      
+      --high: #e5484d;
+      --high-bg: rgba(229, 72, 77, 0.08);
+      --high-border: rgba(229, 72, 77, 0.25);
+      
+      --medium: #d97706;
+      --medium-bg: rgba(217, 119, 6, 0.08);
+      --medium-border: rgba(217, 119, 6, 0.25);
+      
+      --low: #10b981;
+      --low-bg: rgba(16, 185, 129, 0.08);
+      --low-border: rgba(16, 185, 129, 0.25);
+
+      --breach: #e5484d;
+      --purple: #8b5cf6;
+      --purple-bg: rgba(139, 92, 246, 0.08);
+    }
+
     * {
       box-sizing: border-box;
       margin: 0;
@@ -80,7 +147,7 @@
       font-size: 13.5px;
       line-height: 1.5;
       overflow: hidden;
-      color-scheme: dark;
+      transition: background-color 0.2s ease, color 0.2s ease;
     }
 
     /* ---- Layout Container ---- */
@@ -100,6 +167,7 @@
       padding: 20px 14px;
       z-index: 50;
       user-select: none;
+      transition: background-color 0.2s ease;
     }
 
     .brand {
@@ -114,13 +182,13 @@
     .brand .logo-icon {
       width: 28px;
       height: 28px;
-      background: #ffffff;
-      color: #000000;
+      background: var(--text-headings);
+      color: var(--bg);
       border-radius: var(--radius-sm);
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 0 0 1px rgba(255,255,255,0.2), 0 2px 6px rgba(255,255,255,0.15);
+      box-shadow: 0 0 0 1px var(--border-strong), 0 2px 6px rgba(0,0,0,0.1);
     }
 
     .brand .logo-icon svg {
@@ -133,7 +201,7 @@
       font-size: 14px;
       font-weight: 700;
       letter-spacing: -0.025em;
-      color: #ffffff;
+      color: var(--text-headings);
       line-height: 1.2;
     }
 
@@ -181,7 +249,7 @@
 
     .nav-item.active {
       background: var(--surface-active);
-      color: #ffffff;
+      color: var(--text-headings);
       box-shadow: var(--shadow-border);
     }
 
@@ -230,6 +298,7 @@
       flex-direction: column;
       overflow: hidden;
       background: var(--canvas);
+      transition: background-color 0.2s ease;
     }
 
     /* ---- Topbar ---- */
@@ -242,6 +311,7 @@
       border-bottom: 1px solid var(--border);
       background: var(--bg);
       z-index: 40;
+      transition: background-color 0.2s ease;
     }
 
     .topbar-left {
@@ -254,7 +324,7 @@
       font-size: 14px;
       font-weight: 600;
       letter-spacing: -0.02em;
-      color: #ffffff;
+      color: var(--text-headings);
     }
 
     .topbar-breadcrumb {
@@ -265,7 +335,7 @@
     .topbar-actions {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
     }
 
     .org-selector-wrap {
@@ -284,7 +354,7 @@
       background: var(--surface);
       border: none;
       box-shadow: var(--shadow-border);
-      color: #ffffff;
+      color: var(--text-headings);
       border-radius: var(--radius-sm);
       padding: 6px 28px 6px 10px;
       font-size: 12.5px;
@@ -302,7 +372,7 @@
     }
 
     .org-selector-wrap select:focus {
-      box-shadow: 0 0 0 1px #ffffff, 0 0 0 3px rgba(255,255,255,0.15);
+      box-shadow: 0 0 0 1px var(--text-headings), 0 0 0 3px rgba(0, 112, 243, 0.2);
     }
 
     .header-status {
@@ -337,6 +407,29 @@
     }
 
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.35} }
+
+    /* ---- Theme Toggle Button ---- */
+    .theme-toggle-btn {
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: var(--radius-sm);
+      background: var(--surface);
+      box-shadow: var(--shadow-border);
+      color: var(--text);
+      cursor: pointer;
+      border: none;
+      transition: all 0.15s ease;
+    }
+
+    .theme-toggle-btn:hover {
+      background: var(--surface-hover);
+      box-shadow: var(--shadow-border-strong);
+      color: var(--text-headings);
+    }
 
     /* ---- Page Content ---- */
     .page-content {
@@ -381,11 +474,11 @@
       gap: 10px;
       position: relative;
       overflow: hidden;
-      transition: transform 0.15s ease, box-shadow 0.15s ease;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.2s ease;
     }
 
     .stat-card:hover {
-      box-shadow: 0 0 0 1px var(--border-strong), 0 8px 20px rgba(0,0,0,0.6);
+      box-shadow: 0 0 0 1px var(--border-strong), 0 8px 20px rgba(0,0,0,0.1);
       transform: translateY(-1px);
     }
 
@@ -401,14 +494,14 @@
       font-weight: 700;
       line-height: 1;
       letter-spacing: -0.035em;
-      color: #ffffff;
+      color: var(--text-headings);
       font-variant-numeric: tabular-nums;
     }
 
     .stat-card .value.high { color: var(--high); }
     .stat-card .value.medium { color: var(--medium); }
     .stat-card .value.breach { color: var(--high); }
-    .stat-card .value.accent { color: #ffffff; }
+    .stat-card .value.accent { color: var(--text-headings); }
 
     .stat-card .bg-icon {
       position: absolute;
@@ -416,8 +509,8 @@
       right: -8px;
       width: 52px;
       height: 52px;
-      color: #ffffff;
-      opacity: 0.03;
+      color: var(--text-headings);
+      opacity: 0.04;
       pointer-events: none;
     }
 
@@ -434,7 +527,7 @@
       font-size: 15px;
       font-weight: 600;
       letter-spacing: -0.02em;
-      color: #ffffff;
+      color: var(--text-headings);
     }
 
     /* ---- Buttons ---- */
@@ -462,13 +555,13 @@
     }
 
     .btn-primary {
-      background: #ffffff;
-      color: #000000;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.4);
+      background: var(--btn-primary-bg);
+      color: var(--btn-primary-text);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.15);
     }
 
     .btn-primary:hover {
-      background: #e6e6e6;
+      background: var(--btn-primary-hover);
     }
 
     .btn-secondary {
@@ -480,17 +573,17 @@
     .btn-secondary:hover {
       background: var(--surface-hover);
       box-shadow: var(--shadow-border-strong);
-      color: #ffffff;
+      color: var(--text-headings);
     }
 
     .btn-verify {
-      background: rgba(0, 223, 143, 0.08);
+      background: var(--low-bg);
       color: var(--low);
       box-shadow: 0 0 0 1px var(--low-border);
     }
 
     .btn-verify:hover {
-      background: rgba(0, 223, 143, 0.14);
+      background: rgba(0, 223, 143, 0.18);
     }
 
     .btn-danger {
@@ -537,7 +630,7 @@
     .badge.HIGH { background: var(--high-bg); color: var(--high); box-shadow: 0 0 0 1px var(--high-border); }
     .badge.MEDIUM { background: var(--medium-bg); color: var(--medium); box-shadow: 0 0 0 1px var(--medium-border); }
     .badge.LOW { background: var(--low-bg); color: var(--low); box-shadow: 0 0 0 1px var(--low-border); }
-    .badge.rule { background: rgba(255, 255, 255, 0.08); color: #ffffff; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15); }
+    .badge.rule { background: var(--surface-active); color: var(--text-headings); box-shadow: 0 0 0 1px var(--border-strong); }
     .badge.system { background: var(--surface-hover); color: var(--text-muted); box-shadow: var(--shadow-border); font-family: inherit; font-size: 11px; text-transform: none; }
     .badge.breach { background: var(--high-bg); color: var(--high); box-shadow: 0 0 0 1px var(--high-border); }
     .badge.fallback { background: var(--medium-bg); color: var(--medium); box-shadow: 0 0 0 1px var(--medium-border); }
@@ -554,7 +647,7 @@
       font-family: 'Geist Mono', monospace;
     }
 
-    .status-badge.OPEN { background: rgba(0, 112, 243, 0.12); color: #3291ff; box-shadow: 0 0 0 1px rgba(0, 112, 243, 0.25); }
+    .status-badge.OPEN { background: rgba(0, 112, 243, 0.12); color: var(--accent-blue); box-shadow: 0 0 0 1px rgba(0, 112, 243, 0.25); }
     .status-badge.ACKNOWLEDGED { background: var(--medium-bg); color: var(--medium); box-shadow: 0 0 0 1px var(--medium-border); }
     .status-badge.RESOLVED { background: var(--low-bg); color: var(--low); box-shadow: 0 0 0 1px var(--low-border); }
 
@@ -577,7 +670,7 @@
 
     .violation-card:hover {
       background: var(--surface-hover);
-      box-shadow: 0 0 0 1px var(--border-strong), 0 4px 16px rgba(0,0,0,0.5);
+      box-shadow: 0 0 0 1px var(--border-strong), 0 4px 16px rgba(0,0,0,0.08);
     }
 
     .violation-card.HIGH { border-left-color: var(--high); }
@@ -600,8 +693,8 @@
     .violation-field {
       font-family: 'Geist Mono', monospace;
       font-size: 11.5px;
-      color: #ffffff;
-      background: #000000;
+      color: var(--text-headings);
+      background: var(--code-bg);
       padding: 2px 7px;
       border-radius: var(--radius-xs);
       box-shadow: var(--shadow-border);
@@ -645,6 +738,7 @@
       border-radius: var(--radius-md);
       box-shadow: var(--shadow-card);
       padding: 18px 20px;
+      transition: background-color 0.2s ease;
     }
 
     .overview-card h3 {
@@ -673,7 +767,7 @@
 
     .progress-track {
       height: 5px;
-      background: rgba(255, 255, 255, 0.06);
+      background: var(--track-bg);
       border-radius: 999px;
       overflow: hidden;
     }
@@ -709,21 +803,21 @@
 
     .leaderboard-track {
       height: 5px;
-      background: rgba(255, 255, 255, 0.06);
+      background: var(--track-bg);
       border-radius: 999px;
       overflow: hidden;
     }
 
     .leaderboard-fill {
       height: 100%;
-      background: #ffffff;
+      background: var(--text-headings);
       border-radius: 999px;
     }
 
     .leaderboard-count {
       font-size: 12px;
       font-weight: 600;
-      color: #ffffff;
+      color: var(--text-headings);
       text-align: right;
       font-variant-numeric: tabular-nums;
       font-family: 'Geist Mono', monospace;
@@ -739,6 +833,7 @@
       align-items: center;
       gap: 14px;
       flex-wrap: wrap;
+      transition: background-color 0.2s ease;
     }
 
     .integrity-result {
@@ -762,6 +857,7 @@
       padding: 14px 18px;
       flex-wrap: wrap;
       gap: 14px;
+      transition: background-color 0.2s ease;
     }
 
     .filters-group {
@@ -784,10 +880,10 @@
     }
 
     .filter-item select, .filter-item input {
-      background: #000000;
+      background: var(--input-bg);
       border: none;
       box-shadow: var(--shadow-border);
-      color: #ffffff;
+      color: var(--text-headings);
       border-radius: var(--radius-sm);
       padding: 6px 10px;
       font-size: 12.5px;
@@ -797,7 +893,7 @@
     }
 
     .filter-item select:focus, .filter-item input:focus {
-      box-shadow: 0 0 0 1px #ffffff, 0 0 0 3px rgba(255,255,255,0.15);
+      box-shadow: 0 0 0 1px var(--text-headings), 0 0 0 3px rgba(0, 112, 243, 0.2);
     }
 
     .table-container {
@@ -805,6 +901,7 @@
       border-radius: var(--radius-md);
       box-shadow: var(--shadow-card);
       overflow: hidden;
+      transition: background-color 0.2s ease;
     }
 
     .table-wrap {
@@ -819,7 +916,7 @@
     }
 
     thead tr {
-      background: #000000;
+      background: var(--canvas);
       border-bottom: 1px solid var(--border);
     }
 
@@ -853,7 +950,7 @@
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0.65);
+      background: rgba(0,0,0,0.6);
       backdrop-filter: blur(6px);
       z-index: 200;
       opacity: 0;
@@ -866,13 +963,13 @@
       position: fixed;
       right: 0; top: 0; bottom: 0;
       width: min(580px, 100vw);
-      background: #090909;
-      box-shadow: -1px 0 0 0 var(--border), -16px 0 48px rgba(0,0,0,0.8);
+      background: var(--drawer-bg);
+      box-shadow: -1px 0 0 0 var(--border), -16px 0 48px rgba(0,0,0,0.3);
       padding: 28px;
       overflow-y: auto;
       z-index: 201;
       transform: translateX(100%);
-      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s ease;
     }
 
     .drawer.open { transform: translateX(0); }
@@ -890,7 +987,7 @@
       font-size: 16px;
       font-weight: 600;
       letter-spacing: -0.02em;
-      color: #ffffff;
+      color: var(--text-headings);
     }
 
     .drawer-close {
@@ -908,7 +1005,7 @@
     }
 
     .drawer-close:hover {
-      color: #ffffff;
+      color: var(--text-headings);
       background: var(--surface-hover);
     }
 
@@ -976,8 +1073,8 @@
     }
 
     .investigate-turn.user {
-      background: #ffffff;
-      color: #000000;
+      background: var(--btn-primary-bg);
+      color: var(--btn-primary-text);
       align-self: flex-end;
       max-width: 88%;
       font-weight: 500;
@@ -1018,7 +1115,7 @@
 
     .investigate-suggestions button:hover {
       box-shadow: var(--shadow-border-strong);
-      color: #ffffff;
+      color: var(--text-headings);
       background: var(--surface-hover);
     }
 
@@ -1029,10 +1126,10 @@
 
     .investigate-input-row input {
       flex: 1;
-      background: #000000;
+      background: var(--input-bg);
       box-shadow: var(--shadow-border);
       border: none;
-      color: #ffffff;
+      color: var(--text-headings);
       border-radius: var(--radius-sm);
       padding: 8px 12px;
       font-size: 12.5px;
@@ -1042,7 +1139,7 @@
     }
 
     .investigate-input-row input:focus {
-      box-shadow: 0 0 0 1px #ffffff, 0 0 0 3px rgba(255,255,255,0.15);
+      box-shadow: 0 0 0 1px var(--text-headings), 0 0 0 3px rgba(0, 112, 243, 0.2);
     }
 
     /* ---- Simulate Breach Panel ---- */
@@ -1059,7 +1156,7 @@
       border-radius: var(--radius-xs);
       box-shadow: var(--shadow-border);
       font-family: 'Geist Mono', monospace;
-      color: #ffffff;
+      color: var(--text-headings);
       font-size: 12px;
     }
 
@@ -1077,14 +1174,15 @@
       border-radius: var(--radius-md);
       box-shadow: var(--shadow-card);
       padding: 18px;
+      transition: background-color 0.2s ease;
     }
 
     .sim-panel select {
       width: 100%;
-      background: #000000;
+      background: var(--input-bg);
       box-shadow: var(--shadow-border);
       border: none;
-      color: #ffffff;
+      color: var(--text-headings);
       border-radius: var(--radius-sm);
       padding: 8px 10px;
       font-size: 12.5px;
@@ -1097,10 +1195,10 @@
       min-height: 200px;
       margin-top: 8px;
       resize: vertical;
-      background: #000000;
+      background: var(--input-bg);
       box-shadow: var(--shadow-border);
       border: none;
-      color: #ffffff;
+      color: var(--text-headings);
       border-radius: var(--radius-sm);
       padding: 12px;
       font-size: 12px;
@@ -1110,7 +1208,7 @@
     }
 
     .sim-textarea:focus {
-      box-shadow: 0 0 0 1px #ffffff, 0 0 0 3px rgba(255,255,255,0.15);
+      box-shadow: 0 0 0 1px var(--text-headings), 0 0 0 3px rgba(0, 112, 243, 0.2);
     }
 
     /* ---- Modal ---- */
@@ -1118,7 +1216,7 @@
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0.7);
+      background: rgba(0,0,0,0.6);
       backdrop-filter: blur(6px);
       z-index: 210;
     }
@@ -1133,11 +1231,12 @@
       width: min(780px, 94vw);
       max-height: 88vh;
       overflow-y: auto;
-      background: #0a0a0a;
+      background: var(--modal-bg);
       box-shadow: var(--shadow-dropdown);
       border-radius: var(--radius-lg);
       padding: 24px;
       z-index: 211;
+      transition: background-color 0.2s ease;
     }
 
     .modal.open { display: block; }
@@ -1145,7 +1244,7 @@
     .modal h3 {
       font-size: 16px;
       font-weight: 700;
-      color: #ffffff;
+      color: var(--text-headings);
       margin-bottom: 4px;
       letter-spacing: -0.02em;
     }
@@ -1157,12 +1256,12 @@
     }
 
     .modal .modal-sub code {
-      background: #000000;
+      background: var(--input-bg);
       padding: 1px 5px;
       border-radius: var(--radius-xs);
       font-family: 'Geist Mono', monospace;
       box-shadow: var(--shadow-border);
-      color: #ffffff;
+      color: var(--text-headings);
     }
 
     .modal-close {
@@ -1181,7 +1280,7 @@
       transition: all 0.15s ease;
     }
 
-    .modal-close:hover { color: #ffffff; background: var(--surface-hover); }
+    .modal-close:hover { color: var(--text-headings); background: var(--surface-hover); }
 
     .form-section { margin-bottom: 18px; }
     .form-section-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
@@ -1200,10 +1299,10 @@
     .form-row.linkage-row { grid-template-columns: 2fr 1fr 26px; }
 
     .form-row input, .form-row select {
-      background: #000000;
+      background: var(--input-bg);
       box-shadow: var(--shadow-border);
       border: none;
-      color: #ffffff;
+      color: var(--text-headings);
       border-radius: var(--radius-sm);
       padding: 7px 9px;
       font-size: 12px;
@@ -1213,7 +1312,7 @@
     }
 
     .form-row input:focus, .form-row select:focus {
-      box-shadow: 0 0 0 1px #ffffff, 0 0 0 2px rgba(255,255,255,0.15);
+      box-shadow: 0 0 0 1px var(--text-headings), 0 0 0 2px rgba(0, 112, 243, 0.2);
     }
 
     .row-remove {
@@ -1240,13 +1339,13 @@
     }
 
     .form-add-row:hover {
-      border-color: #ffffff;
-      color: #ffffff;
+      border-color: var(--text-headings);
+      color: var(--text-headings);
     }
 
     .form-org-id-row { margin-bottom: 18px; }
     .form-org-id-row label { display: block; font-size: 11.5px; color: var(--text-muted); margin-bottom: 6px; font-weight: 500; }
-    .form-org-id-row input { width: 100%; max-width: 320px; background: #000000; box-shadow: var(--shadow-border); border: none; color: #ffffff; padding: 7px 10px; border-radius: var(--radius-sm); font-size: 12.5px; outline: none; }
+    .form-org-id-row input { width: 100%; max-width: 320px; background: var(--input-bg); box-shadow: var(--shadow-border); border: none; color: var(--text-headings); padding: 7px 10px; border-radius: var(--radius-sm); font-size: 12.5px; outline: none; }
 
     .form-error-box {
       display: none;
@@ -1282,7 +1381,7 @@
     }
 
     .empty .icon { font-size: 36px; margin-bottom: 12px; opacity: 0.4; }
-    .empty h4 { font-size: 14px; font-weight: 600; color: #ffffff; margin-bottom: 4px; letter-spacing: -0.01em; }
+    .empty h4 { font-size: 14px; font-weight: 600; color: var(--text-headings); margin-bottom: 4px; letter-spacing: -0.01em; }
     .empty p { font-size: 12.5px; color: var(--text-muted); max-width: 320px; }
 
     /* ---- Toast ---- */
@@ -1290,7 +1389,7 @@
       position: fixed;
       bottom: 24px;
       right: 24px;
-      background: #111111;
+      background: var(--surface);
       box-shadow: var(--shadow-dropdown);
       border-radius: var(--radius-sm);
       padding: 12px 18px;
@@ -1304,18 +1403,18 @@
       display: flex;
       align-items: center;
       gap: 10px;
-      color: #ffffff;
+      color: var(--text-headings);
     }
 
     .toast.show { opacity: 1; transform: translateY(0); }
-    .toast.success { box-shadow: 0 0 0 1px var(--low-border), 0 12px 28px rgba(0,0,0,0.8); }
-    .toast.error { box-shadow: 0 0 0 1px var(--high-border), 0 12px 28px rgba(0,0,0,0.8); }
+    .toast.success { box-shadow: 0 0 0 1px var(--low-border), 0 12px 28px rgba(0,0,0,0.15); }
+    .toast.error { box-shadow: 0 0 0 1px var(--high-border), 0 12px 28px rgba(0,0,0,0.15); }
 
     /* Scrollbars */
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 999px; }
-    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.22); }
+    ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 999px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text-subtle); }
   </style>
 </head>
 <body>
@@ -1376,6 +1475,13 @@
           </select>
         </div>
         <button class="btn btn-secondary" onclick="openAddOrgModal()"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Add Organization</button>
+        
+        <!-- Theme Toggle -->
+        <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Toggle Theme" aria-label="Toggle Theme">
+          <svg id="themeIconSun" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+          <svg id="themeIconMoon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+        </button>
+
         <div class="header-status">
           <div class="ws-dot connecting" id="wsDot"></div>
           <span id="wsLabel">Connecting…</span>
@@ -1434,7 +1540,7 @@
             <h3>Remediation Status</h3>
             <div class="progress-item">
               <div class="progress-item-header"><span>OPEN</span><span id="ov-stat-open-lbl">0</span></div>
-              <div class="progress-track"><div class="progress-fill" id="ov-stat-open-fill" style="width:0%; background:#3291ff"></div></div>
+              <div class="progress-track"><div class="progress-fill" id="ov-stat-open-fill" style="width:0%; background:var(--accent-blue)"></div></div>
             </div>
             <div class="progress-item">
               <div class="progress-item-header"><span>ACKNOWLEDGED</span><span id="ov-stat-ack-lbl">0</span></div>
@@ -1618,7 +1724,7 @@
           <div class="sim-panel">
             <div class="form-section-title">
               <h4>Preset Scenario</h4>
-              <span class="hint">Target: <strong id="simOrgTarget" style="color:#ffffff">any</strong></span>
+              <span class="hint">Target: <strong id="simOrgTarget" style="color:var(--text-headings)">any</strong></span>
             </div>
             <select id="simExampleSelect" onchange="loadSimExample()"></select>
             <div id="simOrgHint" style="font-size:11.5px; color: var(--medium); margin-top:6px; min-height: 14px;"></div>
@@ -1715,6 +1821,35 @@
 <div class="toast" id="toast"></div>
 
 <script>
+// ---- Theme Management ----
+let currentTheme = localStorage.getItem('veritas_theme') || 'dark';
+
+function applyTheme(theme) {
+  currentTheme = theme;
+  document.documentElement.setAttribute('data-theme', theme);
+  document.documentElement.style.colorScheme = theme;
+  localStorage.setItem('veritas_theme', theme);
+  
+  const sun = document.getElementById('themeIconSun');
+  const moon = document.getElementById('themeIconMoon');
+  if (sun && moon) {
+    if (theme === 'light') {
+      sun.style.display = 'none';
+      moon.style.display = 'block';
+    } else {
+      sun.style.display = 'block';
+      moon.style.display = 'none';
+    }
+  }
+}
+
+function toggleTheme() {
+  applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
+}
+
+// Initial theme application
+applyTheme(currentTheme);
+
 // ---- State ----
 let ws = null;
 let wsConnected = false;
@@ -1984,11 +2119,11 @@ function renderAuditTable(rows) {
     const breach = v.breach_notification_candidate ? `<span style="color:var(--breach);display:flex;justify-content:center;">${alertIconTable}</span>` : '-';
     const statusCls = v.remediation_status || 'OPEN';
     return `<tr>
-      <td class="mono" style="color:#ffffff">#${v.violation_id}</td>
+      <td class="mono" style="color:var(--text-headings)">#${v.violation_id}</td>
       <td style="font-size:12px; font-variant-numeric: tabular-nums;">${ts}</td>
       <td><span class="badge rule">${v.rule_id}</span></td>
       <td><span class="badge ${v.severity}">${v.severity}</span></td>
-      <td class="mono" style="color:#ffffff">${v.field}</td>
+      <td class="mono" style="color:var(--text-headings)">${v.field}</td>
       <td style="font-size:12px;">${v.source_system}</td>
       <td><span class="status-badge ${statusCls}">${statusCls}</span></td>
       <td style="text-align:center">${breach}</td>
@@ -2082,7 +2217,7 @@ async function openDrawer(verdictId) {
       ${v.breach_notification_candidate ? `<span class="badge breach"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Breach Candidate</span>` : ''}
       ${v.used_fallback ? '<span class="badge fallback">Template Explanation</span>' : ''}
     </div>
-    <div class="drawer-field"><div class="lbl">Violating Field</div><div class="val mono" style="color:#ffffff">${v.field}</div></div>
+    <div class="drawer-field"><div class="lbl">Violating Field</div><div class="val mono" style="color:var(--text-headings)">${v.field}</div></div>
     <div class="drawer-field"><div class="lbl">Source System</div><div class="val">${v.source_system}</div></div>
     <div class="drawer-field"><div class="lbl">Timestamp</div><div class="val" style="font-variant-numeric:tabular-nums">${ts}</div></div>
     <div class="drawer-field"><div class="lbl">Statute-Grounded Explanation</div><div class="val">${v.explanation}</div></div>
@@ -2093,7 +2228,7 @@ async function openDrawer(verdictId) {
       ${v.remediation_updated_at ? `<div class="drawer-field" style="flex:1;"><div class="lbl">Updated</div><div class="val" style="background:transparent; padding:0; box-shadow:none; font-size:12px; color:var(--text-muted); font-variant-numeric:tabular-nums;">${new Date(v.remediation_updated_at).toLocaleString()}</div></div>` : ''}
     </div>
 
-    <div class="drawer-field" style="margin-top:8px;"><div class="lbl">Cryptographic Hash (#${v.violation_id})</div><div class="val mono" style="font-size:11px;color:var(--text-muted); background: #000000;">${v.row_hash}</div></div>
+    <div class="drawer-field" style="margin-top:8px;"><div class="lbl">Cryptographic Hash (#${v.violation_id})</div><div class="val mono" style="font-size:11px;color:var(--text-muted); background: var(--code-bg);">${v.row_hash}</div></div>
 
     <div class="drawer-actions">
       ${canAck ? `<button class="btn btn-warn" onclick="updateStatus('${v.verdict_id}','ACKNOWLEDGED')">Acknowledge</button>` : ''}
