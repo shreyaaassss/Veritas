@@ -1859,6 +1859,13 @@ const MAX_FEED = 100;
 
 let currentOrgId = localStorage.getItem('veritas_org_id') || '';
 
+function formatOrgDisplayName(orgId) {
+  if (orgId === 'blinkit') return 'E-Commerce';
+  if (orgId === 'edtech_co') return 'EdTech';
+  if (orgId === 'acme_bank') return 'Acme Bank';
+  return orgId;
+}
+
 // ---- Org selector ----
 async function populateOrgSelector() {
   const sel = document.getElementById('orgSelector');
@@ -1874,7 +1881,7 @@ async function populateOrgSelector() {
       currentOrgId = orgIds[0];
     }
     sel.innerHTML = orgIds.map(id =>
-      `<option value="${id}" ${id === currentOrgId ? 'selected' : ''}>${id}</option>`
+      `<option value="${id}" ${id === currentOrgId ? 'selected' : ''}>${formatOrgDisplayName(id)}</option>`
     ).join('');
   } catch (e) {
     sel.innerHTML = '<option value="">Failed to load orgs</option>';
@@ -1930,7 +1937,7 @@ function connectWS() {
   ws.onopen = () => {
     wsConnected = true;
     document.getElementById('wsDot').className = 'ws-dot connected';
-    document.getElementById('wsLabel').textContent = `Live — ${currentOrgId}`;
+    document.getElementById('wsLabel').textContent = `Live — ${formatOrgDisplayName(currentOrgId)}`;
   };
 
   ws.onmessage = (evt) => {
@@ -2615,17 +2622,17 @@ function loadSimExample() {
 
   const ex = SIM_EXAMPLES[key];
   ta.value = JSON.stringify(ex.body(), null, 2);
-  target.textContent = ex.org || 'any';
+  target.textContent = ex.org ? formatOrgDisplayName(ex.org) : 'any';
 
   if (ex.org && ex.org !== currentOrgId) {
     const orgSel = document.getElementById('orgSelector');
     const hasOrg = Array.from(orgSel.options).some(o => o.value === ex.org);
     if (hasOrg) {
-      hint.textContent = `Targeting "${ex.org}" — switching selector to match configured rule.`;
+      hint.textContent = `Targeting "${formatOrgDisplayName(ex.org)}" — switching selector to match configured rule.`;
       orgSel.value = ex.org;
       activateOrg(ex.org);
     } else {
-      hint.textContent = `Targets org "${ex.org}", which is not registered here.`;
+      hint.textContent = `Targets org "${formatOrgDisplayName(ex.org)}", which is not registered here.`;
     }
   } else {
     hint.textContent = '';
