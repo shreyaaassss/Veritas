@@ -161,7 +161,7 @@ def analyze_text(text: str) -> list:
     filtered = []
     for r in results:
         matched_text = text[r.start:r.end]
-        if r.entity_type == "PERSON" and _is_known_id_shape(matched_text):
+        if r.entity_type == "PERSON" and (any(c.isdigit() for c in matched_text) or _is_known_id_shape(matched_text)):
             continue
         filtered.append(r)
     return filtered

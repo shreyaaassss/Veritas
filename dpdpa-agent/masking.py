@@ -81,17 +81,27 @@ def _placeholder_for(entity_type: str) -> str:
     return f"[{_label_for_entity_type(entity_type)}_REDACTED]"
 
 
+_ENTITY_PRIORITY: Dict[str, int] = {
+    "IN_AADHAAR": 100,
+    "IN_PAN": 100,
+    "IN_PHONE": 90,
+    "PHONE_NUMBER": 90,
+    "EMAIL_ADDRESS": 90,
+    "PERSON": 10,
+}
+
+
 def mask_text(text: str, matches: Iterable[_MatchLike]) -> str:
     """
     Returns `text` with every match's matched_text substring replaced by
     its category-labeled placeholder. Matches are applied longest-
-    matched_text-first so a short match's replacement can't fragment a
-    longer overlapping match still pending replacement. Matches with an
-    empty matched_text are skipped defensively (nothing to replace).
+    matched_text-first (and highest entity priority first) so a short or generic
+    match cannot fragment a specific match. Matches with an empty matched_text
+    are skipped defensively.
     """
     ordered = sorted(
         (m for m in matches if m.matched_text),
-        key=lambda m: len(m.matched_text),
+        key=lambda m: (len(m.matched_text), _ENTITY_PRIORITY.get(m.entity_type, 50)),
         reverse=True,
     )
     masked = text
