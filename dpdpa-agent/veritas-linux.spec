@@ -57,7 +57,7 @@ a = Analysis(
         'openai', 'yaml', 'pydantic',
     ],
     hookspath=[],
-    runtime_hooks=[],
+    runtime_hooks=['pyi_rth_spacy.py'],
     excludes=['pytest', 'pytest_asyncio', 'httpx', '_pytest', 'IPython', 'matplotlib', 'PIL'],
     cipher=block_cipher,
     noarchive=False,

@@ -65,7 +65,7 @@ a = Analysis(
         'anyio', 'anyio._backends._asyncio',
     ],
     hookspath=[],
-    runtime_hooks=[],
+    runtime_hooks=['pyi_rth_spacy.py'],
     excludes=[
         'pytest', 'pytest_asyncio', '_pytest',
         'IPython', 'matplotlib', 'PIL',

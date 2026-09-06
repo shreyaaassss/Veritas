@@ -59,8 +59,15 @@ def build_analyzer_engine() -> AnalyzerEngine:
     Custom Aadhaar/PAN/Phone recognizers work correctly with either model
     (they are pure regex — no spaCy NLP needed).
     """
-    # Try large model first if installed, fall back to small model
+    # Try large model first if installed, fall back to small model.
+    # In a PyInstaller bundle, sys._MEIPASS is added to sys.path by the
+    # runtime hook (pyi_rth_spacy.py) so is_package() finds the bundled model.
+    import sys as _sys
     import spacy
+    if hasattr(_sys, '_MEIPASS') and _sys._MEIPASS not in _sys.path:
+        _sys.path.insert(0, _sys._MEIPASS)
+
+    nlp_engine = None  # ensure always bound before the loop completes
     for model_name in ["en_core_web_lg", "en_core_web_sm"]:
         if not spacy.util.is_package(model_name):
             continue

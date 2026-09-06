@@ -124,7 +124,7 @@ a = Analysis(
     ],
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
+    runtime_hooks=['pyi_rth_spacy.py'],
     excludes=[
         # Test dependencies — not needed in production
         'pytest',
