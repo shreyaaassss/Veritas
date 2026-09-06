@@ -59,18 +59,13 @@ a = Analysis(
         'cryptography.hazmat.primitives.asymmetric.padding',
         'cryptography.hazmat.primitives.hashes',
         'openai', 'yaml', 'pydantic',
+        # httpx required by weasel (spaCy CLI dep) at import time
+        'httpx', 'httpx._transports', 'httpx._transports.default',
+        'httpcore',
+        'anyio', 'anyio._backends._asyncio',
     ],
     hookspath=[],
     runtime_hooks=[],
-    hiddenimports=[
-        # httpx is required by weasel (spaCy CLI dependency) at import time
-        'httpx',
-        'httpx._transports',
-        'httpx._transports.default',
-        'httpcore',
-        'anyio',
-        'anyio._backends._asyncio',
-    ],
     excludes=[
         'pytest', 'pytest_asyncio', '_pytest',
         'IPython', 'matplotlib', 'PIL',
