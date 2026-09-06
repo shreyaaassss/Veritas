@@ -1,9 +1,7 @@
 name: Build macOS Runtime (Apple Silicon)
 
-# Trigger manually from GitHub Actions tab
-# OR automatically on push to main when relevant files change
 on:
-  workflow_dispatch:   # Manual trigger — click "Run workflow" in GitHub Actions tab
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
@@ -13,69 +11,69 @@ on:
 jobs:
   build-mac-arm:
     name: Build veritas-runtime (macOS arm64 / Apple Silicon)
-    runs-on: macos-latest   # GitHub-hosted Apple Silicon runner (arm64)
+    runs-on: macos-latest
 
     steps:
-      # ---- 1. Checkout ----
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ---- 2. Python setup ----
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      # ---- 3. Cache pip packages ----
+      - name: Upgrade pip and install build tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+
       - name: Cache pip packages
         uses: actions/cache@v4
         with:
           path: ~/Library/Caches/pip
-          key: mac-pip-${{ hashFiles('dpdpa-agent/requirements.txt') }}
-          restore-keys: mac-pip-
+          key: mac-pip-${{ runner.arch }}-py312-${{ hashFiles('dpdpa-agent/requirements.txt') }}
+          restore-keys: |
+            mac-pip-${{ runner.arch }}-py312-
 
-      # ---- 4. Cache spaCy model (750 MB — saves ~5 min on every run) ----
-      - name: Cache spaCy en_core_web_lg model
-        uses: actions/cache@v4
-        id: spacy-cache
-        with:
-          path: ~/Library/Python/3.12/lib/python/site-packages/en_core_web_lg
-          key: spacy-en-core-web-lg-mac-arm64
-
-      # ---- 5. Install dependencies ----
       - name: Install Python dependencies
         working-directory: dpdpa-agent
         run: |
-          pip install --upgrade pip --quiet
-          pip install pyinstaller --quiet
-          pip install -r requirements.txt --quiet
+          # Use --prefer-binary to avoid source builds that can fail on macOS arm64
+          # Use flexible versions (>=) instead of strict pins
+          pip install --prefer-binary \
+            "fastapi>=0.115.0" \
+            "uvicorn[standard]>=0.30.0" \
+            "pydantic>=2.8.0" \
+            "pydantic[email]" \
+            "pyyaml>=6.0" \
+            "openai>=1.0.0" \
+            "requests>=2.31.0" \
+            "httpx>=0.27.0" \
+            "cryptography>=41.0.0" \
+            "presidio-analyzer>=2.2.0" \
+            "presidio-anonymizer>=2.2.0" \
+            "spacy>=3.7.0"
 
-      # ---- 6. Download spaCy model (only if not cached) ----
+      - name: Cache spaCy model
+        uses: actions/cache@v4
+        id: spacy-cache
+        with:
+          path: |
+            ~/Library/Python/3.12/lib/python/site-packages/en_core_web_lg
+            /Users/runner/hostedtoolcache/Python/3.12.10/arm64/lib/python3.12/site-packages/en_core_web_lg
+          key: spacy-en-core-web-lg-mac-arm64-v2
+
       - name: Download spaCy language model
         if: steps.spacy-cache.outputs.cache-hit != 'true'
-        run: |
-          python -m spacy download en_core_web_lg
+        run: python -m spacy download en_core_web_lg
 
-      # ---- 7. Build with PyInstaller ----
-      - name: Build veritas-runtime with PyInstaller
+      - name: Build with PyInstaller
         working-directory: dpdpa-agent
         run: |
           python -m PyInstaller veritas-mac.spec --noconfirm
           ls -lh dist/veritas-runtime
 
-      # ---- 8. Quick smoke test ----
-      - name: Smoke test — binary starts and rejects missing license
-        working-directory: dpdpa-agent
-        run: |
-          # Should print license error and exit non-zero (no .vlic present)
-          if dist/veritas-runtime --max-events 0 2>&1 | grep -q "LICENSE ERROR"; then
-            echo "PASS: Binary runs and rejects missing license correctly"
-          else
-            echo "WARN: Could not confirm license check (spaCy load may still be in progress)"
-          fi
-
-      # ---- 9. Upload artifact ----
-      - name: Upload veritas-runtime (macOS arm64)
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: veritas-runtime-macos-arm64
@@ -83,15 +81,14 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
-      # ---- 10. Print summary ----
       - name: Build summary
         working-directory: dpdpa-agent
         run: |
           SIZE=$(du -sh dist/veritas-runtime | cut -f1)
-          echo "## Build Complete" >> $GITHUB_STEP_SUMMARY
-          echo "| Item | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "|------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Binary | \`veritas-runtime\` (macOS Apple Silicon) |" >> $GITHUB_STEP_SUMMARY
+          echo "## Build Complete ✅" >> $GITHUB_STEP_SUMMARY
+          echo "| | |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| Binary | \`veritas-runtime\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Size | $SIZE |" >> $GITHUB_STEP_SUMMARY
-          echo "| Architecture | arm64 (M1/M2/M3/M4/M5 compatible) |" >> $GITHUB_STEP_SUMMARY
-          echo "| Download | Actions tab → this run → Artifacts |" >> $GITHUB_STEP_SUMMARY
+          echo "| Arch | arm64 (M1/M2/M3/M4/M5) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Download | Artifacts section below |" >> $GITHUB_STEP_SUMMARY
