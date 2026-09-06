@@ -1,0 +1,31 @@
+# Veritas Agent Configuration
+# ============================
+# Copy this file to agent-config.yaml and fill in your values.
+# Issue a registration key from the Veritas dashboard (Agents tab → Issue Registration Key).
+
+# Address of the Veritas appliance (or server/VM running Veritas)
+veritas_address: http://192.168.1.50:8000
+
+# One-time registration key issued from the Veritas dashboard.
+# Consumed on first start — remove or leave blank after the agent has registered.
+registration_key: YOUR_ONE_TIME_KEY_HERE
+
+# Optional: human label shown in the Agents tab of the dashboard
+source_label: production-server-1
+
+# Log sources to tail. Add one entry per source.
+sources:
+  # Tail a log file
+  - type: file
+    path: /var/log/order-service/app.log
+    source_system: order-service      # must match your org's registered source_system
+
+  # Tail another log file
+  - type: file
+    path: /var/log/support-ticketing/app.log
+    source_system: support-ticketing
+
+  # Tail a Docker container's stdout/stderr logs
+  - type: docker
+    container: marketing-service      # Docker container name
+    source_system: marketing-analytics

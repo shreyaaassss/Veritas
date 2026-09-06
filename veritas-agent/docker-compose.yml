@@ -1,0 +1,16 @@
+version: "3.9"
+
+services:
+  veritas-agent:
+    build: .
+    volumes:
+      - ./agent-config.yaml:/app/agent-config.yaml:ro   # config — read-only
+      - veritas-state:/app                               # persists .veritas_state.json
+      - /var/run/docker.sock:/var/run/docker.sock        # Docker log access (optional)
+      - /var/log:/var/log:ro                             # file log access (optional)
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1
+
+volumes:
+  veritas-state:

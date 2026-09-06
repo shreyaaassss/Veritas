@@ -1,0 +1,38 @@
+# ---- Secrets — NEVER commit ----
+tools/private_key.pem
+dpdpa-agent/.env
+dpdpa-agent/veritas.vlic
+*.vlic
+
+# ---- Large build outputs ----
+dpdpa-agent/dist/
+dpdpa-agent/build/
+dist/
+installer/output/
+
+# ---- Python ----
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+
+# ---- Go ----
+veritas-launcher/*.exe
+
+# ---- Node / Vercel portal ----
+veritas-license-portal/node_modules/
+veritas-license-portal/.next/
+veritas-license-portal/.env.local
+
+# ---- SQLite databases (runtime data) ----
+*.db
+
+# ---- Logs ----
+*.log
+pipeline.log
+
+# ---- OS ----
+.DS_Store
+Thumbs.db

@@ -229,6 +229,32 @@ def main():
                         help="Random seed for reproducible runs")
     args = parser.parse_args()
 
+    # ---- License check — must pass before anything else starts ----
+    from license import LicenseError, validate_license
+    try:
+        _lic = validate_license()
+        print(
+            f"[Veritas] License valid — {_lic.org} · {_lic.tier} · "
+            f"expires {_lic.expiry} ({_lic.days_remaining}d remaining)"
+        )
+    except LicenseError as e:
+        border = "=" * 60
+        print(f"\n{border}\nLICENSE ERROR\n{border}\n{e}\n{border}\n")
+        raise SystemExit(1)
+
+    # ---- First-run setup (PyInstaller bundle only) -------------------
+    # When running as a packaged exe, seed org configs are bundled inside
+    # sys._MEIPASS (read-only). Copy them to data_root() on first run so
+    # they are readable AND writable for new org creation.
+    from runtime_paths import bundle_root, data_root, is_bundled
+    if is_bundled():
+        import shutil as _shutil
+        _bundle_configs = bundle_root() / "org_config" / "configs"
+        _data_configs   = data_root()   / "org_config" / "configs"
+        if _bundle_configs.exists() and not _data_configs.exists():
+            print("[Veritas] First run — copying seed org configs to data directory...")
+            _shutil.copytree(str(_bundle_configs), str(_data_configs))
+
     import threading
 
     # Run the FastAPI server in a background thread

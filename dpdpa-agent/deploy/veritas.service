@@ -1,0 +1,37 @@
+[Unit]
+Description=Veritas DPDPA Compliance Platform
+Documentation=https://github.com/your-org/veritas
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=veritas
+Group=veritas
+WorkingDirectory=/opt/veritas/dpdpa-agent
+
+# Load secrets from .env (OPENAI_API_KEY, LLM_MODEL, etc.)
+# The leading - means systemd does NOT fail if the file is absent.
+EnvironmentFile=-/opt/veritas/dpdpa-agent/.env
+
+# --violation-rate 0: disable synthetic event generators.
+# Real compliance events arrive via the Veritas Agent (POST /v1/{org_id}/events).
+ExecStart=/opt/veritas/venv/bin/python run_pipeline.py --violation-rate 0
+
+# Restart automatically on any failure.
+# RestartSec=10 gives uvicorn time to fully release port 8000 before the next attempt.
+Restart=always
+RestartSec=10
+
+# Route all output to the systemd journal.
+# View live: journalctl -u veritas -f
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=veritas
+
+# Memory cap — spaCy's en_core_web_lg model uses ~400 MB.
+# 800 M gives comfortable headroom on a Raspberry Pi 4 (4 GB).
+MemoryMax=800M
+
+[Install]
+WantedBy=multi-user.target

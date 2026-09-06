@@ -18,7 +18,9 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
+import agent_store.store as agent_store_module
 import evidence_store.store as store_module
+from agent_store.store import get_agent_store, reset_agent_store
 from dashboard import live_feed
 from dashboard.server import app
 
@@ -27,14 +29,38 @@ client = TestClient(app)
 
 @pytest.fixture(autouse=True)
 def isolated_store(tmp_path, monkeypatch):
-    """Every test gets a fresh, isolated Evidence Store file — never the
-    real on-disk evidence.db."""
+    """Every test gets a fresh, isolated Evidence Store AND Agent Store —
+    never the real on-disk databases."""
     monkeypatch.setattr(store_module, "_DEFAULT_DB_PATH", tmp_path / "api_test_evidence.db")
+    monkeypatch.setattr(agent_store_module, "_DEFAULT_DB_PATH", tmp_path / "api_test_agents.db")
     store_module.reset_store()
+    reset_agent_store()
     live_feed._ws_clients.clear()
     yield
     store_module.reset_store()
+    reset_agent_store()
     live_feed._ws_clients.clear()
+
+
+@pytest.fixture()
+def blinkit_token():
+    """Issue a registration key and register an agent for blinkit.
+    Returns a valid Bearer token string for use in /v1/blinkit/events calls."""
+    store = get_agent_store()
+    key = store.issue_key("blinkit")
+    store.consume_key(key)
+    _agent, token = store.create_agent("blinkit", "test-source")
+    return token
+
+
+@pytest.fixture()
+def edtech_token():
+    """Valid Bearer token for edtech_co /events calls."""
+    store = get_agent_store()
+    key = store.issue_key("edtech_co")
+    store.consume_key(key)
+    _agent, token = store.create_agent("edtech_co", "test-source")
+    return token
 
 
 class TestOrgValidation:
@@ -44,12 +70,12 @@ class TestOrgValidation:
         assert r.status_code == 404
         assert "definitely_not_a_registered_org" in r.json()["detail"]
 
-    def test_events_unknown_org_returns_404(self):
+    def test_events_without_token_returns_401(self):
         r = client.post(
-            "/v1/definitely_not_a_registered_org/events",
+            "/v1/blinkit/events",
             json={"source_type": "log", "source_system": "x", "raw_snippet": "hello"},
         )
-        assert r.status_code == 404
+        assert r.status_code == 401
 
     def test_scan_known_org_accepted(self):
         r = client.post("/v1/blinkit/scan", json={"text": "just a clean log line, nothing sensitive"})
@@ -243,10 +269,11 @@ class TestScanAndEventsShareTheSameStore:
     """Part B3: violations from /scan and /events must land in the same,
     correctly-scoped Evidence Store — no divergent storage path."""
 
-    def test_scan_and_events_verdicts_both_appear_in_the_same_org_query(self):
+    def test_scan_and_events_verdicts_both_appear_in_the_same_org_query(self, blinkit_token):
         client.post("/v1/blinkit/scan", json={"text": "leaked employee id: ABCDE1234F"})
         client.post(
             "/v1/blinkit/events",
+            headers={"Authorization": f"Bearer {blinkit_token}"},
             json={
                 "source_type": "log", "source_system": "support-ticketing",
                 "raw_snippet": "agent note: aadhaar 2345 6789 0124 read aloud to customer",

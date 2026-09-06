@@ -65,7 +65,8 @@ logger = logging.getLogger("llm_explainer.explainer")
 # Load statute snippets (static — locked at module init)
 # ---------------------------------------------------------------------------
 
-_SNIPPETS_PATH = Path(__file__).parent / "statute_snippets.json"
+from runtime_paths import bundle_root as _bundle_root
+_SNIPPETS_PATH = _bundle_root() / "llm_explainer" / "statute_snippets.json"
 
 
 def _load_snippets() -> dict:

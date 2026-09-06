@@ -6,6 +6,10 @@
   <title>Veritas — DPDPA Compliance Dashboard</title>
   <meta name="description" content="Real-time, multi-tenant DPDPA compliance monitoring. Live violation feed, tamper-evident evidence store, and auditor-grade remediation tracking." />
   
+  <!-- jsPDF — client-side PDF generation, no build step required -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
   <!-- Geist and Geist Mono Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -650,6 +654,59 @@
     .status-badge.OPEN { background: rgba(0, 112, 243, 0.12); color: var(--accent-blue); box-shadow: 0 0 0 1px rgba(0, 112, 243, 0.25); }
     .status-badge.ACKNOWLEDGED { background: var(--medium-bg); color: var(--medium); box-shadow: 0 0 0 1px var(--medium-border); }
     .status-badge.RESOLVED { background: var(--low-bg); color: var(--low); box-shadow: 0 0 0 1px var(--low-border); }
+    .status-badge.ACTIVE  { color: var(--low);  background: rgba(0, 223, 143, 0.10); box-shadow: 0 0 0 1px rgba(0, 223, 143, 0.25); }
+    .status-badge.REVOKED { color: var(--high); background: var(--high-bg);          box-shadow: 0 0 0 1px var(--high-border); }
+
+    /* ---- License Badge ---- */
+    .license-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 0.7rem; font-family: 'Geist Mono', monospace;
+      color: var(--text-muted);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 3px 10px;
+      white-space: nowrap;
+      letter-spacing: 0.01em;
+    }
+    .license-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--low);
+      flex-shrink: 0;
+    }
+
+    /* ---- First-Boot Welcome Overlay ---- */
+    #welcomeOverlay {
+      position: fixed; inset: 0; z-index: 300;
+      background: var(--bg);
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.35s ease;
+    }
+    #welcomeOverlay.visible { opacity: 1; pointer-events: all; }
+    .welcome-card {
+      max-width: 480px; width: 90%;
+      background: var(--surface);
+      border: 1px solid var(--border-strong);
+      border-radius: 12px;
+      padding: 2.5rem;
+      box-shadow: var(--shadow-card);
+      text-align: center;
+    }
+    .welcome-logo {
+      font-size: 1.5rem; font-weight: 800; letter-spacing: -0.04em;
+      color: var(--text-headings); margin-bottom: 1.25rem;
+    }
+    .welcome-card h2 { font-size: 1.1rem; font-weight: 600; color: var(--text-headings); margin-bottom: 0.6rem; }
+    .welcome-card p  { font-size: 0.875rem; color: var(--text-muted); line-height: 1.65; margin-bottom: 2rem; }
+    .welcome-steps   { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 2rem; text-align: left; }
+    .welcome-step    { display: flex; align-items: flex-start; gap: 0.75rem; font-size: 0.82rem; color: var(--text-muted); }
+    .welcome-step-num {
+      min-width: 20px; height: 20px;
+      background: var(--surface-active); border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.7rem; font-weight: 700; color: var(--text); margin-top: 1px;
+    }
 
     /* ---- Live Violation Feed ---- */
     .violation-list {
@@ -1444,6 +1501,9 @@
       <div class="nav-item" id="nav-audit" onclick="showTab('audit')">
         <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span> Audit Ledger
       </div>
+      <div class="nav-item" id="nav-agents" onclick="showTab('agents')">
+        <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg></span> Agents
+      </div>
       <div class="nav-item" id="nav-simulate" onclick="showTab('simulate')">
         <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6M10 3v5.5L4.5 18a2 2 0 0 0 1.7 3h11.6a2 2 0 0 0 1.7-3L14 8.5V3"/><line x1="8.5" y1="14" x2="15.5" y2="14"/></svg></span> Scan Sandbox
       </div>
@@ -1468,6 +1528,10 @@
       </div>
 
       <div class="topbar-actions">
+        <div class="license-badge" id="licenseBadge" style="display:none;">
+          <span class="license-dot"></span>
+          <span id="licenseBadgeText">Licensed</span>
+        </div>
         <div class="org-selector-wrap">
           <label for="orgSelector">Tenant</label>
           <select id="orgSelector" onchange="onOrgChange()">
@@ -1677,8 +1741,12 @@
           </div>
         </div>
 
-        <div style="display:flex; justify-content: flex-end; margin-bottom: 4px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
           <span id="auditCount" style="font-size:12px;color:var(--text-muted);font-family:'Geist Mono',monospace;"></span>
+          <button class="btn btn-secondary" onclick="downloadAuditPDF()" style="font-size:0.78rem;padding:0.25rem 0.75rem;gap:5px;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download PDF Report
+          </button>
         </div>
 
         <!-- Table -->
@@ -1756,7 +1824,121 @@
         </div>
       </main>
 
+      <!-- ====== AGENTS TAB ====== -->
+      <main class="page-section" id="main-agents">
+
+        <div class="stats-bar">
+          <div class="stat-card">
+            <div class="label">Total Agents</div>
+            <div class="value accent" id="ag-total">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">Active</div>
+            <div class="value" style="color:var(--low)" id="ag-active">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">Revoked</div>
+            <div class="value" style="color:var(--high)" id="ag-revoked">0</div>
+          </div>
+        </div>
+
+        <div class="section-header">
+          <h2>Registered Agents</h2>
+          <button class="btn btn-primary" onclick="openIssueKeyModal()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+            Issue Registration Key
+          </button>
+        </div>
+
+        <div class="table-container">
+          <div class="table-wrap">
+            <table id="agentsTable">
+              <thead>
+                <tr>
+                  <th>Agent ID</th>
+                  <th>Source</th>
+                  <th>Status</th>
+                  <th>Events</th>
+                  <th>Last Heartbeat</th>
+                  <th>Registered</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="agentsTbody">
+                <tr id="agentsEmptyRow">
+                  <td colspan="7" style="text-align:center;color:var(--text-muted);padding:2rem;">
+                    No agents registered for this organisation.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </main>
+
     </div>
+  </div>
+</div>
+
+<!-- ====== ISSUE KEY MODAL ====== -->
+<div class="modal-overlay" id="issueKeyOverlay" onclick="closeIssueKeyModal()"></div>
+<div class="modal" id="issueKeyModal">
+  <div class="modal-close" onclick="closeIssueKeyModal()">✕</div>
+  <h3>Issue Registration Key</h3>
+  <div class="modal-sub">A one-time key the Veritas Agent presents on first start to receive its <code>agent_id</code> and <code>auth_token</code>. Valid for <strong>30 minutes</strong>, single-use.</div>
+
+  <div id="issueKeyStep1">
+    <p style="color:var(--text-muted);margin:1rem 0;">Generating a key for org: <code id="issueKeyOrgLabel"></code></p>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="generateKey()">Generate Key</button>
+      <button class="btn btn-secondary" onclick="closeIssueKeyModal()">Cancel</button>
+    </div>
+  </div>
+
+  <div id="issueKeyStep2" style="display:none;">
+    <div class="form-error-box" style="border-color:var(--accent-blue);color:var(--text);margin:1rem 0;">
+      Copy this key — it will <strong>not</strong> be shown again.
+    </div>
+    <div style="position:relative;margin:0.5rem 0 1rem;">
+      <pre id="issueKeyValue" style="background:var(--code-bg);border:1px solid var(--border);border-radius:6px;padding:1rem 3.5rem 1rem 1rem;font-family:'Geist Mono',monospace;font-size:0.82rem;overflow-x:auto;word-break:break-all;margin:0;"></pre>
+      <button id="copyKeyBtn" class="btn btn-secondary" onclick="copyKey()" style="position:absolute;top:0.5rem;right:0.5rem;padding:0.2rem 0.55rem;font-size:0.73rem;">Copy</button>
+    </div>
+    <div style="color:var(--text-muted);font-size:0.8rem;margin-bottom:1.5rem;line-height:1.7;">
+      Configure your Agent container:<br/>
+      <code>veritas_address: http://&lt;host&gt;:8000</code><br/>
+      <code>registration_key: &lt;key above&gt;</code>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeIssueKeyModal()">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====== FIRST-BOOT WELCOME OVERLAY ====== -->
+<div id="welcomeOverlay">
+  <div class="welcome-card">
+    <div class="welcome-logo">VERITAS</div>
+    <h2>Welcome to your compliance appliance.</h2>
+    <p>Veritas is ready. Before you begin, configure your first organisation — this tells Veritas which data fields, consent purposes, and retention policies to enforce.</p>
+    <div class="welcome-steps">
+      <div class="welcome-step">
+        <div class="welcome-step-num">1</div>
+        <span>Configure your organisation — name, PII fields, purposes, retention</span>
+      </div>
+      <div class="welcome-step">
+        <div class="welcome-step-num">2</div>
+        <span>Issue a registration key and deploy the Veritas Agent</span>
+      </div>
+      <div class="welcome-step">
+        <div class="welcome-step-num">3</div>
+        <span>Production telemetry flows in — violations appear live on this dashboard</span>
+      </div>
+    </div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;gap:8px;" onclick="startOnboarding()">
+      Configure Organisation
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+    </button>
   </div>
 </div>
 
@@ -1874,9 +2056,11 @@ async function populateOrgSelector() {
     const data = await r.json();
     const orgIds = data.org_ids || [];
     if (orgIds.length === 0) {
+      showWelcomeOverlay();
       sel.innerHTML = '<option value="">No orgs registered</option>';
       return;
     }
+    dismissWelcomeOverlay();
     if (!currentOrgId || !orgIds.includes(currentOrgId)) {
       currentOrgId = orgIds[0];
     }
@@ -1917,12 +2101,14 @@ function showTab(name) {
     'overview': 'Overview',
     'live': 'Live Stream',
     'audit': 'Audit Ledger',
+    'agents': 'Agents',
     'simulate': 'Scan Sandbox'
   };
-  document.getElementById('pageTitle').innerText = titleMap[name];
+  document.getElementById('pageTitle').innerText = titleMap[name] || name;
 
   if (name === 'audit') { loadAuditTable(); refreshStats(); }
   if (name === 'overview') { refreshOverview(); }
+  if (name === 'agents') { loadAgents(); }
 }
 
 // ---- WebSocket ----
@@ -2490,6 +2676,7 @@ async function submitNewOrg() {
 
     if (r.ok && data.status === 'ok') {
       closeAddOrgModal();
+      dismissWelcomeOverlay();
       showToast(`Organization "${config.org_id}" created`, 'success');
       activateOrg(config.org_id);
       await populateOrgSelector();
@@ -2734,8 +2921,262 @@ function renderSimResults(data) {
   `;
 }
 
+// ---- PDF Audit Report ----
+async function downloadAuditPDF() {
+  if (!currentOrgId) { showToast('Select an organisation first', 'error'); return; }
+
+  // Fetch all verdicts for the current org (no filters — full ledger)
+  let rows = [];
+  try {
+    const r = await fetch(`/api/${encodeURIComponent(currentOrgId)}/verdicts`);
+    if (!r.ok) { showToast('Failed to fetch verdicts for PDF', 'error'); return; }
+    rows = (await r.json()).verdicts || [];
+  } catch (e) {
+    showToast('Network error generating PDF', 'error');
+    return;
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+
+  const generated = new Date().toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
+  const pageW = doc.internal.pageSize.getWidth();
+
+  // ---- Header ----
+  doc.setFillColor(10, 10, 10);
+  doc.rect(0, 0, pageW, 22, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.setTextColor(255, 255, 255);
+  doc.text('VERITAS — DPDPA Compliance Audit Report', 14, 10);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(180, 180, 180);
+  doc.text(`Organisation: ${currentOrgId}`, 14, 17);
+  doc.text(`Generated: ${generated}`, pageW - 14, 17, { align: 'right' });
+
+  // ---- Summary stats ----
+  const total      = rows.length;
+  const byHigh     = rows.filter(r => r.severity === 'HIGH').length;
+  const byMed      = rows.filter(r => r.severity === 'MEDIUM').length;
+  const byLow      = rows.filter(r => r.severity === 'LOW').length;
+  const open       = rows.filter(r => r.remediation_status === 'OPEN').length;
+  const acked      = rows.filter(r => r.remediation_status === 'ACKNOWLEDGED').length;
+  const resolved   = rows.filter(r => r.remediation_status === 'RESOLVED').length;
+  const breaches   = rows.filter(r => r.breach_notification_candidate).length;
+
+  doc.setFontSize(9);
+  doc.setTextColor(60, 60, 60);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Summary', 14, 30);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(80, 80, 80);
+
+  const summaryLines = [
+    `Total Violations: ${total}   |   HIGH: ${byHigh}   MEDIUM: ${byMed}   LOW: ${byLow}`,
+    `Status — OPEN: ${open}   ACKNOWLEDGED: ${acked}   RESOLVED: ${resolved}   |   Breach Candidates: ${breaches}`,
+  ];
+  summaryLines.forEach((line, i) => doc.text(line, 14, 36 + i * 5));
+
+  // ---- Table ----
+  const tableRows = rows.map(r => [
+    r.violation_id ?? '—',
+    r.timestamp ? new Date(r.timestamp).toLocaleString() : '—',
+    r.rule_id ?? '—',
+    r.severity ?? '—',
+    r.field ?? '—',
+    r.source_system ?? '—',
+    r.remediation_status ?? '—',
+    r.breach_notification_candidate ? '✓' : '',
+    r.explanation ? r.explanation.substring(0, 80) + (r.explanation.length > 80 ? '…' : '') : '—',
+  ]);
+
+  doc.autoTable({
+    startY: 48,
+    head: [['#', 'Timestamp', 'Rule', 'Severity', 'Field', 'System', 'Status', 'Breach', 'Explanation']],
+    body: tableRows,
+    styles: { fontSize: 7, cellPadding: 2 },
+    headStyles: { fillColor: [20, 20, 20], textColor: [255, 255, 255], fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [248, 248, 248] },
+    columnStyles: {
+      0: { cellWidth: 10 },
+      1: { cellWidth: 35 },
+      2: { cellWidth: 28 },
+      3: { cellWidth: 18 },
+      4: { cellWidth: 22 },
+      5: { cellWidth: 28 },
+      6: { cellWidth: 26 },
+      7: { cellWidth: 14, halign: 'center' },
+      8: { cellWidth: 'auto' },
+    },
+    didParseCell: (data) => {
+      if (data.section === 'body' && data.column.index === 3) {
+        const sev = data.cell.raw;
+        if (sev === 'HIGH')   { data.cell.styles.textColor = [220, 53, 69]; data.cell.styles.fontStyle = 'bold'; }
+        if (sev === 'MEDIUM') { data.cell.styles.textColor = [200, 130, 0]; }
+        if (sev === 'LOW')    { data.cell.styles.textColor = [40, 167, 69]; }
+      }
+    },
+  });
+
+  // ---- Footer ----
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(7);
+    doc.setTextColor(160, 160, 160);
+    doc.text(
+      `Veritas DPDPA Audit Report — ${currentOrgId} — Page ${i} of ${pageCount}`,
+      pageW / 2, doc.internal.pageSize.getHeight() - 5,
+      { align: 'center' }
+    );
+  }
+
+  const filename = `veritas-audit-${currentOrgId}-${new Date().toISOString().substring(0,10)}.pdf`;
+  doc.save(filename);
+  showToast(`Report downloaded: ${filename}`, 'success');
+}
+
+// ---- First-Boot Onboarding ----
+function showWelcomeOverlay() {
+  document.getElementById('welcomeOverlay').classList.add('visible');
+}
+function dismissWelcomeOverlay() {
+  document.getElementById('welcomeOverlay').classList.remove('visible');
+}
+function startOnboarding() {
+  openAddOrgModal();
+}
+
+// ---- Agents Tab ----
+async function loadAgents() {
+  if (!currentOrgId) return;
+  try {
+    const r = await fetch(`/agents?org_id=${encodeURIComponent(currentOrgId)}`);
+    if (!r.ok) return;
+    const data = await r.json();
+    renderAgentsTable(data.agents || []);
+  } catch (e) {
+    console.error('loadAgents failed', e);
+  }
+}
+
+function renderAgentsTable(agents) {
+  const tbody   = document.getElementById('agentsTbody');
+  const total   = document.getElementById('ag-total');
+  const active  = document.getElementById('ag-active');
+  const revoked = document.getElementById('ag-revoked');
+
+  const activeCount  = agents.filter(a => a.status === 'ACTIVE').length;
+  const revokedCount = agents.filter(a => a.status === 'REVOKED').length;
+  total.textContent   = agents.length;
+  active.textContent  = activeCount;
+  revoked.textContent = revokedCount;
+
+  if (agents.length === 0) {
+    tbody.innerHTML = `<tr id="agentsEmptyRow"><td colspan="7" style="text-align:center;color:var(--text-muted);padding:2rem;">No agents registered for this organisation.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = agents.map(a => {
+    const hb      = a.last_heartbeat_at ? new Date(a.last_heartbeat_at).toLocaleTimeString() : '<span style="color:var(--text-subtle)">—</span>';
+    const created = new Date(a.created_at).toLocaleDateString();
+    const canRevoke = a.status === 'ACTIVE';
+    return `<tr>
+      <td class="mono" style="font-size:0.8rem;">${escapeHtml(a.agent_id)}</td>
+      <td><span class="badge system">${escapeHtml(a.source_label || 'unlabelled')}</span></td>
+      <td><span class="status-badge ${escapeHtml(a.status)}">${escapeHtml(a.status)}</span></td>
+      <td>${a.events_received}</td>
+      <td>${hb}</td>
+      <td>${created}</td>
+      <td>${canRevoke
+        ? `<button class="btn btn-danger" style="font-size:0.75rem;padding:0.2rem 0.6rem;" onclick="revokeAgent('${escapeHtml(a.agent_id)}')">Revoke</button>`
+        : '<span style="color:var(--text-subtle);font-size:0.8rem;">—</span>'
+      }</td>
+    </tr>`;
+  }).join('');
+}
+
+function openIssueKeyModal() {
+  document.getElementById('issueKeyOrgLabel').textContent = currentOrgId;
+  document.getElementById('issueKeyStep1').style.display = '';
+  document.getElementById('issueKeyStep2').style.display = 'none';
+  document.getElementById('issueKeyValue').textContent = '';
+  document.getElementById('copyKeyBtn').textContent = 'Copy';
+  document.getElementById('issueKeyOverlay').classList.add('open');
+  document.getElementById('issueKeyModal').classList.add('open');
+}
+
+function closeIssueKeyModal() {
+  document.getElementById('issueKeyOverlay').classList.remove('open');
+  document.getElementById('issueKeyModal').classList.remove('open');
+}
+
+async function generateKey() {
+  try {
+    const r = await fetch('/agents/issue-key', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ org_id: currentOrgId }),
+    });
+    if (!r.ok) {
+      const err = await r.json();
+      showToast(err.detail || 'Failed to generate key', 'error');
+      return;
+    }
+    const data = await r.json();
+    document.getElementById('issueKeyValue').textContent = data.key;
+    document.getElementById('issueKeyStep1').style.display = 'none';
+    document.getElementById('issueKeyStep2').style.display = '';
+  } catch (e) {
+    showToast('Network error generating key', 'error');
+  }
+}
+
+function copyKey() {
+  const key = document.getElementById('issueKeyValue').textContent;
+  navigator.clipboard.writeText(key).then(() => {
+    const btn = document.getElementById('copyKeyBtn');
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+  });
+}
+
+async function revokeAgent(agentId) {
+  if (!confirm(`Revoke agent ${agentId}?\n\nIt will immediately stop accepting telemetry.`)) return;
+  try {
+    const r = await fetch(`/agents/${encodeURIComponent(agentId)}/revoke`, { method: 'POST' });
+    if (!r.ok) {
+      const err = await r.json();
+      showToast(err.detail || 'Revoke failed', 'error');
+      return;
+    }
+    showToast(`Agent ${agentId} revoked.`, 'success');
+    loadAgents();
+  } catch (e) {
+    showToast('Network error revoking agent', 'error');
+  }
+}
+
+// ---- License Badge ----
+async function checkLicense() {
+  try {
+    const r = await fetch('/api/license');
+    if (!r.ok) return;
+    const d = await r.json();
+    if (d.valid) {
+      const org  = d.org.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      const tier = d.tier.charAt(0).toUpperCase() + d.tier.slice(1);
+      document.getElementById('licenseBadgeText').textContent = `${org} \u00b7 ${tier} \u00b7 exp ${d.expiry}`;
+      document.getElementById('licenseBadge').style.display = 'inline-flex';
+    }
+  } catch (e) { /* badge stays hidden */ }
+}
+
 // ---- Initialization ----
 (async function init() {
+  await checkLicense();
   await populateOrgSelector();
   connectWS();
   refreshStats();

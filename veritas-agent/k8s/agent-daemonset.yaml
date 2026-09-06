@@ -1,0 +1,112 @@
+# Veritas Agent — Kubernetes DaemonSet
+# ======================================
+# Runs one Veritas Agent on EVERY node in the cluster.
+# Use this when you want to tail host-level logs from all nodes,
+# or when your application pods are spread across multiple nodes.
+#
+# For a single-instance deployment, use agent-deployment.yaml instead.
+#
+# Apply: kubectl apply -f agent-daemonset.yaml
+
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: veritas-agent
+  namespace: default
+  labels:
+    app: veritas-agent
+    mode: daemonset
+    version: "1.0.0"
+spec:
+  selector:
+    matchLabels:
+      app: veritas-agent
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        app: veritas-agent
+    spec:
+      # Use the host's network namespace so the agent can reach the
+      # Veritas Runtime via the cluster's internal network.
+      hostNetwork: false
+      restartPolicy: Always
+
+      # Tolerate all taints so the agent runs on every node,
+      # including control-plane nodes if desired.
+      tolerations:
+        - operator: Exists
+          effect: NoSchedule
+        - operator: Exists
+          effect: NoExecute
+
+      containers:
+        - name: veritas-agent
+          image: veritas-agent:latest
+          imagePullPolicy: IfNotPresent
+
+          env:
+            - name: VERITAS_REGISTRATION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: veritas-agent-secret
+                  key: registration_key
+
+            # NODE_NAME is injected automatically — useful for source_label
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+
+          volumeMounts:
+            - name: config
+              mountPath: /app/agent-config.yaml
+              subPath: agent-config.yaml
+              readOnly: true
+
+            # Node-local state directory — one per node, persists registrations.
+            # hostPath ensures each node's agent has its own identity.
+            - name: state
+              mountPath: /app
+
+            # Docker socket — for container log tailing on this node
+            - name: docker-socket
+              mountPath: /var/run/docker.sock
+              readOnly: true
+
+            # All host logs on this node
+            - name: host-logs
+              mountPath: /var/log
+              readOnly: true
+
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "256Mi"
+
+      volumes:
+        - name: config
+          configMap:
+            name: veritas-agent-config
+
+        # Node-local hostPath for state — each node gets its own agent identity
+        - name: state
+          hostPath:
+            path: /var/lib/veritas-agent
+            type: DirectoryOrCreate
+
+        - name: docker-socket
+          hostPath:
+            path: /var/run/docker.sock
+            type: Socket
+
+        - name: host-logs
+          hostPath:
+            path: /var/log
+            type: Directory

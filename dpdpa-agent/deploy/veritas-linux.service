@@ -1,0 +1,35 @@
+[Unit]
+Description=Veritas DPDPA Compliance Platform
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=veritas
+Group=veritas
+WorkingDirectory=/opt/veritas
+
+# Load secrets (.env optional — won't fail if missing)
+EnvironmentFile=-/opt/veritas/.env
+Environment=VERITAS_DATA_DIR=/opt/veritas
+
+# Use Go launcher if available (validates license + supervises runtime)
+# Falls back to Python directly if launcher binary not present
+ExecStart=/bin/bash -c '\
+  if [ -f /opt/veritas/veritas-launcher ]; then \
+    exec /opt/veritas/veritas-launcher run; \
+  else \
+    exec /opt/veritas/venv/bin/python run_pipeline.py --violation-rate 0; \
+  fi'
+
+Restart=always
+RestartSec=10
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=veritas
+
+MemoryMax=800M
+
+[Install]
+WantedBy=multi-user.target

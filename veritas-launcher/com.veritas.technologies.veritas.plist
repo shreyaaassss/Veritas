@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.veritas.technologies.veritas</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Library/Application Support/Veritas/veritas-launcher</string>
+        <string>run</string>
+    </array>
+
+    <!-- Start automatically when the system boots -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- Restart automatically if it exits -->
+    <key>KeepAlive</key>
+    <true/>
+
+    <!-- Throttle restarts: wait 10s before restarting on crash -->
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+
+    <!-- Log output -->
+    <key>StandardOutPath</key>
+    <string>/Library/Logs/Veritas/veritas.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Library/Logs/Veritas/veritas-error.log</string>
+
+    <!-- Working directory and data directory -->
+    <key>WorkingDirectory</key>
+    <string>/Library/Application Support/Veritas</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>VERITAS_DATA_DIR</key>
+        <string>/Library/Application Support/Veritas</string>
+    </dict>
+</dict>
+</plist>

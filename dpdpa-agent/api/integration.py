@@ -58,8 +58,11 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, Body, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException
 from pydantic import BaseModel, Field, model_validator
+
+from agent_store.models import Agent
+from api.agent_auth import verify_agent_token
 
 import pipeline_control
 from config_loader import OrgConfigNotFoundError, load_org_config
@@ -218,14 +221,29 @@ def _entity_summary(m: MatchedEntity) -> Dict[str, Any]:
 
 class IngestEventRequest(BaseModel):
     source_type: SourceType
-    source_system: str = Field(..., min_length=1)
+    source_system: str = Field(..., min_length=1, max_length=200)
     timestamp: Optional[datetime] = None
-    raw_snippet: str = Field(..., min_length=1)
+    raw_snippet: str = Field(..., min_length=1, max_length=100_000)
     fields: Dict[str, str] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _validate_fields_size(self) -> "IngestEventRequest":
+        if len(self.fields) > 50:
+            raise ValueError("Too many fields — max 50 per event.")
+        for k, v in self.fields.items():
+            if len(k) > 200:
+                raise ValueError(f"Field key too long (max 200 chars): {repr(k)[:40]}")
+            if len(v) > 10_000:
+                raise ValueError(f"Field value for {k!r} too long (max 10,000 chars).")
+        return self
 
 
 @router.post("/{org_id}/events")
-async def ingest_event(org_id: str, req: IngestEventRequest) -> Dict[str, Any]:
+async def ingest_event(
+    org_id: str,
+    req: IngestEventRequest,
+    _agent: Agent = Depends(verify_agent_token),
+) -> Dict[str, Any]:
     """
     Stream/Telemetry mode. org_id comes ONLY from the URL path — never
     inferred from any default/config/global — and is what gets threaded

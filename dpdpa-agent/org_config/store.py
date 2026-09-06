@@ -40,7 +40,8 @@ logger = logging.getLogger("org_config.store")
 
 # The directory where all org config YAML files are stored.
 # Relative to this file's location (org_config/), configs/ is a sibling directory.
-_CONFIGS_DIR = Path(__file__).parent / "configs"
+from runtime_paths import data_root as _data_root
+_CONFIGS_DIR = _data_root() / "org_config" / "configs"
 
 
 def _org_dir(org_id: str) -> Path:

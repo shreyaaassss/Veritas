@@ -1,0 +1,55 @@
+# Veritas Agent — Configuration ConfigMap
+# =========================================
+# Contains agent-config.yaml as a ConfigMap so the Agent container can
+# mount it at /app/agent-config.yaml.
+#
+# Edit the values below before applying:
+#   veritas_address — IP or hostname of your Veritas Runtime server
+#   source_label    — human label shown in the Agents tab of the dashboard
+#   sources         — which log files or containers to tail
+#
+# Apply: kubectl apply -f agent-configmap.yaml
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: veritas-agent-config
+  namespace: default
+  labels:
+    app: veritas-agent
+    component: config
+data:
+  agent-config.yaml: |
+    # Veritas Agent Configuration
+    # ============================
+    # The registration_key is injected from the Secret at runtime.
+    # Do not paste the key here — it lives in agent-secret.yaml.
+
+    # Address of the Veritas Runtime (change to your server's IP or hostname)
+    veritas_address: http://192.168.1.50:8000
+
+    # The registration_key is mounted from the Secret via an environment
+    # variable and written here by the entrypoint. Leave as-is.
+    registration_key: "${VERITAS_REGISTRATION_KEY}"
+
+    # Human label shown in the Agents tab of the Veritas dashboard
+    source_label: k8s-production
+
+    # Log sources to tail. Add one entry per log file or container.
+    # source_system must match the value declared in your org's Veritas config.
+    sources:
+      # Example: tail a log file on the host (requires hostPath volume mount)
+      - type: file
+        path: /var/log/order-service/app.log
+        source_system: order-service
+
+      # Example: tail a Kubernetes container's stdout/stderr
+      # Requires the Docker socket to be mounted (see agent-deployment.yaml)
+      - type: docker
+        container: marketing-service
+        source_system: marketing-analytics
+
+      # Add more sources as needed:
+      # - type: file
+      #   path: /var/log/support-ticketing/app.log
+      #   source_system: support-ticketing

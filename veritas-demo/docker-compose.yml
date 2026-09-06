@@ -1,0 +1,71 @@
+version: "3.9"
+
+# Veritas Demo — Simulated Production Environment
+# ================================================
+# Four services write realistic log traffic to a shared volume.
+# The Veritas Agent tails those logs and forwards each line to the appliance.
+#
+# Before starting:
+#   1. Copy agent-config.yaml.example → agent-config.yaml
+#   2. Fill in veritas_address and registration_key
+#   3. Build the agent image: cd ../veritas-agent && docker build -t veritas-agent:latest .
+#   4. Run: docker compose up --build
+
+services:
+
+  order-service:
+    build: ./services
+    command: python order_service.py
+    volumes:
+      - logs:/logs
+    environment:
+      - VIOLATION_RATE=0.10    # 10% of lines contain raw PII → EXPOSURE_001
+      - EMIT_INTERVAL=2.0      # one log line every 2 seconds
+    restart: unless-stopped
+
+  support-service:
+    build: ./services
+    command: python support_service.py
+    volumes:
+      - logs:/logs
+    environment:
+      - VIOLATION_RATE=0.10    # 10% of lines contain customer PII → EXPOSURE_001
+      - EMIT_INTERVAL=3.0
+    restart: unless-stopped
+
+  marketing-service:
+    build: ./services
+    command: python marketing_service.py
+    volumes:
+      - logs:/logs
+    environment:
+      - VIOLATION_RATE=0.10    # 10% of events include raw phone → PURPOSE_001
+      - EMIT_INTERVAL=2.5
+    restart: unless-stopped
+
+  delivery-service:
+    build: ./services
+    command: python delivery_service.py
+    volumes:
+      - logs:/logs
+    environment:
+      - VIOLATION_RATE=0.20    # 20% reference DP-4471 (stale partner) → RETENTION_001
+      - EMIT_INTERVAL=5.0
+    restart: unless-stopped
+
+  veritas-agent:
+    image: veritas-agent:latest   # built from veritas-agent/ directory
+    volumes:
+      - ./agent-config.yaml:/app/agent-config.yaml:ro   # fill this in first
+      - agent-state:/app                                  # persists registration across restarts
+      - logs:/logs:ro                                     # read-only: agent tails, services write
+    restart: unless-stopped
+    depends_on:
+      - order-service
+      - support-service
+      - marketing-service
+      - delivery-service
+
+volumes:
+  logs:         # shared log files (written by services, read by agent)
+  agent-state:  # persists .veritas_state.json across container restarts

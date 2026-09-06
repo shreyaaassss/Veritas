@@ -45,18 +45,46 @@ from typing import Any, Optional
 
 import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
 
 from api.integration import router as integration_router
 from dashboard.live_feed import broadcaster_task, get_live_feed_queue, register_client, set_server_loop, unregister_client
 from evidence_store.store import get_store
+from license import LicenseError, validate_license
 
 logger = logging.getLogger("dashboard.server")
 
+# ---------------------------------------------------------------------------
+# Body size limit middleware (Block 8 — Security Hardening)
+# Rejects requests whose Content-Length header exceeds 256 KB before the
+# body is read. Prevents unbounded memory use from oversized Agent payloads.
+# ---------------------------------------------------------------------------
+
+_MAX_BODY_BYTES = 256 * 1024  # 256 KB
+
+
+class _BodySizeLimit(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        content_length = request.headers.get("content-length")
+        if content_length:
+            try:
+                if int(content_length) > _MAX_BODY_BYTES:
+                    return JSONResponse(
+                        {"detail": f"Request body too large. Maximum {_MAX_BODY_BYTES} bytes."},
+                        status_code=413,
+                    )
+            except ValueError:
+                pass
+        return await call_next(request)
+
+
 app = FastAPI(title="DPDPA Compliance Agent — Dashboard", version="1.0.0")
 
+app.add_middleware(_BodySizeLimit)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -66,6 +94,9 @@ app.add_middleware(
 
 app.include_router(integration_router)
 
+from api.agents import router as agents_router  # noqa: E402
+app.include_router(agents_router)
+
 
 # ---------------------------------------------------------------------------
 # Routes — dashboard page + WebSocket
@@ -73,7 +104,8 @@ app.include_router(integration_router)
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_dashboard():
-    html_path = Path(__file__).parent / "index.html"
+    from runtime_paths import bundle_root
+    html_path = bundle_root() / "dashboard" / "index.html"
     return HTMLResponse(html_path.read_text(encoding="utf-8"))
 
 
@@ -202,6 +234,27 @@ async def get_stats(org_id: str):
 
 
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# License info endpoint
+# ---------------------------------------------------------------------------
+
+@app.get("/api/license")
+async def get_license_info():
+    """Returns license metadata for the dashboard badge. Never exposes the key itself."""
+    try:
+        info = validate_license()
+        return {
+            "valid":          True,
+            "org":            info.org,
+            "tier":           info.tier,
+            "expiry":         info.expiry,
+            "issued":         info.issued,
+            "days_remaining": info.days_remaining,
+        }
+    except LicenseError as e:
+        return JSONResponse({"valid": False, "error": str(e)}, status_code=403)
+
+
 # Server lifecycle: start broadcaster on startup
 # ---------------------------------------------------------------------------
 

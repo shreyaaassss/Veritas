@@ -1,0 +1,28 @@
+# Veritas Agent Configuration — Simulation Environment
+# ======================================================
+# 1. Copy this file to agent-config.yaml
+# 2. Fill in veritas_address (IP of the machine running Veritas)
+# 3. Fill in registration_key (from Dashboard → Agents → Issue Registration Key)
+# 4. Run: docker compose up --build
+
+veritas_address: http://192.168.1.50:8000   # ← change to your Veritas IP
+registration_key: YOUR_ONE_TIME_KEY_HERE     # ← paste key from dashboard
+
+source_label: simulated-production
+
+sources:
+  - type: file
+    path: /logs/order-service.log
+    source_system: order-service
+
+  - type: file
+    path: /logs/support-ticketing.log
+    source_system: support-ticketing
+
+  - type: file
+    path: /logs/marketing-analytics.log
+    source_system: marketing-analytics
+
+  - type: file
+    path: /logs/delivery-partner-service.log
+    source_system: delivery-partner-service

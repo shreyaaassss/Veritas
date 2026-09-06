@@ -1,0 +1,27 @@
+[Unit]
+Description=Veritas DPDPA Compliance Platform
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=veritas
+Group=veritas
+WorkingDirectory=/opt/veritas
+
+EnvironmentFile=-/opt/veritas/.env
+Environment=VERITAS_DATA_DIR=/opt/veritas
+
+ExecStart=/opt/veritas/veritas-launcher run
+
+Restart=always
+RestartSec=10
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=veritas
+
+MemoryMax=800M
+
+[Install]
+WantedBy=multi-user.target

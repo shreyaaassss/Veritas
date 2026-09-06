@@ -130,7 +130,8 @@ _VALID_TRANSITIONS: dict[str, list[str]] = {
     "RESOLVED": [],  # terminal state
 }
 
-_DEFAULT_DB_PATH = Path(__file__).parent / "evidence.db"
+from runtime_paths import data_root as _data_root
+_DEFAULT_DB_PATH = _data_root() / "evidence.db"
 
 
 def _serialize_immutable(ev: ExplainedVerdict) -> str:
