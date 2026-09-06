@@ -1,83 +1,42 @@
 """
-DPDPA Compliance Agent — End-to-End Pipeline Runner (Phase 8)
-==============================================================
-Wires all phases together in a single command:
+Veritas DPDPA Compliance Platform — Runtime Entry Point
+=========================================================
+Starts the Veritas compliance server. Events arrive exclusively from
+registered Veritas Agents via POST /v1/{org_id}/events.
 
-    python run_pipeline.py                        # run forever, 70% violation rate
-    python run_pipeline.py --violation-rate 0.7   # same
-    python run_pipeline.py --max-events 20        # finite run for testing
-    python run_pipeline.py --port 8080            # custom dashboard port
+No synthetic data generators. No demo mode. Production only.
 
-Automatically loads .env from the project root (OPENAI_API_KEY etc.).
-
-Pipeline topology (mirrors the Phase 0 system flow diagram):
-
-  registry.load_registry()
-       ↓
-  Ingestion (log_generator + api_generator)
-       ↓  asyncio.Queue (raw events)
-  Detection (detect_from_queue)
-       ↓  asyncio.Queue (DetectedEvents)
-  Rule Engine (evaluate_from_queue → VerdictFanout.push_many)
-       ↓  two parallel queues
-  ┌────┴─────────────────┐
-  Explanation            Evidence Store (direct, not via LLM queue)
-  (defer_explanation_from_queue —   ↑
-   deterministic template, NO   │
-   automatic LLM call — see  via broadcaster_task
-   llm_explainer/explainer.py)
-       ↓  out_queue
-  Evidence Store
-  (store_from_queue)
-       ↓
-  Dashboard WebSocket broadcaster
-  (broadcast_from_queue)
-
-Real, statute-grounded LLM explanations now happen ONLY on demand, one
-call per human-asked question, via investigation.py's "@N <question>"
-endpoint (POST /v1/{org_id}/investigate) — not automatically per verdict.
-
-Run with uvicorn serving the FastAPI dashboard on --port (default 8000).
-Open http://localhost:8000 in a browser to see the live dashboard.
+Usage:
+    python run_pipeline.py              # start on port 8000
+    python run_pipeline.py --port 8080  # custom port
 """
 
 from __future__ import annotations
 
 import argparse
-import asyncio
-import json
 import logging
 import os
+import threading
+import time
 from pathlib import Path
 
-# Load .env file automatically
+# Load .env (OPENAI_API_KEY etc.) — no-op if file doesn't exist
 try:
     from dotenv import load_dotenv
-    env_path = Path(__file__).parent / ".env"
-    if env_path.exists():
-        load_dotenv(env_path)
+    _env = Path(__file__).parent / ".env"
+    if _env.exists():
+        load_dotenv(_env)
 except ImportError:
-    # Manual .env reader fallback if python-dotenv is not installed
-    env_path = Path(__file__).parent / ".env"
-    if env_path.exists():
-        with open(env_path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    k, v = line.split("=", 1)
-                    os.environ.setdefault(k.strip(), v.strip())
+    _env = Path(__file__).parent / ".env"
+    if _env.exists():
+        with open(_env, "r", encoding="utf-8") as _f:
+            for _line in _f:
+                _line = _line.strip()
+                if _line and not _line.startswith("#") and "=" in _line:
+                    _k, _v = _line.split("=", 1)
+                    os.environ.setdefault(_k.strip(), _v.strip())
 
 import uvicorn
-
-from detection.engine import detect_from_queue
-from evidence_store.store import get_store
-from ingestion.api_generator import api_generator
-from ingestion.config import IngestionConfig
-from ingestion.log_generator import log_generator
-from llm_explainer.explainer import defer_explanation_from_queue, ExplainedVerdict
-from registry.loader import load_registry
-from rules.fanout import VerdictFanout
-from schemas.models import Verdict
 
 logging.basicConfig(
     level=logging.INFO,
@@ -86,150 +45,17 @@ logging.basicConfig(
 logger = logging.getLogger("pipeline")
 
 
-async def evaluate_from_queue(
-    detected_queue: asyncio.Queue,
-    fanout: VerdictFanout,
-    max_events: int | None = None,
-) -> None:
-    """
-    Pulls DetectedEvents off detected_queue, evaluates each with the Rule Engine,
-    and fans out resulting Verdicts to the VerdictFanout.
-    """
-    from rules.engine import evaluate_event
-
-    processed = 0
-    while max_events is None or processed < max_events:
-        detected = await detected_queue.get()
-        verdicts = evaluate_event(detected)
-        if verdicts:
-            await fanout.push_many(verdicts)
-            logger.info("Rule engine produced %d verdict(s) for event %s", len(verdicts), detected.event.event_id)
-        processed += 1
-
-
-async def broadcast_from_queue(
-    explained_queue: asyncio.Queue,
-    store,
-    max_items: int | None = None,
-) -> None:
-    """
-    Pulls ExplainedVerdicts off explained_queue:
-      1. Appends to Evidence Store (if not already stored)
-      2. Broadcasts to WebSocket clients via the dashboard broadcaster
-    """
-    from dashboard.live_feed import publish as publish_live_feed
-
-    processed = 0
-    while max_items is None or processed < max_items:
-        ev: ExplainedVerdict = await explained_queue.get()
-        # Store
-        try:
-            store.append(ev)
-        except Exception as exc:
-            logger.warning("Evidence store append failed (possible duplicate): %s", exc)
-
-        # Broadcast to this verdict's tenant's WebSocket room only (Phase 6 —
-        # dashboard.live_feed routes by payload["tenant_id"], see that module).
-        try:
-            payload = {
-                **ev.verdict.model_dump(mode="json"),
-                "explanation": ev.explanation,
-                "section_cited": ev.section_cited,
-                "confidence": ev.confidence,
-                "used_fallback": ev.used_fallback,
-            }
-            await publish_live_feed(payload)
-        except Exception as exc:
-            logger.warning("WebSocket broadcast failed: %s", exc)
-
-        processed += 1
-
-
-async def run_pipeline(
-    violation_rate: float = 0.7,
-    log_interval: float = 1.0,
-    api_interval: float = 1.5,
-    max_events: int | None = None,
-    random_seed: int | None = None,
-) -> None:
-    """Main async pipeline coroutine. Runs all modules concurrently."""
-    logger.info("Loading compliance registry…")
-    registry = load_registry()
-    logger.info("Registry loaded: %d entries", len(registry.entries))
-
-    # Ingestion config
-    cfg = IngestionConfig()
-    cfg.log_emit_interval_seconds = log_interval
-    cfg.api_emit_interval_seconds = api_interval
-    cfg.log_exposure_violation_rate = violation_rate
-    cfg.api_marketing_purpose_violation_rate = violation_rate
-    cfg.api_retention_violation_rate = violation_rate
-    if random_seed is not None:
-        cfg.random_seed = random_seed
-
-    # Queues
-    raw_queue: asyncio.Queue = asyncio.Queue()
-    detected_queue: asyncio.Queue = asyncio.Queue()
-    explained_queue: asyncio.Queue = asyncio.Queue()
-
-    # Fanout (Phase 4 → Phase 5 only; Phase 6 gets ExplainedVerdicts from Phase 5)
-    fanout = VerdictFanout()
-
-    store = get_store()
-
-    per_gen_max = None if max_events is None else (max_events // 2) + 1
-
-    tasks = [
-        # Ingestion
-        asyncio.create_task(log_generator(raw_queue, cfg, max_events=per_gen_max), name="log_gen"),
-        asyncio.create_task(api_generator(raw_queue, cfg, max_events=per_gen_max), name="api_gen"),
-        # Detection
-        asyncio.create_task(detect_from_queue(raw_queue, detected_queue, max_events=max_events), name="detection"),
-        # Rule Engine
-        asyncio.create_task(evaluate_from_queue(detected_queue, fanout, max_events=max_events), name="rule_engine"),
-        # Explanation — deferred/template only, no automatic LLM call per
-        # verdict (see llm_explainer/explainer.py's "AUTOMATIC EXPLANATION
-        # REMOVED" note). Real, statute-grounded explanations now happen
-        # on demand via the "@N <question>" investigation endpoint.
-        asyncio.create_task(defer_explanation_from_queue(fanout.llm_explainer_queue, explained_queue, max_verdicts=None), name="explainer"),
-        # Evidence Store + Broadcaster
-        asyncio.create_task(broadcast_from_queue(explained_queue, store, max_items=None), name="broadcaster"),
-    ]
-
-    logger.info("🚀 Pipeline running. Open http://localhost:8000 in your browser.")
-    try:
-        if max_events is not None:
-            # Wait only for bounded tasks
-            await asyncio.gather(*tasks[:4])
-            for t in tasks[4:]:
-                t.cancel()
-        else:
-            await asyncio.gather(*tasks)
-    except asyncio.CancelledError:
-        pass
-    except Exception as exc:
-        logger.error("Pipeline error: %s", exc, exc_info=True)
-
-
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
-        description="DPDPA Compliance Agent — Full Pipeline (Phases 0–8)"
+        description="Veritas DPDPA Compliance Platform"
     )
-    parser.add_argument("--violation-rate", type=float, default=0.7,
-                        help="Fraction of events that are violations (0–1). Default 0.7")
-    parser.add_argument("--log-interval", type=float, default=1.0,
-                        help="Seconds between log generator events. Default 1.0")
-    parser.add_argument("--api-interval", type=float, default=1.5,
-                        help="Seconds between API generator events. Default 1.5")
-    parser.add_argument("--max-events", type=int, default=None,
-                        help="Stop after N events (default: run forever)")
-    parser.add_argument("--port", type=int, default=8000,
-                        help="Dashboard port. Default 8000")
-    parser.add_argument("--seed", type=int, default=None,
-                        help="Random seed for reproducible runs")
+    parser.add_argument(
+        "--port", type=int, default=8000,
+        help="Dashboard port (default: 8000)",
+    )
     args = parser.parse_args()
 
-    # ---- License check — must pass before anything else starts ----
+    # ---- License check ----
     from license import LicenseError, validate_license
     try:
         _lic = validate_license()
@@ -242,23 +68,18 @@ def main():
         print(f"\n{border}\nLICENSE ERROR\n{border}\n{e}\n{border}\n")
         raise SystemExit(1)
 
-    # ---- First-run setup (PyInstaller bundle only) -------------------
-    # When running as a packaged exe, seed org configs are bundled inside
-    # sys._MEIPASS (read-only). Copy them to data_root() on first run so
-    # they are readable AND writable for new org creation.
+    # ---- First-run: copy seed org configs out of the PyInstaller bundle ----
     from runtime_paths import bundle_root, data_root, is_bundled
     if is_bundled():
         import shutil as _shutil
-        _bundle_configs = bundle_root() / "org_config" / "configs"
-        _data_configs   = data_root()   / "org_config" / "configs"
-        if _bundle_configs.exists() and not _data_configs.exists():
-            print("[Veritas] First run — copying seed org configs to data directory...")
-            _shutil.copytree(str(_bundle_configs), str(_data_configs))
+        _src = bundle_root() / "org_config" / "configs"
+        _dst = data_root()   / "org_config" / "configs"
+        if _src.exists() and not _dst.exists():
+            print("[Veritas] First run — copying org configs to data directory...")
+            _shutil.copytree(str(_src), str(_dst))
 
-    import threading
-
-    # Run the FastAPI server in a background thread
-    def _run_server():
+    # ---- Start the FastAPI server (dashboard + API + WebSocket) ----
+    def _run_server() -> None:
         from dashboard.server import app
         uvicorn.run(app, host="0.0.0.0", port=args.port, log_level="warning")
 
@@ -266,16 +87,15 @@ def main():
     server_thread.start()
 
     logger.info("Dashboard available at http://localhost:%d", args.port)
+    logger.info("Waiting for agents to connect and forward events...")
 
-    import time; time.sleep(1.5)  # let server boot before pipeline starts
-
-    asyncio.run(run_pipeline(
-        violation_rate=args.violation_rate,
-        log_interval=args.log_interval,
-        api_interval=args.api_interval,
-        max_events=args.max_events,
-        random_seed=args.seed,
-    ))
+    # Keep the process alive — the server runs in the daemon thread.
+    # Events arrive via POST /v1/{org_id}/events from Veritas Agents.
+    try:
+        while True:
+            time.sleep(60)
+    except KeyboardInterrupt:
+        logger.info("Shutting down.")
 
 
 if __name__ == "__main__":

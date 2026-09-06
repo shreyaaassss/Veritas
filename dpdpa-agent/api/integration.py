@@ -64,7 +64,6 @@ from pydantic import BaseModel, Field, model_validator
 from agent_store.models import Agent
 from api.agent_auth import verify_agent_token
 
-import pipeline_control
 from config_loader import OrgConfigNotFoundError, load_org_config
 from dashboard.live_feed import publish as publish_live_feed
 from detection.engine import detect_event
@@ -381,34 +380,6 @@ async def scan(org_id: str, req: ScanRequest) -> Dict[str, Any]:
     if req.fields:
         response["masked_fields"] = mask_fields(req.fields, all_matches)
     return response
-
-
-# ---------------------------------------------------------------------------
-# Pipeline pause/resume (dashboard's "Pause/Resume Live Feed" button)
-# ---------------------------------------------------------------------------
-# Process-global, not per-org: there is exactly one set of synthetic
-# generators (ingestion/log_generator.py + api_generator.py) per
-# run_pipeline.py process, same as the org selector's Blinkit-only
-# synthetic traffic. See pipeline_control.py for the thread-safety note on
-# why this is a threading.Event, not an asyncio.Event. A no-op (but
-# harmless) toggle when only dashboard.server is running standalone with
-# no generators attached.
-
-@router.post("/pipeline/pause")
-async def pause_pipeline() -> Dict[str, Any]:
-    pipeline_control.pause()
-    return {"running": pipeline_control.is_running()}
-
-
-@router.post("/pipeline/resume")
-async def resume_pipeline() -> Dict[str, Any]:
-    pipeline_control.resume()
-    return {"running": pipeline_control.is_running()}
-
-
-@router.get("/pipeline/status")
-async def pipeline_status() -> Dict[str, Any]:
-    return {"running": pipeline_control.is_running()}
 
 
 # ---------------------------------------------------------------------------

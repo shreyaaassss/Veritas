@@ -1664,14 +1664,6 @@
         <div class="section-header">
           <h2>Live Stream Telemetry</h2>
           <div style="display:flex; align-items:center; gap:10px;">
-            <div class="header-status" style="margin:0;">
-              <div class="ws-dot connected" id="pipelineStatusDot"></div>
-              <span id="pipelineStatusLabel">Pipeline running</span>
-            </div>
-            <button class="btn btn-secondary" id="pipelineToggleBtn" onclick="togglePipeline()">
-              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="pipelineToggleIcon"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
-              <span id="pipelineToggleLabel">Pause Live Feed</span>
-            </button>
             <button class="btn btn-secondary" onclick="clearFeed()">
               <span>Clear Feed</span>
             </button>
@@ -2702,49 +2694,6 @@ function showToast(msg, type='success') {
   setTimeout(() => { el.className = 'toast'; }, 3000);
 }
 
-// ---- Pipeline Pause/Resume ----
-let pipelineRunning = true;
-
-function updatePipelineToggleUI() {
-  const dot = document.getElementById('pipelineStatusDot');
-  const label = document.getElementById('pipelineStatusLabel');
-  const btnLabel = document.getElementById('pipelineToggleLabel');
-  const icon = document.getElementById('pipelineToggleIcon');
-  if (pipelineRunning) {
-    dot.className = 'ws-dot connected';
-    label.textContent = 'Pipeline running';
-    btnLabel.textContent = 'Pause Live Feed';
-    icon.innerHTML = '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
-  } else {
-    dot.className = 'ws-dot';
-    label.textContent = 'Pipeline paused';
-    btnLabel.textContent = 'Resume Live Feed';
-    icon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"/>';
-  }
-}
-
-async function togglePipeline() {
-  const btn = document.getElementById('pipelineToggleBtn');
-  btn.disabled = true;
-  try {
-    const action = pipelineRunning ? 'pause' : 'resume';
-    const r = await fetch(`/v1/pipeline/${action}`, { method: 'POST' });
-    const data = await r.json();
-    pipelineRunning = data.running;
-  } catch (e) {}
-  updatePipelineToggleUI();
-  btn.disabled = false;
-}
-
-async function refreshPipelineStatus() {
-  try {
-    const r = await fetch('/v1/pipeline/status');
-    const data = await r.json();
-    pipelineRunning = data.running;
-    updatePipelineToggleUI();
-  } catch (e) {}
-}
-
 // ---- Simulate Breach Tab ----
 const SIM_EXAMPLES = {
   exposure: {
@@ -3182,9 +3131,7 @@ async function checkLicense() {
   refreshStats();
   refreshOverview();
   populateSimExamples();
-  refreshPipelineStatus();
   setInterval(() => { refreshStats(); refreshOverview(); }, 5000);
-  setInterval(refreshPipelineStatus, 5000);
 })();
 </script>
 </body>
