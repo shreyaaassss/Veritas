@@ -62,8 +62,17 @@ a = Analysis(
     ],
     hookspath=[],
     runtime_hooks=[],
+    hiddenimports=[
+        # httpx is required by weasel (spaCy CLI dependency) at import time
+        'httpx',
+        'httpx._transports',
+        'httpx._transports.default',
+        'httpcore',
+        'anyio',
+        'anyio._backends._asyncio',
+    ],
     excludes=[
-        'pytest', 'pytest_asyncio', 'httpx', '_pytest',
+        'pytest', 'pytest_asyncio', '_pytest',
         'IPython', 'matplotlib', 'PIL',
     ],
     cipher=block_cipher,
