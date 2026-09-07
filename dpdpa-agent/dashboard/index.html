@@ -6,14 +6,21 @@
   <title>Veritas — DPDPA Compliance Dashboard</title>
   <meta name="description" content="Real-time, multi-tenant DPDPA compliance monitoring. Live violation feed, tamper-evident evidence store, and auditor-grade remediation tracking." />
   
-  <!-- jsPDF — client-side PDF generation, no build step required -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+  <!-- jsPDF — served locally from /static/js/ (no CDN, works offline/air-gapped) -->
+  <script src="/static/js/jspdf.umd.min.js"></script>
+  <script src="/static/js/jspdf.plugin.autotable.min.js"></script>
 
-  <!-- Geist and Geist Mono Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <!-- Fonts: system-ui stack (no CDN dependency, works fully offline) -->
+  <style>
+    /* System font stack — renders with native OS fonts: SF Pro (macOS/iOS),
+       Segoe UI (Windows), Roboto (Android/Linux). No external request. */
+    :root {
+      --font-sans: system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue',
+                   Arial, sans-serif;
+      --font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', 'Fira Code',
+                   'Consolas', 'Courier New', monospace;
+    }
+  </style>
 
   <style>
     :root, [data-theme="dark"] {
@@ -145,7 +152,7 @@
       height: 100%;
       background: var(--bg);
       color: var(--text);
-      font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-family: var(--font-sans);
       font-feature-settings: "liga" 1, "tnum" 1;
       letter-spacing: -0.012em;
       font-size: 13.5px;
@@ -283,7 +290,7 @@
       border-radius: var(--radius-sm);
       box-shadow: var(--shadow-border);
       font-size: 11px;
-      font-family: 'Geist Mono', monospace;
+      font-family: var(--font-mono);
       color: var(--text-muted);
     }
 
@@ -628,7 +635,7 @@
       font-weight: 600;
       letter-spacing: 0.03em;
       text-transform: uppercase;
-      font-family: 'Geist Mono', monospace;
+      font-family: var(--font-mono);
     }
 
     .badge.HIGH { background: var(--high-bg); color: var(--high); box-shadow: 0 0 0 1px var(--high-border); }
@@ -648,7 +655,7 @@
       font-size: 10.5px;
       font-weight: 600;
       letter-spacing: 0.02em;
-      font-family: 'Geist Mono', monospace;
+      font-family: var(--font-mono);
     }
 
     .status-badge.OPEN { background: rgba(0, 112, 243, 0.12); color: var(--accent-blue); box-shadow: 0 0 0 1px rgba(0, 112, 243, 0.25); }
@@ -660,7 +667,7 @@
     /* ---- License Badge ---- */
     .license-badge {
       display: inline-flex; align-items: center; gap: 6px;
-      font-size: 0.7rem; font-family: 'Geist Mono', monospace;
+      font-size: 0.7rem; font-family: var(--font-mono);
       color: var(--text-muted);
       background: var(--surface);
       border: 1px solid var(--border);
@@ -748,7 +755,7 @@
     }
 
     .violation-field {
-      font-family: 'Geist Mono', monospace;
+      font-family: var(--font-mono);
       font-size: 11.5px;
       color: var(--text-headings);
       background: var(--code-bg);
@@ -770,7 +777,7 @@
       display: flex;
       align-items: center;
       gap: 6px;
-      font-family: 'Geist Mono', monospace;
+      font-family: var(--font-mono);
     }
 
     .violation-time {
@@ -778,7 +785,7 @@
       color: var(--text-subtle);
       margin-left: auto;
       font-variant-numeric: tabular-nums;
-      font-family: 'Geist Mono', monospace;
+      font-family: var(--font-mono);
     }
 
     /* ---- Overview Cards & Leaderboards ---- */
@@ -855,7 +862,7 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      font-family: 'Geist Mono', monospace;
+      font-family: var(--font-mono);
     }
 
     .leaderboard-track {
@@ -877,7 +884,7 @@
       color: var(--text-headings);
       text-align: right;
       font-variant-numeric: tabular-nums;
-      font-family: 'Geist Mono', monospace;
+      font-family: var(--font-mono);
     }
 
     /* ---- Audit Table & Integrity Panel ---- */
@@ -998,7 +1005,7 @@
     tr:hover td { background: var(--surface-hover); }
 
     .mono {
-      font-family: 'Geist Mono', monospace;
+      font-family: var(--font-mono);
       font-size: 12px;
     }
 
@@ -1212,7 +1219,7 @@
       padding: 2px 6px;
       border-radius: var(--radius-xs);
       box-shadow: var(--shadow-border);
-      font-family: 'Geist Mono', monospace;
+      font-family: var(--font-mono);
       color: var(--text-headings);
       font-size: 12px;
     }
@@ -1260,7 +1267,7 @@
       padding: 12px;
       font-size: 12px;
       line-height: 1.5;
-      font-family: 'Geist Mono', monospace;
+      font-family: var(--font-mono);
       outline: none;
     }
 
@@ -1316,7 +1323,7 @@
       background: var(--input-bg);
       padding: 1px 5px;
       border-radius: var(--radius-xs);
-      font-family: 'Geist Mono', monospace;
+      font-family: var(--font-mono);
       box-shadow: var(--shadow-border);
       color: var(--text-headings);
     }
@@ -1504,6 +1511,12 @@
       <div class="nav-item" id="nav-agents" onclick="showTab('agents')">
         <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg></span> Agents
       </div>
+      <div class="nav-item" id="nav-policy" onclick="showTab('policy')" data-require-role="SUPER_ADMIN,COMPLIANCE_ADMIN">
+        <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span> Policy
+      </div>
+      <div class="nav-item" id="nav-auditlog" onclick="showTab('auditlog')" data-require-role="SUPER_ADMIN">
+        <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></span> Audit Log
+      </div>
       <div class="nav-item" id="nav-simulate" onclick="showTab('simulate')">
         <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6M10 3v5.5L4.5 18a2 2 0 0 0 1.7 3h11.6a2 2 0 0 0 1.7-3L14 8.5V3"/><line x1="8.5" y1="14" x2="15.5" y2="14"/></svg></span> Scan Sandbox
       </div>
@@ -1531,6 +1544,10 @@
         <div class="license-badge" id="licenseBadge" style="display:none;">
           <span class="license-dot"></span>
           <span id="licenseBadgeText">Licensed</span>
+        </div>
+        <div class="license-badge" id="userBadge" style="display:none;gap:8px;cursor:pointer;" title="Click to sign out" onclick="signOut()">
+          <span class="license-dot" id="userRoleDot"></span>
+          <span id="userBadgeText">User</span>
         </div>
         <div class="org-selector-wrap">
           <label for="orgSelector">Tenant</label>
@@ -1634,6 +1651,15 @@
             </div>
           </div>
         </div>
+
+        <!-- System Health Panel -->
+        <div class="overview-grid" style="margin-top:14px;" id="healthPanel">
+          <div class="overview-card" style="grid-column:1/-1;">
+            <h3 style="margin-bottom:12px;">System Health</h3>
+            <div id="healthChecks" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;"></div>
+          </div>
+        </div>
+
       </main>
 
       <!-- ====== LIVE FEED TAB ====== -->
@@ -1686,7 +1712,7 @@
         <div class="integrity-panel">
           <button class="btn btn-verify" onclick="runVerifyChain()"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Verify Cryptographic Hash Chain</button>
           <div class="integrity-result" id="integrityResult"></div>
-          <span style="margin-left:auto;font-size:11.5px;color:var(--text-muted);font-family:'Geist Mono',monospace;" id="integrityTime"></span>
+          <span style="margin-left:auto;font-size:11.5px;color:var(--text-muted);font-family:var(--font-mono);" id="integrityTime"></span>
         </div>
 
         <!-- Filters Bar -->
@@ -1734,8 +1760,8 @@
         </div>
 
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
-          <span id="auditCount" style="font-size:12px;color:var(--text-muted);font-family:'Geist Mono',monospace;"></span>
-          <button class="btn btn-secondary" onclick="downloadAuditPDF()" style="font-size:0.78rem;padding:0.25rem 0.75rem;gap:5px;">
+          <span id="auditCount" style="font-size:12px;color:var(--text-muted);font-family:var(--font-mono);"></span>
+          <button class="btn btn-secondary" onclick="downloadAuditPDF()" style="font-size:0.78rem;padding:0.25rem 0.75rem;gap:5px;" data-require-role="SUPER_ADMIN,COMPLIANCE_ADMIN,AUDITOR">
             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             Download PDF Report
           </button>
@@ -1768,6 +1794,112 @@
                     </div>
                   </td>
                 </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+
+      <!-- ====== POLICY TAB ====== -->
+      <main class="page-section" id="main-policy">
+        <div class="section-header">
+          <h2>Compliance Policy</h2>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-secondary" onclick="loadPolicy()" style="font-size:0.78rem;">Refresh</button>
+            <button class="btn btn-primary" onclick="openAddOrgModal()" style="font-size:0.78rem;" data-require-role="SUPER_ADMIN,COMPLIANCE_ADMIN">Edit Policy</button>
+          </div>
+        </div>
+
+        <!-- Version history -->
+        <div id="policyVersionBar" style="display:flex;align-items:center;gap:8px;margin-bottom:1rem;font-size:0.8rem;color:var(--text-muted);">
+          <span>Version:</span>
+          <select id="policyVersionSelect" onchange="loadPolicyVersion()" style="background:var(--input-bg);border:1px solid var(--border);border-radius:6px;padding:0.3rem 0.5rem;color:var(--text);font-size:0.78rem;"></select>
+          <span id="policyVersionBadge" style="display:none;" class="badge system">current</span>
+        </div>
+
+        <!-- Fields table -->
+        <div class="table-container" id="policyFieldsContainer">
+          <div class="table-wrap">
+            <table id="policyFieldsTable">
+              <thead>
+                <tr>
+                  <th>Field Name</th>
+                  <th>PII Category</th>
+                  <th>Declared Purpose</th>
+                  <th>Consent Scope</th>
+                  <th>Retention (days)</th>
+                  <th>Source System</th>
+                </tr>
+              </thead>
+              <tbody id="policyFieldsTbody">
+                <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:2rem;">Select an organisation to view its policy.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Identifiers + Linkage rules summary -->
+        <div class="overview-grid" style="margin-top:14px;">
+          <div class="overview-card">
+            <h3>Custom Identifiers</h3>
+            <div id="policyIdentifiers" style="font-size:0.82rem;color:var(--text-muted);">—</div>
+          </div>
+          <div class="overview-card">
+            <h3>Linkage Rules</h3>
+            <div id="policyLinkage" style="font-size:0.82rem;color:var(--text-muted);">—</div>
+          </div>
+        </div>
+      </main>
+
+      <!-- ====== AUDIT LOG TAB (SUPER_ADMIN only) ====== -->
+      <main class="page-section" id="main-auditlog">
+        <div class="section-header">
+          <h2>System Audit Log</h2>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-secondary" onclick="loadAuditLog()" style="font-size:0.78rem;">Refresh</button>
+            <button class="btn btn-secondary" onclick="triggerBackup()" style="font-size:0.78rem;" title="Create a verified backup of all Veritas data">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Backup Now
+            </button>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem;">
+          <select id="auditActionFilter" onchange="loadAuditLog()" style="background:var(--input-bg);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.6rem;color:var(--text);font-size:0.8rem;">
+            <option value="">All Actions</option>
+            <option value="LOGIN">LOGIN</option>
+            <option value="LOGIN_FAILED">LOGIN_FAILED</option>
+            <option value="LOGOUT">LOGOUT</option>
+            <option value="USER_CREATED">USER_CREATED</option>
+            <option value="USER_UPDATED">USER_UPDATED</option>
+            <option value="ORG_ACCESS_GRANTED">ORG_ACCESS_GRANTED</option>
+            <option value="ORG_ACCESS_REVOKED">ORG_ACCESS_REVOKED</option>
+            <option value="AGENT_KEY_ISSUED">AGENT_KEY_ISSUED</option>
+            <option value="AGENT_REVOKED">AGENT_REVOKED</option>
+            <option value="VIOLATION_ACKNOWLEDGED">VIOLATION_ACKNOWLEDGED</option>
+            <option value="VIOLATION_RESOLVED">VIOLATION_RESOLVED</option>
+          </select>
+          <select id="auditResultFilter" onchange="loadAuditLog()" style="background:var(--input-bg);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.6rem;color:var(--text);font-size:0.8rem;">
+            <option value="">All Results</option>
+            <option value="SUCCESS">SUCCESS</option>
+            <option value="FAILURE">FAILURE</option>
+          </select>
+          <span id="auditTotal" style="margin-left:auto;font-size:0.78rem;color:var(--text-muted);align-self:center;"></span>
+        </div>
+        <div class="table-container">
+          <div class="table-wrap">
+            <table id="auditTable">
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Action</th>
+                  <th>Actor</th>
+                  <th>Org</th>
+                  <th>Resource</th>
+                  <th>Result</th>
+                </tr>
+              </thead>
+              <tbody id="auditLogTbody">
+                <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:2rem;">No entries loaded.</td></tr>
               </tbody>
             </table>
           </div>
@@ -1836,7 +1968,7 @@
 
         <div class="section-header">
           <h2>Registered Agents</h2>
-          <button class="btn btn-primary" onclick="openIssueKeyModal()">
+          <button class="btn btn-primary" onclick="openIssueKeyModal()" data-require-role="SUPER_ADMIN,COMPLIANCE_ADMIN">
             <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
             Issue Registration Key
           </button>
@@ -1893,7 +2025,7 @@
       Copy this key — it will <strong>not</strong> be shown again.
     </div>
     <div style="position:relative;margin:0.5rem 0 1rem;">
-      <pre id="issueKeyValue" style="background:var(--code-bg);border:1px solid var(--border);border-radius:6px;padding:1rem 3.5rem 1rem 1rem;font-family:'Geist Mono',monospace;font-size:0.82rem;overflow-x:auto;word-break:break-all;margin:0;"></pre>
+      <pre id="issueKeyValue" style="background:var(--code-bg);border:1px solid var(--border);border-radius:6px;padding:1rem 3.5rem 1rem 1rem;font-family:var(--font-mono);font-size:0.82rem;overflow-x:auto;word-break:break-all;margin:0;"></pre>
       <button id="copyKeyBtn" class="btn btn-secondary" onclick="copyKey()" style="position:absolute;top:0.5rem;right:0.5rem;padding:0.2rem 0.55rem;font-size:0.73rem;">Copy</button>
     </div>
     <div style="color:var(--text-muted);font-size:0.8rem;margin-bottom:1.5rem;line-height:1.7;">
@@ -2044,7 +2176,9 @@ function formatOrgDisplayName(orgId) {
 async function populateOrgSelector() {
   const sel = document.getElementById('orgSelector');
   try {
-    const r = await fetch('/v1/orgs');
+    // Use /api/auth/my-orgs so each user only sees orgs they have access to.
+    // SUPER_ADMIN gets all orgs; other roles get only their assigned orgs.
+    const r = await fetch('/api/auth/my-orgs', { credentials: 'include' });
     const data = await r.json();
     const orgIds = data.org_ids || [];
     if (orgIds.length === 0) {
@@ -2074,6 +2208,9 @@ function activateOrg(orgId) {
   if (document.getElementById('main-audit').classList.contains('active')) {
     loadAuditTable();
   }
+  if (document.getElementById('main-policy').classList.contains('active')) {
+    loadPolicy();
+  }
 }
 
 function onOrgChange() {
@@ -2090,17 +2227,21 @@ function showTab(name) {
   document.getElementById('main-' + name).classList.add('active');
 
   const titleMap = {
-    'overview': 'Overview',
-    'live': 'Live Stream',
-    'audit': 'Audit Ledger',
-    'agents': 'Agents',
-    'simulate': 'Scan Sandbox'
+    'overview':  'Overview',
+    'live':      'Live Stream',
+    'audit':     'Audit Ledger',
+    'agents':    'Agents',
+    'policy':    'Compliance Policy',
+    'auditlog':  'System Audit Log',
+    'simulate':  'Scan Sandbox',
   };
   document.getElementById('pageTitle').innerText = titleMap[name] || name;
 
-  if (name === 'audit') { loadAuditTable(); refreshStats(); }
-  if (name === 'overview') { refreshOverview(); }
-  if (name === 'agents') { loadAgents(); }
+  if (name === 'audit')    { loadAuditTable(); refreshStats(); }
+  if (name === 'overview') { refreshOverview(); refreshHealth(); }
+  if (name === 'agents')   { loadAgents(); }
+  if (name === 'auditlog') { loadAuditLog(); }
+  if (name === 'policy')   { loadPolicy(); }
 }
 
 // ---- WebSocket ----
@@ -2227,6 +2368,36 @@ function renderLeaderboard(containerId, counts) {
       <span class="leaderboard-count">${count}</span>
     </div>
   `).join('');
+}
+
+async function refreshHealth() {
+  const container = document.getElementById('healthChecks');
+  if (!container) return;
+  try {
+    const r = await fetch('/api/system/health', { credentials: 'include' });
+    if (!r.ok) return;
+    const data = await r.json();
+    const icons = { ok:'🟢', valid:'🟢', active:'🟢', disabled:'🟡', low:'🟡', error:'🔴', no_cert:'🟡' };
+    const labels = {
+      evidence_store: 'Evidence Store', agent_store: 'Agent Store',
+      license: 'License', tls: 'TLS', disk: 'Disk', runtime: 'Runtime',
+    };
+    container.innerHTML = Object.entries(data.checks).map(([key, val]) => {
+      const st    = val.status || 'ok';
+      const icon  = icons[st] || '🟡';
+      const label = labels[key] || key;
+      let sub = '';
+      if (key === 'disk' && val.free_pct !== undefined) sub = `${val.free_pct}% free`;
+      else if (key === 'license' && val.days_remaining !== undefined) sub = `${val.days_remaining}d remaining`;
+      else if (key === 'agent_store' && val.agents !== undefined) sub = `${val.agents} agent(s)`;
+      else if (key === 'runtime' && val.version) sub = `v${val.version}`;
+      return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;">
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:4px;">${label}</div>
+        <div style="font-size:0.85rem;font-weight:600;">${icon} ${st.toUpperCase()}</div>
+        ${sub ? `<div style="font-size:0.7rem;color:var(--text-muted);margin-top:2px;">${sub}</div>` : ''}
+      </div>`;
+    }).join('');
+  } catch (e) { /* silent — health is non-critical display */ }
 }
 
 async function refreshOverview() {
@@ -3108,6 +3279,62 @@ async function revokeAgent(agentId) {
   }
 }
 
+// ---- Current User & RBAC ----
+let currentUserRole = null;
+
+async function loadCurrentUser() {
+  try {
+    const r = await fetch('/api/auth/me', { credentials: 'include' });
+    if (!r.ok) {
+      // Session expired — redirect to login
+      window.location.href = '/login';
+      return;
+    }
+    const u = await r.json();
+    currentUserRole = u.role;
+
+    // Show user badge
+    const badge = document.getElementById('userBadge');
+    const text  = document.getElementById('userBadgeText');
+    const dot   = document.getElementById('userRoleDot');
+    if (badge && text) {
+      text.textContent = `${u.username} · ${u.role.replace('_', ' ')}`;
+      // Role colour: SUPER_ADMIN=blue, COMPLIANCE_ADMIN=green, AUDITOR=orange, VIEWER=grey
+      const colours = {
+        SUPER_ADMIN:      '#3b82f6',
+        COMPLIANCE_ADMIN: '#00df8f',
+        AUDITOR:          '#f5a623',
+        VIEWER:           '#666',
+      };
+      if (dot) dot.style.background = colours[u.role] || '#888';
+      badge.style.display = 'inline-flex';
+    }
+
+    // Apply role-based UI restrictions
+    applyRoleUI(u.role);
+  } catch (e) {
+    console.error('Could not load current user:', e);
+  }
+}
+
+function applyRoleUI(role) {
+  // Elements with data-require-role are hidden unless the current role matches
+  document.querySelectorAll('[data-require-role]').forEach(el => {
+    const required = el.getAttribute('data-require-role').split(',').map(r => r.trim());
+    if (!required.includes(role)) {
+      el.style.display = 'none';
+    }
+  });
+}
+
+async function signOut() {
+  try {
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+  } finally {
+    window.location.href = '/login';
+  }
+}
+
 // ---- License Badge ----
 async function checkLicense() {
   try {
@@ -3123,8 +3350,142 @@ async function checkLicense() {
   } catch (e) { /* badge stays hidden */ }
 }
 
+// ---- Policy Management ----
+let _policyVersions = [];
+
+async function loadPolicy() {
+  if (!currentOrgId) return;
+  // Load version history
+  try {
+    const r = await fetch(`/v1/orgs/${encodeURIComponent(currentOrgId)}/config/history`, { credentials: 'include' });
+    if (!r.ok) return;
+    const data = await r.json();
+    _policyVersions = data.versions || [];
+    const sel = document.getElementById('policyVersionSelect');
+    if (sel) {
+      sel.innerHTML = _policyVersions.map(v =>
+        `<option value="${escapeHtml(v.version)}">${v.uploaded_at}${v.is_current ? ' (current)' : ''}</option>`
+      ).join('');
+    }
+  } catch (e) {}
+  // Load current config
+  await loadPolicyVersion();
+}
+
+async function loadPolicyVersion() {
+  if (!currentOrgId) return;
+  const sel = document.getElementById('policyVersionSelect');
+  const version = sel?.value || '';
+  const badge = document.getElementById('policyVersionBadge');
+
+  const url = version
+    ? `/v1/orgs/${encodeURIComponent(currentOrgId)}/config/history/${encodeURIComponent(version)}`
+    : `/v1/orgs/${encodeURIComponent(currentOrgId)}/config`;
+
+  try {
+    const r = await fetch(url, { credentials: 'include' });
+    if (!r.ok) return;
+    const data = await r.json();
+    const config = data.config || data;
+
+    // Show current badge
+    const isCurrent = !version || (data.is_current === true);
+    if (badge) badge.style.display = isCurrent ? 'inline-flex' : 'none';
+
+    // Render fields
+    const tbody = document.getElementById('policyFieldsTbody');
+    const fields = config.fields || [];
+    if (fields.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:2rem;">No fields declared yet.</td></tr>`;
+    } else {
+      tbody.innerHTML = fields.map(f => `<tr>
+        <td class="mono" style="font-size:0.8rem;">${escapeHtml(f.field_name||'')}</td>
+        <td><span class="badge system">${escapeHtml(f.pii_category||'')}</span></td>
+        <td style="font-size:0.8rem;">${escapeHtml(f.declared_purpose||'')}</td>
+        <td style="font-size:0.78rem;color:var(--text-muted);">${escapeHtml(f.consent_scope||'')}</td>
+        <td style="font-size:0.8rem;text-align:center;">${f.retention_days||'—'}</td>
+        <td><span class="badge rule" style="font-size:0.7rem;">${escapeHtml(f.source_system||'')}</span></td>
+      </tr>`).join('');
+    }
+
+    // Identifiers
+    const ids = config.identifiers || [];
+    document.getElementById('policyIdentifiers').innerHTML = ids.length
+      ? ids.map(i => `<div style="margin-bottom:6px;"><strong>${escapeHtml(i.name)}</strong> — ${escapeHtml(i.pattern)} <span style="color:var(--text-subtle)">(${i.validator})</span></div>`).join('')
+      : '<span style="color:var(--text-subtle)">None declared.</span>';
+
+    // Linkage rules
+    const rules = config.linkage_rules || [];
+    document.getElementById('policyLinkage').innerHTML = rules.length
+      ? rules.map(r => `<div style="margin-bottom:6px;">${r.fields?.join(' + ')} → <span class="badge system" style="font-size:0.7rem;">${escapeHtml(r.risk||'LINKAGE_RISK')}</span></div>`).join('')
+      : '<span style="color:var(--text-subtle)">No linkage rules defined.</span>';
+
+  } catch (e) { console.error('Policy load error:', e); }
+}
+
+// ---- Audit Log ----
+async function loadAuditLog() {
+  const tbody  = document.getElementById('auditLogTbody');
+  const total  = document.getElementById('auditTotal');
+  const action = document.getElementById('auditActionFilter')?.value || '';
+  const result = document.getElementById('auditResultFilter')?.value || '';
+
+  if (!tbody) return;
+  tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:2rem;">Loading…</td></tr>`;
+
+  try {
+    const params = new URLSearchParams();
+    if (action) params.set('action', action);
+    if (result) params.set('result', result);
+    params.set('limit', '200');
+
+    const r = await fetch(`/api/audit/logs?${params}`, { credentials: 'include' });
+    if (!r.ok) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--high);padding:2rem;">Error: ${r.status}</td></tr>`;
+      return;
+    }
+    const data = await r.json();
+    if (total) total.textContent = `${data.total} entries`;
+
+    if (!data.entries || data.entries.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:2rem;">No audit log entries.</td></tr>`;
+      return;
+    }
+
+    const resultColour = { SUCCESS: 'var(--low)', FAILURE: 'var(--high)' };
+
+    tbody.innerHTML = data.entries.map(e => `<tr>
+      <td style="font-size:0.78rem;font-family:var(--font-mono)">${new Date(e.timestamp).toLocaleString()}</td>
+      <td><span class="badge rule" style="font-size:0.72rem;">${escapeHtml(e.action)}</span></td>
+      <td style="font-size:0.8rem;">${escapeHtml(e.actor_name || e.actor_id || '—')}</td>
+      <td style="font-size:0.8rem;">${escapeHtml(e.org_id || '—')}</td>
+      <td style="font-size:0.78rem;color:var(--text-muted);">${escapeHtml(e.resource || '—')}</td>
+      <td><span style="font-size:0.72rem;font-weight:600;color:${resultColour[e.result] || 'var(--text-muted)'};">${escapeHtml(e.result)}</span></td>
+    </tr>`).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--high);padding:2rem;">Network error loading audit log.</td></tr>`;
+  }
+}
+
+// ---- Backup ----
+async function triggerBackup() {
+  if (!confirm('Create a backup of all Veritas data now?\n\nThis may take a few seconds.')) return;
+  try {
+    const r = await fetch('/api/system/backup', { method: 'POST', credentials: 'include' });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok) {
+      showToast(`Backup created: ${d.filename} (${d.size_mb} MB)`, 'success');
+    } else {
+      showToast(d.detail || 'Backup failed.', 'error');
+    }
+  } catch (e) {
+    showToast('Network error creating backup.', 'error');
+  }
+}
+
 // ---- Initialization ----
 (async function init() {
+  await loadCurrentUser();   // load role first — gates all UI
   await checkLicense();
   await populateOrgSelector();
   connectWS();
@@ -3132,6 +3493,7 @@ async function checkLicense() {
   refreshOverview();
   populateSimExamples();
   setInterval(() => { refreshStats(); refreshOverview(); }, 5000);
+  setInterval(refreshHealth, 30000);  // health panel refreshes every 30s
 })();
 </script>
 </body>

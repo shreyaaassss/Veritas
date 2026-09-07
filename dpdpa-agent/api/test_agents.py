@@ -13,9 +13,12 @@ from fastapi.testclient import TestClient
 
 import agent_store.store as agent_store_module
 import evidence_store.store as store_module
+import user_store.store as user_store_module
 from agent_store.store import get_agent_store, reset_agent_store
 from dashboard import live_feed
 from dashboard.server import app
+from user_store.store import get_user_store, reset_user_store
+from user_store.models import UserRole
 
 client = TestClient(app)
 
@@ -24,18 +27,35 @@ client = TestClient(app)
 # Fixtures
 # ---------------------------------------------------------------------------
 
+def _make_admin():
+    from passlib.context import CryptContext
+    pw_hash = CryptContext(schemes=["bcrypt"], deprecated="auto").hash("testpass123!")
+    get_user_store().create_user("testadmin", "admin@test.io", pw_hash, UserRole.SUPER_ADMIN)
+    r = client.post("/api/auth/login", data={"username": "testadmin", "password": "testpass123!"})
+    assert r.status_code == 200, f"Login failed in test setup: {r.text}"
+
+
 @pytest.fixture(autouse=True)
 def isolated_stores(tmp_path, monkeypatch):
-    """Fresh, isolated stores for every test."""
+    """Fresh, isolated stores for every test + auto-login as SUPER_ADMIN."""
     monkeypatch.setattr(store_module, "_DEFAULT_DB_PATH", tmp_path / "test_evidence.db")
     monkeypatch.setattr(agent_store_module, "_DEFAULT_DB_PATH", tmp_path / "test_agents.db")
+    monkeypatch.setattr(user_store_module, "_DEFAULT_DB_PATH", tmp_path / "test_users.db")
+    monkeypatch.setenv("VERITAS_SECURE_COOKIES", "false")
+    monkeypatch.setenv("VERITAS_JWT_SECRET", "test-jwt-secret-for-unit-tests-only")
     store_module.reset_store()
     reset_agent_store()
+    reset_user_store()
     live_feed._ws_clients.clear()
+
+    _make_admin()
+
     yield
     store_module.reset_store()
     reset_agent_store()
+    reset_user_store()
     live_feed._ws_clients.clear()
+    client.cookies.clear()
 
 
 def _register_agent(org_id: str = "blinkit", source_label: str = "test-service") -> tuple[str, str]:

@@ -1,0 +1,38 @@
+[Unit]
+Description=Veritas Agent — DPDPA telemetry forwarder
+Documentation=https://veritas.io/docs/agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=veritas-agent
+Group=veritas-agent
+WorkingDirectory=/opt/veritas-agent
+
+# Config and state live in the install directory
+Environment=PYTHONUNBUFFERED=1
+
+# Use bundled executable if available, otherwise venv Python
+ExecStart=/bin/bash -c '\
+  if [ -f /opt/veritas-agent/veritas-agent ]; then \
+    exec /opt/veritas-agent/veritas-agent --config /etc/veritas-agent/agent-config.yaml; \
+  else \
+    exec /opt/veritas-agent/venv/bin/python /opt/veritas-agent/agent.py \
+         --config /etc/veritas-agent/agent-config.yaml; \
+  fi'
+
+# Restart always — the agent should survive transient failures
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=veritas-agent
+
+# Resource limits — agent is lightweight
+MemoryMax=256M
+
+[Install]
+WantedBy=multi-user.target

@@ -63,6 +63,8 @@ from pydantic import BaseModel, Field, model_validator
 
 from agent_store.models import Agent
 from api.agent_auth import verify_agent_token
+from api.auth_deps import check_org_access, get_current_user, org_access, require_roles
+from user_store.models import User, UserRole
 
 from config_loader import OrgConfigNotFoundError, load_org_config
 from dashboard.live_feed import publish as publish_live_feed
@@ -72,7 +74,10 @@ from evidence_store.store import get_store
 from investigation import investigate, parse_reference
 from llm_explainer.explainer import ExplainedVerdict, build_deferred_explanation
 from masking import mask_fields, mask_text
-from org_config.store import list_registered_orgs, upload_org_config as store_upload_org_config
+from org_config.store import (
+    get_config_raw, get_config_version_meta,
+    list_registered_orgs, upload_org_config as store_upload_org_config,
+)
 from registry.loader import reload_org_config
 from rules.engine import evaluate_event
 from schemas.models import Event, RuleId, SourceType, Verdict
@@ -336,7 +341,10 @@ def _event_from_scan_request(org_id: str, req: ScanRequest) -> Event:
 
 
 @router.post("/{org_id}/scan")
-async def scan(org_id: str, req: ScanRequest) -> Dict[str, Any]:
+async def scan(
+    org_id: str, req: ScanRequest,
+    _user: User = Depends(org_access(UserRole.COMPLIANCE_ADMIN, UserRole.AUDITOR)),
+) -> Dict[str, Any]:
     """
     Synchronous scan — stateless w.r.t. correctness (no prior Stream-mode
     event required). See module docstring for the write-to-Evidence-Store
@@ -387,7 +395,7 @@ async def scan(org_id: str, req: ScanRequest) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 @router.get("/orgs")
-async def list_orgs() -> Dict[str, Any]:
+async def list_orgs(_user: User = Depends(get_current_user)) -> Dict[str, Any]:
     """Every org_id with at least one stored config version. Read-only,
     no auth — same posture as the rest of this phase (see module docstring
     on the auth non-goal)."""
@@ -395,11 +403,60 @@ async def list_orgs() -> Dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# Phase 14 — Policy Management: read current config + version history
+# ---------------------------------------------------------------------------
+
+@router.get("/orgs/{org_id}/config")
+async def get_org_config_endpoint(
+    org_id: str, _user: User = Depends(org_access()),
+) -> Dict[str, Any]:
+    """Get the current compliance policy config for an org."""
+    _require_org_config(org_id)
+    raw = get_config_raw(org_id)
+    if raw is None:
+        raise HTTPException(status_code=404, detail=f"No config found for org {org_id!r}.")
+    return raw
+
+
+@router.get("/orgs/{org_id}/config/history")
+async def list_config_versions(
+    org_id: str, _user: User = Depends(org_access()),
+) -> Dict[str, Any]:
+    """
+    List all policy config versions for an org, newest first.
+    Each entry includes: version filename, upload timestamp, whether it's current, size.
+    """
+    _require_org_config(org_id)
+    versions = get_config_version_meta(org_id)
+    return {"org_id": org_id, "versions": versions, "total": len(versions)}
+
+
+@router.get("/orgs/{org_id}/config/history/{version}")
+async def get_config_version(
+    org_id: str, version: str, _user: User = Depends(org_access()),
+) -> Dict[str, Any]:
+    """
+    Retrieve a specific historical version of an org's compliance policy.
+    Version is the filename e.g. '2026-08-21T00-00-00Z.yaml'.
+    """
+    _require_org_config(org_id)
+    raw = get_config_raw(org_id, version=version)
+    if raw is None:
+        raise HTTPException(status_code=404, detail=f"Version {version!r} not found for org {org_id!r}.")
+    versions = get_config_version_meta(org_id)
+    is_current = any(v["version"] == version and v["is_current"] for v in versions)
+    return {"version": version, "is_current": is_current, "config": raw}
+
+
+# ---------------------------------------------------------------------------
 # Minimal org config upload (explicit non-goal exception — see module docstring)
 # ---------------------------------------------------------------------------
 
 @router.post("/orgs/{org_id}/config")
-async def upload_org_config_endpoint(org_id: str, config: Dict[str, Any] = Body(...)) -> Dict[str, Any]:
+async def upload_org_config_endpoint(
+    org_id: str, config: Dict[str, Any] = Body(...),
+    _user: User = Depends(org_access(UserRole.COMPLIANCE_ADMIN)),
+) -> Dict[str, Any]:
     """
     Minimal config registration: validates via Phase 1's own
     validate_org_config (called internally by org_config.store.
@@ -416,6 +473,24 @@ async def upload_org_config_endpoint(org_id: str, config: Dict[str, Any] = Body(
     if result["status"] == "ok":
         reload_org_config(org_id)
         logger.info("Registered/updated org config for org_id=%r, reloaded into rule engine cache.", org_id)
+        # Auto-grant the uploading user access to this org (SUPER_ADMIN already has wildcard)
+        if _user.role != UserRole.SUPER_ADMIN:
+            try:
+                from user_store.store import get_user_store as _users
+                _users().grant_org_access(_user.user_id, org_id, granted_by=_user.user_id)
+                logger.info("Auto-granted %r access to org %r after config upload.", _user.username, org_id)
+            except Exception:
+                pass
+        # Audit log the policy change
+        try:
+            from audit_log.store import get_audit_store
+            get_audit_store().log(
+                "ORG_CONFIG_UPDATED",
+                actor_id=_user.user_id, actor_name=_user.username,
+                org_id=org_id, resource=f"org_config:{result.get('version','unknown')}",
+            )
+        except Exception:
+            pass
     return result
 
 
@@ -443,7 +518,10 @@ class InvestigateRequest(BaseModel):
 
 
 @router.post("/{org_id}/investigate")
-async def investigate_endpoint(org_id: str, req: InvestigateRequest) -> Dict[str, Any]:
+async def investigate_endpoint(
+    org_id: str, req: InvestigateRequest,
+    _user: User = Depends(org_access(UserRole.COMPLIANCE_ADMIN, UserRole.AUDITOR)),
+) -> Dict[str, Any]:
     """
     Layer 2+3 of the breach investigation system: resolve the '@N'
     reference to its full stored breach record, then answer the

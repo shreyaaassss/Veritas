@@ -104,6 +104,22 @@ else
     echo "==> spaCy model already installed."
 fi
 
+# ---- TLS certificate ----
+CERT_DIR="$INSTALL_DIR/certs"
+CERT_FILE="$CERT_DIR/server.crt"
+KEY_FILE="$CERT_DIR/server.key"
+if [[ ! -f "$CERT_FILE" ]]; then
+    echo "==> Generating self-signed TLS certificate..."
+    mkdir -p "$CERT_DIR"
+    "$VENV_DIR/bin/python" -c "
+from tls import generate_self_signed_cert
+from pathlib import Path
+generate_self_signed_cert(Path('$CERT_FILE'), Path('$KEY_FILE'))
+    " && echo "    [OK] TLS certificate generated at $CERT_FILE" || echo "    WARNING: TLS cert generation failed — server will run over HTTP"
+else
+    echo "==> TLS certificate already exists — skipping generation."
+fi
+
 # ---- Permissions ----
 echo "==> Setting permissions..."
 chown -R veritas:veritas "$INSTALL_DIR"

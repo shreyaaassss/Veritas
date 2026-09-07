@@ -1,21 +1,15 @@
 """
-Veritas Agent Management API (Block 2)
-=======================================
-Six endpoints split into two groups:
+Veritas Agent Management API
+================================
+Admin-facing routes (require human JWT auth):
+    POST /agents/issue-key          Issue one-time registration key
+    GET  /agents                    List agents
+    GET  /agents/{agent_id}         Agent detail
+    POST /agents/{agent_id}/revoke  Revoke agent
 
-  Admin-facing (no auth — consistent with existing no-auth model for admin routes):
-    POST /agents/issue-key          Issue a one-time registration key for an org
-    GET  /agents                    List all registered agents (filterable by org)
-    GET  /agents/{agent_id}         Single agent detail
-    POST /agents/{agent_id}/revoke  Revoke an agent
-
-  Agent-facing (called by the deployable Veritas Agent container):
-    POST /agent/register            Bootstrap: consume key → get identity
-    POST /agent/heartbeat           Update last-seen timestamp
-
-Note: /agent/register and /agent/heartbeat use the singular /agent prefix
-(not /agents) to match the plan's documented URL contract that the Agent
-binary is configured with.
+Agent-facing routes (require Agent Bearer token, NOT human auth):
+    POST /agent/register            Bootstrap registration (key-based)
+    POST /agent/heartbeat           Heartbeat update (agent token)
 """
 
 from __future__ import annotations
@@ -29,7 +23,10 @@ from pydantic import BaseModel, Field
 from agent_store.models import Agent, AgentStatus
 from agent_store.store import get_agent_store
 from api.agent_auth import verify_agent_token
+from api.auth_deps import get_current_user, require_roles
 from config_loader import OrgConfigNotFoundError, load_org_config
+from rate_limit import issue_key_rate_limit, register_rate_limit
+from user_store.models import User, UserRole
 
 logger = logging.getLogger("api.agents")
 
@@ -86,10 +83,11 @@ class RegisterAgentRequest(BaseModel):
 
 
 class RegisterAgentResponse(BaseModel):
-    agent_id: str
-    auth_token: str
-    org_id: str
+    agent_id:       str
+    auth_token:     str
+    org_id:         str
     event_endpoint: str
+    server_version: str = "1.0.0"   # Phase 22 — agent can detect version mismatches
 
 
 class HeartbeatRequest(BaseModel):
@@ -101,7 +99,11 @@ class HeartbeatRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 @router.post("/agents/issue-key", response_model=IssueKeyResponse)
-async def issue_registration_key(req: IssueKeyRequest) -> IssueKeyResponse:
+async def issue_registration_key(
+    req: IssueKeyRequest,
+    _user: User = Depends(require_roles(UserRole.SUPER_ADMIN, UserRole.COMPLIANCE_ADMIN)),
+    _rl: None = Depends(issue_key_rate_limit),
+) -> IssueKeyResponse:
     """
     Issue a one-time registration key for an org.
     Called by the admin UI when the admin clicks "Register Agent".
@@ -121,7 +123,7 @@ async def issue_registration_key(req: IssueKeyRequest) -> IssueKeyResponse:
 
 
 @router.get("/agents")
-async def list_agents(org_id: Optional[str] = None) -> dict:
+async def list_agents(org_id: Optional[str] = None, _user: User = Depends(get_current_user)) -> dict:
     """
     List all registered agents, optionally filtered by org_id.
     Called by the admin UI's Agents section.
@@ -131,7 +133,7 @@ async def list_agents(org_id: Optional[str] = None) -> dict:
 
 
 @router.get("/agents/{agent_id}")
-async def get_agent(agent_id: str) -> dict:
+async def get_agent(agent_id: str, _user: User = Depends(get_current_user)) -> dict:
     """Single agent detail by agent_id."""
     agent = get_agent_store().get_agent(agent_id)
     if agent is None:
@@ -140,7 +142,10 @@ async def get_agent(agent_id: str) -> dict:
 
 
 @router.post("/agents/{agent_id}/revoke")
-async def revoke_agent(agent_id: str) -> dict:
+async def revoke_agent(
+    agent_id: str,
+    _user: User = Depends(require_roles(UserRole.SUPER_ADMIN, UserRole.COMPLIANCE_ADMIN)),
+) -> dict:
     """
     Revoke an agent. Subsequent telemetry from this agent will be rejected
     with 403. The agent record is kept for audit purposes.
@@ -149,6 +154,12 @@ async def revoke_agent(agent_id: str) -> dict:
     if not found:
         raise HTTPException(status_code=404, detail=f"Agent {agent_id!r} not found.")
     logger.info("Admin revoked agent %s", agent_id)
+    try:
+        from audit_log.store import AuditAction, get_audit_store
+        get_audit_store().log(AuditAction.AGENT_REVOKED, actor_id=_user.user_id, actor_name=_user.username,
+                              resource=f"agent:{agent_id}")
+    except Exception:
+        pass
     return {"ok": True, "agent_id": agent_id, "status": "REVOKED"}
 
 
@@ -157,7 +168,10 @@ async def revoke_agent(agent_id: str) -> dict:
 # ---------------------------------------------------------------------------
 
 @router.post("/agent/register", response_model=RegisterAgentResponse)
-async def register_agent(req: RegisterAgentRequest) -> RegisterAgentResponse:
+async def register_agent(
+    req: RegisterAgentRequest,
+    _rl: None = Depends(register_rate_limit),
+) -> RegisterAgentResponse:
     """
     Agent bootstrap registration.
     The Agent presents the one-time registration key it was configured with.

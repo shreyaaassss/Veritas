@@ -173,39 +173,49 @@ class TestInvestigateEndpoint:
 
     @pytest.fixture(autouse=True)
     def isolated_store(self, tmp_path, monkeypatch):
+        import user_store.store as user_store_module
+        from user_store.store import get_user_store, reset_user_store
+        from user_store.models import UserRole
         monkeypatch.setattr(store_module, "_DEFAULT_DB_PATH", tmp_path / "api_investigation_test.db")
+        monkeypatch.setattr(user_store_module, "_DEFAULT_DB_PATH", tmp_path / "api_invest_users.db")
+        monkeypatch.setenv("VERITAS_SECURE_COOKIES", "false")
+        monkeypatch.setenv("VERITAS_JWT_SECRET", "test-jwt-secret-for-unit-tests-only")
         store_module.reset_store()
+        reset_user_store()
+
+        # Create admin + store auth client
+        from passlib.context import CryptContext
+        from dashboard.server import app
+        pw_hash = CryptContext(schemes=["bcrypt"], deprecated="auto").hash("testpass123!")
+        get_user_store().create_user("inv_admin", "inv@test.io", pw_hash, UserRole.SUPER_ADMIN)
+        self._client = TestClient(app)
+        r = self._client.post("/api/auth/login", data={"username": "inv_admin", "password": "testpass123!"})
+        assert r.status_code == 200, f"Login failed: {r.text}"
+
         yield
         store_module.reset_store()
+        reset_user_store()
 
     def test_text_form_with_reference(self):
-        from dashboard.server import app
-        client = TestClient(app)
-        client.post("/v1/blinkit/scan", json={"text": "leaked employee id: ABCDE1234F"})
+        self._client.post("/v1/blinkit/scan", json={"text": "leaked employee id: ABCDE1234F"})
 
         with patch("investigation._call_llm_for_investigation", return_value="It was exposed in a log."):
-            r = client.post("/v1/blinkit/investigate", json={"text": "@1 what happened?"})
+            r = self._client.post("/v1/blinkit/investigate", json={"text": "@1 what happened?"})
         assert r.status_code == 200
         assert r.json()["answer"] == "It was exposed in a log."
 
     def test_structured_form(self):
-        from dashboard.server import app
-        client = TestClient(app)
-        client.post("/v1/blinkit/scan", json={"text": "leaked employee id: ABCDE1234F"})
+        self._client.post("/v1/blinkit/scan", json={"text": "leaked employee id: ABCDE1234F"})
 
         with patch("investigation._call_llm_for_investigation", return_value="It was exposed."):
-            r = client.post("/v1/blinkit/investigate", json={"violation_id": 1, "question": "what happened?"})
+            r = self._client.post("/v1/blinkit/investigate", json={"violation_id": 1, "question": "what happened?"})
         assert r.status_code == 200
         assert r.json()["violation_id"] == 1
 
     def test_missing_reference_returns_400(self):
-        from dashboard.server import app
-        client = TestClient(app)
-        r = client.post("/v1/blinkit/investigate", json={"text": "no reference here"})
+        r = self._client.post("/v1/blinkit/investigate", json={"text": "no reference here"})
         assert r.status_code == 400
 
     def test_unknown_org_returns_404(self):
-        from dashboard.server import app
-        client = TestClient(app)
-        r = client.post("/v1/nonexistent_org/investigate", json={"text": "@1 what happened"})
+        r = self._client.post("/v1/nonexistent_org/investigate", json={"text": "@1 what happened"})
         assert r.status_code == 404

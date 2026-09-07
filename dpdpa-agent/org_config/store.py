@@ -203,6 +203,51 @@ def list_registered_orgs() -> List[str]:
     )
 
 
+def get_config_raw(org_id: str, version: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """
+    Return the raw dict of an org's config (latest, or a specific version).
+    Version is the filename e.g. "2026-08-21T00-00-00Z.yaml".
+    Returns None if the org or version doesn't exist.
+    """
+    if version:
+        config_path = _CONFIGS_DIR / org_id / version
+        if not config_path.exists():
+            return None
+    else:
+        config_path = _latest_config_path(org_id)
+        if config_path is None:
+            return None
+
+    with open(config_path, "r", encoding="utf-8") as f:
+        raw = yaml.safe_load(f)
+    return raw if isinstance(raw, dict) else None
+
+
+def get_config_version_meta(org_id: str) -> List[Dict[str, Any]]:
+    """
+    Return metadata for all config versions of an org, newest first.
+    Each entry: {version, uploaded_at, is_current, size_bytes}
+    """
+    versions = list_org_config_versions(org_id)
+    if not versions:
+        return []
+    current = versions[-1]  # newest = current
+    result = []
+    for v in reversed(versions):
+        path = _CONFIGS_DIR / org_id / v
+        # Convert filename back to ISO timestamp: "2026-08-21T00-00-00Z.yaml" → "2026-08-21T00:00:00Z"
+        ts_str = v.replace(".yaml", "").replace("-", ":", 2)  # only first two hyphens in time part
+        # Safer approach: just return the filename as version ID, timestamp parseable from it
+        uploaded_at = v.replace(".yaml", "").replace("T", "T").replace("-", ":", 2) if "T" in v else v
+        result.append({
+            "version":     v,
+            "uploaded_at": uploaded_at,
+            "is_current":  v == current,
+            "size_bytes":  path.stat().st_size if path.exists() else 0,
+        })
+    return result
+
+
 def delete_org_configs(org_id: str) -> int:
     """
     Delete all stored configs for an org. Returns the number of files deleted.

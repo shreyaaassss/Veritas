@@ -36,3 +36,18 @@ pipeline.log
 # ---- OS ----
 .DS_Store
 Thumbs.db
+
+# ---- Runtime data — generated at startup, never commit ----
+dpdpa-agent/secrets/
+dpdpa-agent/certs/
+dpdpa-agent/backups/
+dpdpa-agent/.pytest_cache/
+
+# ---- Test-generated org configs (created by tests without tmp_path isolation) ----
+dpdpa-agent/org_config/configs/e2e_corp/
+dpdpa-agent/org_config/configs/org_a/
+dpdpa-agent/org_config/configs/org_b/
+dpdpa-agent/org_config/configs/other_corp/
+dpdpa-agent/org_config/configs/api_test_org/
+dpdpa-agent/org_config/configs/edtech_co_test/
+dpdpa-agent/org_config/configs/phase4_test_org/

@@ -158,29 +158,26 @@ def _grounding_check(llm_response: _LLMResponse, expected_section: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# OpenAI-compatible LLM call (uses openai package already installed)
+# LLM call — uses ai_config for provider/mode abstraction
 # ---------------------------------------------------------------------------
 
 def _call_llm(verdict: Verdict, snippet: dict) -> Optional[_LLMResponse]:
     """
-    Calls the LLM with the verdict + statute snippet, temperature=0,
+    Calls the configured LLM with the verdict + statute snippet, temperature=0,
     requiring structured JSON output. Returns a validated _LLMResponse on
     success, None on ANY failure (caught, never re-raised).
+
+    Provider selection is fully delegated to ai_config.get_ai_client():
+      - VERITAS_AI_MODE=disabled (or no keys configured) → returns None immediately
+      - VERITAS_AI_MODE=external → OpenAI or Anthropic SDK
+      - VERITAS_AI_MODE=local   → OpenAI-compatible client to local URL
     """
     try:
-        from openai import OpenAI
-
-        api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")
-        # Support Anthropic-compatible OpenAI SDK usage if ANTHROPIC_API_KEY set
-        if os.environ.get("ANTHROPIC_API_KEY") and not os.environ.get("OPENAI_API_KEY"):
-            client = OpenAI(
-                api_key=os.environ["ANTHROPIC_API_KEY"],
-                base_url="https://api.anthropic.com/v1/",
-            )
-            model = "claude-sonnet-4-5"
-        else:
-            client = OpenAI(api_key=api_key)
-            model = os.environ.get("LLM_MODEL", "gpt-4o-mini")
+        from ai_config import get_ai_client
+        client, model = get_ai_client()
+        if client is None:
+            logger.debug("AI disabled or unconfigured — skipping LLM call")
+            return None
 
         prompt = f"""You are a DPDPA (Digital Personal Data Protection Act 2023) compliance analyst assistant.
 You will be given a compliance violation verdict and the relevant statute text.
@@ -207,16 +204,31 @@ Rules:
 - Confidence should be 0.8-1.0 for clear violations, 0.5-0.8 for ambiguous cases
 """
 
-        # Force JSON mode where supported
-        response = client.chat.completions.create(
-            model=model,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0,
-            max_tokens=400,
-            response_format={"type": "json_object"} if "gpt" in model else None,
-        )
+        # Detect Anthropic native SDK vs OpenAI-compatible client
+        try:
+            from anthropic import Anthropic as _Anthropic
+            _is_anthropic = isinstance(client, _Anthropic)
+        except ImportError:
+            _is_anthropic = False
 
-        raw = response.choices[0].message.content
+        if _is_anthropic:
+            response = client.messages.create(
+                model=model,
+                max_tokens=400,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            raw = response.content[0].text if response.content else None
+        else:
+            # OpenAI SDK or OpenAI-compatible (local Ollama / LM Studio)
+            response = client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0,
+                max_tokens=400,
+                response_format={"type": "json_object"} if "gpt" in model else None,
+            )
+            raw = response.choices[0].message.content
+
         if not raw:
             logger.warning("LLM returned empty content")
             return None

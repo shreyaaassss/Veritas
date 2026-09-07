@@ -205,36 +205,25 @@ def _should_force_fallback() -> bool:
     return os.environ.get("FORCE_LLM_FALLBACK", "").strip() == "1"
 
 
-def _get_llm_client_and_model():
-    """
-    Minimal client setup — deliberately duplicated from
-    llm_explainer/explainer.py's _call_llm rather than importing it,
-    to keep this module's only dependency on that one the frozen,
-    read-only _STATUTE_SNIPPETS dict (see module docstring: this module
-    is new, additive, and does not modify explain_verdict's existing,
-    already-tested call path).
-    """
-    from openai import OpenAI
-
-    api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")
-    if os.environ.get("ANTHROPIC_API_KEY") and not os.environ.get("OPENAI_API_KEY"):
-        client = OpenAI(api_key=os.environ["ANTHROPIC_API_KEY"], base_url="https://api.anthropic.com/v1/")
-        model = "claude-sonnet-4-5"
-    else:
-        client = OpenAI(api_key=api_key)
-        model = os.environ.get("LLM_MODEL", "gpt-4o-mini")
-    return client, model
-
-
 def _call_llm_for_investigation(
     row: Dict[str, Any],
     question: str,
     history: List[Dict[str, str]],
     aggregate_context: str,
 ) -> Optional[str]:
-    """Returns the LLM's free-text answer, or None on ANY failure (never raises)."""
+    """Returns the LLM's free-text answer, or None on ANY failure (never raises).
+
+    Provider selection is fully delegated to ai_config.get_ai_client():
+      - mode=disabled → returns None immediately (no LLM call)
+      - mode=external → OpenAI or Anthropic SDK
+      - mode=local    → OpenAI-compatible client to local URL (Ollama, etc.)
+    """
     try:
-        client, model = _get_llm_client_and_model()
+        from ai_config import get_ai_client
+        client, model = get_ai_client()
+        if client is None:
+            logger.debug("AI disabled or unconfigured — investigation falling back to template")
+            return None
 
         statute_snippet = _STATUTE_SNIPPETS.get(row["rule_id"], {})
         statute_text = statute_snippet.get("text", "(no statute text on file for this rule — cite nothing.)")
@@ -258,21 +247,40 @@ Rules you must follow:
 - Keep answers concise (a few sentences, or a short numbered list for step-by-step questions) unless asked to elaborate further.
 """
 
-        messages = [{"role": "system", "content": system_prompt}]
+        messages_payload = [{"role": "system", "content": system_prompt}]
         for turn in history:
             role = turn.get("role")
             content = turn.get("content", "")
             if role in ("user", "assistant") and content:
-                messages.append({"role": role, "content": content})
-        messages.append({"role": "user", "content": question})
+                messages_payload.append({"role": role, "content": content})
+        messages_payload.append({"role": "user", "content": question})
 
-        response = client.chat.completions.create(
-            model=model,
-            messages=messages,
-            temperature=0,
-            max_tokens=500,
-        )
-        text = response.choices[0].message.content
+        # Detect Anthropic native SDK vs OpenAI-compatible client
+        try:
+            from anthropic import Anthropic as _Anthropic
+            _is_anthropic = isinstance(client, _Anthropic)
+        except ImportError:
+            _is_anthropic = False
+
+        if _is_anthropic:
+            # Anthropic SDK: system prompt is a top-level param, not a message
+            anthropic_messages = [m for m in messages_payload if m["role"] != "system"]
+            response = client.messages.create(
+                model=model,
+                max_tokens=500,
+                system=system_prompt,
+                messages=anthropic_messages,
+            )
+            text = response.content[0].text if response.content else None
+        else:
+            response = client.chat.completions.create(
+                model=model,
+                messages=messages_payload,
+                temperature=0,
+                max_tokens=500,
+            )
+            text = response.choices[0].message.content
+
         return text.strip() if text else None
 
     except Exception as exc:

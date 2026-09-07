@@ -47,14 +47,18 @@ import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
+from api.auth import needs_setup, router as auth_router
+from api.auth_deps import check_org_access, get_current_user, org_access, require_roles
 from api.integration import router as integration_router
 from dashboard.live_feed import broadcaster_task, get_live_feed_queue, register_client, set_server_loop, unregister_client
 from evidence_store.store import get_store
 from license import LicenseError, validate_license
+from user_store.models import User, UserRole
 
 logger = logging.getLogger("dashboard.server")
 
@@ -64,10 +68,12 @@ logger = logging.getLogger("dashboard.server")
 # body is read. Prevents unbounded memory use from oversized Agent payloads.
 # ---------------------------------------------------------------------------
 
+_API_VERSION = "1.0.0"
 _MAX_BODY_BYTES = 256 * 1024  # 256 KB
 
 
 class _BodySizeLimit(BaseHTTPMiddleware):
+    """Rejects requests whose Content-Length exceeds 256 KB (Phase 8 hardening)."""
     async def dispatch(self, request: Request, call_next):
         content_length = request.headers.get("content-length")
         if content_length:
@@ -82,15 +88,105 @@ class _BodySizeLimit(BaseHTTPMiddleware):
         return await call_next(request)
 
 
-app = FastAPI(title="DPDPA Compliance Agent — Dashboard", version="1.0.0")
+class _SecurityHeaders(BaseHTTPMiddleware):
+    """
+    Phase 21 — Security headers added to every response.
 
+    CSP notes:
+      - 'unsafe-inline' is required because the dashboard uses inline JS/CSS.
+        This is a known limitation of single-file HTML dashboards.
+        Future hardening would extract JS to separate files and add nonces.
+      - frame-ancestors 'none' prevents clickjacking (supersedes X-Frame-Options
+        in modern browsers; both are set for compatibility).
+      - connect-src includes wss: for WebSocket connections.
+    """
+
+    def _csp(self, is_https: bool) -> str:
+        upgrade = "upgrade-insecure-requests; " if is_https else ""
+        return (
+            f"{upgrade}"
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data:; "
+            "font-src 'self'; "
+            "connect-src 'self' ws: wss:; "
+            "frame-ancestors 'none'; "
+            "base-uri 'self'; "
+            "form-action 'self'"
+        )
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        is_https = request.url.scheme == "https"
+
+        response.headers["X-Content-Type-Options"]    = "nosniff"
+        response.headers["X-Frame-Options"]            = "DENY"
+        response.headers["X-XSS-Protection"]           = "1; mode=block"
+        response.headers["Referrer-Policy"]             = "strict-origin-when-cross-origin"
+        response.headers["Content-Security-Policy"]     = self._csp(is_https)
+        response.headers["Permissions-Policy"]          = "geolocation=(), camera=(), microphone=()"
+        response.headers["X-Veritas-API-Version"]       = _API_VERSION
+
+        if is_https:
+            response.headers["Strict-Transport-Security"] = (
+                "max-age=31536000; includeSubDomains; preload"
+            )
+
+        # Never expose server implementation details
+        for hdr in ("server", "x-powered-by"):
+            try:
+                del response.headers[hdr]
+            except (KeyError, Exception):
+                pass
+
+        return response
+
+
+app = FastAPI(
+    title="Veritas DPDPA Compliance Platform",
+    version=_API_VERSION,
+    description=(
+        "On-premise DPDPA compliance monitoring API. "
+        "All endpoints require authentication except /health, /ready, "
+        "/login, /setup, and /api/tls/cert."
+    ),
+    docs_url=None,     # Disable auto-generated Swagger UI in production
+    redoc_url=None,    # Disable ReDoc in production
+    openapi_url="/api/openapi.json",  # Still available for integrations
+)
+
+app.add_middleware(_SecurityHeaders)
 app.add_middleware(_BodySizeLimit)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=["http://localhost:8000", "http://127.0.0.1:8000",
+                   "https://localhost:8000", "https://127.0.0.1:8000"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
+    expose_headers=["X-Veritas-API-Version"],
 )
+
+# Serve bundled JS libraries (jsPDF etc.) at /static — no CDN needed
+# Works offline / air-gapped. Path resolves to dashboard/static/ directory.
+_static_dir = None
+try:
+    from runtime_paths import bundle_root
+    _static_dir = bundle_root() / "dashboard" / "static"
+    if not _static_dir.exists():
+        # Development fallback: next to this file
+        from pathlib import Path as _Path
+        _static_dir = _Path(__file__).parent / "static"
+except Exception:
+    from pathlib import Path as _Path
+    _static_dir = _Path(__file__).parent / "static"
+
+if _static_dir and _static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
+
+# Auth router first — login/logout/setup are public
+app.include_router(auth_router)
 
 app.include_router(integration_router)
 
@@ -102,9 +198,39 @@ app.include_router(agents_router)
 # Routes — dashboard page + WebSocket
 # ---------------------------------------------------------------------------
 
-@app.get("/", response_class=HTMLResponse)
-async def serve_dashboard():
+@app.get("/login", response_class=HTMLResponse)
+async def serve_login():
     from runtime_paths import bundle_root
+    html_path = bundle_root() / "dashboard" / "login.html"
+    return HTMLResponse(html_path.read_text(encoding="utf-8"))
+
+
+@app.get("/setup", response_class=HTMLResponse)
+async def serve_setup():
+    """First-boot admin setup page. Redirects to login if users already exist."""
+    from fastapi.responses import RedirectResponse
+    if not needs_setup():
+        return RedirectResponse(url="/login", status_code=302)
+    from runtime_paths import bundle_root
+    html_path = bundle_root() / "dashboard" / "setup.html"
+    return HTMLResponse(html_path.read_text(encoding="utf-8"))
+
+
+@app.get("/", response_class=HTMLResponse)
+async def serve_dashboard(request: Request):
+    from fastapi.responses import RedirectResponse
+    from runtime_paths import bundle_root
+    from api.auth_deps import decode_access_token, _COOKIE_NAME
+
+    # First-boot: no users exist → redirect to setup
+    if needs_setup():
+        return RedirectResponse(url="/setup", status_code=302)
+
+    # Not authenticated → redirect to login
+    token = request.cookies.get(_COOKIE_NAME)
+    if not token or not decode_access_token(token):
+        return RedirectResponse(url="/login", status_code=302)
+
     html_path = bundle_root() / "dashboard" / "index.html"
     return HTMLResponse(html_path.read_text(encoding="utf-8"))
 
@@ -112,11 +238,16 @@ async def serve_dashboard():
 @app.websocket("/ws/{org_id}")
 async def websocket_endpoint(ws: WebSocket, org_id: str):
     """
-    Live feed for exactly ONE org's verdicts. A client connected here for
-    org_id="A" is registered only in dashboard.live_feed's "A" room and
-    will never receive a payload whose tenant_id is anything else — see
-    live_feed.broadcast()'s per-room routing.
+    Live feed for exactly ONE org's verdicts.
+    Auth: validates JWT cookie on the WebSocket upgrade handshake.
+    Closes with 4001 if not authenticated.
     """
+    from api.auth_deps import decode_access_token, _COOKIE_NAME
+    token = ws.cookies.get(_COOKIE_NAME)
+    if not token or not decode_access_token(token):
+        await ws.close(code=4001, reason="Authentication required")
+        return
+
     await ws.accept()
     register_client(org_id, ws)
     logger.info("WebSocket client connected for org_id=%r.", org_id)
@@ -137,6 +268,8 @@ async def websocket_endpoint(ws: WebSocket, org_id: str):
 # Routes — Evidence Store queries, all org_id-scoped
 # ---------------------------------------------------------------------------
 
+from fastapi import Depends  # noqa: E402 (needed here for Depends in route signatures)
+
 @app.get("/api/{org_id}/verdicts")
 async def list_verdicts(
     org_id: str,
@@ -145,6 +278,7 @@ async def list_verdicts(
     remediation_status: Optional[str] = Query(None),
     date_start: Optional[str] = Query(None),
     date_end: Optional[str] = Query(None),
+    _user: User = Depends(check_org_access),
 ):
     store = get_store()
     date_range = (date_start, date_end) if date_start and date_end else None
@@ -159,7 +293,7 @@ async def list_verdicts(
 
 
 @app.get("/api/{org_id}/verdicts/{verdict_id}")
-async def get_verdict(org_id: str, verdict_id: str):
+async def get_verdict(org_id: str, verdict_id: str, _user: User = Depends(check_org_access)):
     store = get_store()
     row = store.get_by_verdict_id(org_id, verdict_id)
     if row is None:
@@ -168,7 +302,7 @@ async def get_verdict(org_id: str, verdict_id: str):
 
 
 @app.get("/api/{org_id}/violations/{violation_id}")
-async def get_violation_by_number(org_id: str, violation_id: int):
+async def get_violation_by_number(org_id: str, violation_id: int, _user: User = Depends(check_org_access)):
     """
     The "tag #N and ask what the breach is" lookup — a plain,
     human-referenceable per-tenant sequential number (1, 2, 3, ...) rather
@@ -189,25 +323,104 @@ class StatusUpdate(BaseModel):
 
 
 @app.post("/api/{org_id}/verdicts/{verdict_id}/status")
-async def update_verdict_status(org_id: str, verdict_id: str, body: StatusUpdate):
+async def update_verdict_status(
+    org_id: str, verdict_id: str, body: StatusUpdate,
+    _user: User = Depends(org_access(UserRole.COMPLIANCE_ADMIN)),
+):
     store = get_store()
     try:
         store.update_status(org_id, verdict_id, body.status)
         row = store.get_by_verdict_id(org_id, verdict_id)
+        try:
+            from audit_log.store import AuditAction, get_audit_store
+            _action = AuditAction.VIOLATION_ACKNOWLEDGED if body.status == "ACKNOWLEDGED" else AuditAction.VIOLATION_RESOLVED
+            get_audit_store().log(_action, actor_id=_user.user_id, actor_name=_user.username,
+                                  org_id=org_id, resource=f"verdict:{verdict_id}")
+        except Exception:
+            pass
         return {"ok": True, "verdict": row}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.get("/api/{org_id}/verify-chain")
-async def verify_chain(org_id: str):
+async def verify_chain(org_id: str, _user: User = Depends(check_org_access)):
+    """
+    Verify the tamper-evident SHA-256 hash chain for this organisation's evidence.
+    Returns whether the chain is intact and where it first breaks (if at all).
+
+    Terminology note: the evidence store is TAMPER-EVIDENT, not tamper-proof.
+    It can detect modification but cannot prevent it — the chain verification
+    result should be treated as a signal, not a guarantee.
+    """
     store = get_store()
     result = store.verify_chain(org_id)
-    return result
+    total = store.count(org_id)
+    return {
+        **result,
+        "total_records": total,
+        "terminology": "tamper-evident",
+        "note": (
+            "VERIFIED means all stored records match their SHA-256 chain hashes. "
+            "BROKEN means at least one record was modified, deleted, or reordered after storage."
+        ),
+    }
+
+
+@app.get("/api/{org_id}/evidence/export")
+async def export_evidence(
+    org_id: str,
+    format: str = Query("json", pattern="^(json|csv)$"),
+    source_system: Optional[str] = Query(None),
+    severity: Optional[str] = Query(None),
+    remediation_status: Optional[str] = Query(None),
+    _user: User = Depends(org_access(UserRole.COMPLIANCE_ADMIN, UserRole.AUDITOR)),
+):
+    """
+    Export evidence records as JSON or CSV.
+    Requires COMPLIANCE_ADMIN or AUDITOR role.
+    Raw PII values are never included — only verdict metadata.
+    """
+    import csv
+    import io
+    from fastapi.responses import StreamingResponse
+
+    store = get_store()
+    rows = store.query(org_id, source_system=source_system, severity=severity,
+                       remediation_status=remediation_status)
+
+    try:
+        from audit_log.store import get_audit_store
+        get_audit_store().log("REPORT_EXPORTED", actor_id=_user.user_id, actor_name=_user.username,
+                              org_id=org_id, detail={"format": format, "count": len(rows)})
+    except Exception:
+        pass
+
+    if format == "csv":
+        fields = ["violation_id", "verdict_id", "rule_id", "severity", "field",
+                  "source_system", "remediation_status", "timestamp", "breach_notification_candidate"]
+        output = io.StringIO()
+        writer = csv.DictWriter(output, fieldnames=fields, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(rows)
+        output.seek(0)
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename=veritas-evidence-{org_id}.csv"},
+        )
+    else:
+        import json as _json
+        content = _json.dumps({"org_id": org_id, "count": len(rows), "records": rows}, default=str, indent=2)
+        return StreamingResponse(
+            iter([content]),
+            media_type="application/json",
+            headers={"Content-Disposition": f"attachment; filename=veritas-evidence-{org_id}.json"},
+        )
 
 
 @app.get("/api/{org_id}/stats")
-async def get_stats(org_id: str):
+async def get_stats(org_id: str, _user: User = Depends(check_org_access)):
     store = get_store()
     rows = store.query(org_id)
     stats: dict[str, Any] = {
@@ -231,6 +444,339 @@ async def get_stats(org_id: str):
         if row.get("breach_notification_candidate"):
             stats["breach_candidates"] += 1
     return stats
+
+
+# ---------------------------------------------------------------------------
+# TLS certificate endpoint (public — Agents need this to verify the server)
+# ---------------------------------------------------------------------------
+
+@app.get("/api/tls/cert")
+async def get_server_cert():
+    """
+    Returns the server's TLS certificate in PEM format.
+    Public endpoint — no auth required. Agents call this during enrollment
+    to obtain the CA cert they need to verify future TLS connections.
+    Only available when TLS is enabled (returns 404 when running over HTTP).
+    """
+    from fastapi.responses import PlainTextResponse
+    from tls import cert_path, tls_mode
+    if tls_mode() == "false":
+        raise HTTPException(status_code=404, detail="TLS is not enabled on this server.")
+    crt = cert_path()
+    if not crt.exists():
+        raise HTTPException(status_code=404, detail="TLS certificate not yet generated.")
+    return PlainTextResponse(crt.read_text(encoding="utf-8"), media_type="application/x-pem-file")
+
+
+# ---------------------------------------------------------------------------
+# Case Management (Phase 13)
+# ---------------------------------------------------------------------------
+
+class CaseUpdate(BaseModel):
+    assignee: Optional[str] = None
+    priority: Optional[str] = None
+    due_date: Optional[str] = None
+    notes:    Optional[str] = None
+
+
+class CommentCreate(BaseModel):
+    content: str = Field(..., min_length=1, max_length=4000)
+
+
+@app.get("/api/{org_id}/verdicts/{verdict_id}/case")
+async def get_case(org_id: str, verdict_id: str, _user: User = Depends(check_org_access)):
+    store = get_store()
+    return store.get_case(org_id, verdict_id) or {"verdict_id": verdict_id, "tenant_id": org_id}
+
+
+@app.patch("/api/{org_id}/verdicts/{verdict_id}/case")
+async def update_case(
+    org_id: str, verdict_id: str, body: CaseUpdate,
+    _user: User = Depends(org_access(UserRole.COMPLIANCE_ADMIN)),
+):
+    store = get_store()
+    if store.get_by_verdict_id(org_id, verdict_id) is None:
+        raise HTTPException(404, f"Verdict {verdict_id!r} not found.")
+    result = store.upsert_case(org_id, verdict_id, assignee=body.assignee,
+                               priority=body.priority, due_date=body.due_date,
+                               notes=body.notes, updated_by=_user.username)
+    return result
+
+
+@app.get("/api/{org_id}/verdicts/{verdict_id}/comments")
+async def get_comments(org_id: str, verdict_id: str, _user: User = Depends(check_org_access)):
+    return {"comments": get_store().get_comments(org_id, verdict_id)}
+
+
+@app.post("/api/{org_id}/verdicts/{verdict_id}/comments", status_code=201)
+async def add_comment(
+    org_id: str, verdict_id: str, body: CommentCreate,
+    _user: User = Depends(org_access(UserRole.COMPLIANCE_ADMIN, UserRole.AUDITOR)),
+):
+    store = get_store()
+    if store.get_by_verdict_id(org_id, verdict_id) is None:
+        raise HTTPException(404, f"Verdict {verdict_id!r} not found.")
+    return store.add_comment(org_id, verdict_id, body.content,
+                             author_id=_user.user_id, author_name=_user.username)
+
+
+# ---------------------------------------------------------------------------
+# Audit log endpoint (SUPER_ADMIN only)
+# ---------------------------------------------------------------------------
+
+@app.get("/api/audit/logs")
+async def get_audit_logs(
+    action: Optional[str] = Query(None),
+    actor_id: Optional[str] = Query(None),
+    org_id: Optional[str] = Query(None),
+    result: Optional[str] = Query(None),
+    limit: int = Query(200, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+    _user: User = Depends(require_roles(UserRole.SUPER_ADMIN)),
+):
+    """Return audit log entries. SUPER_ADMIN only."""
+    from audit_log.store import get_audit_store
+    store = get_audit_store()
+    entries = store.query(action=action, actor_id=actor_id, org_id=org_id, result=result, limit=limit, offset=offset)
+    total = store.count(action=action, org_id=org_id)
+    return {"entries": entries, "total": total, "limit": limit, "offset": offset}
+
+
+# ---------------------------------------------------------------------------
+# Backup & Recovery endpoints (Phase 18) — SUPER_ADMIN only
+# ---------------------------------------------------------------------------
+
+@app.get("/api/system/backups")
+async def list_backups_endpoint(_user: User = Depends(require_roles(UserRole.SUPER_ADMIN))):
+    """List available backup files. SUPER_ADMIN only."""
+    from backup import list_backups
+    return {"backups": list_backups()}
+
+
+@app.post("/api/system/backup", status_code=201)
+async def create_backup_endpoint(_user: User = Depends(require_roles(UserRole.SUPER_ADMIN))):
+    """
+    Trigger a backup of all Veritas data.
+    Backup is verified immediately after creation.
+    SUPER_ADMIN only. Stop agents before restoring from a backup.
+    """
+    from backup import create_backup
+    try:
+        out = create_backup()
+        size_mb = round(out.stat().st_size / 1_048_576, 1)
+        try:
+            from audit_log.store import get_audit_store
+            get_audit_store().log("BACKUP_CREATED", actor_id=_user.user_id,
+                                  actor_name=_user.username,
+                                  detail={"filename": out.name, "size_mb": size_mb})
+        except Exception:
+            pass
+        return {"ok": True, "filename": out.name, "size_mb": size_mb, "path": str(out)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Backup failed: {e}")
+
+
+@app.post("/api/system/backup/verify")
+async def verify_backup_endpoint(
+    filename: str = Query(..., description="Backup filename to verify"),
+    _user: User = Depends(require_roles(UserRole.SUPER_ADMIN)),
+):
+    """Verify a backup archive's integrity by checking SHA-256 checksums."""
+    from backup import list_backups, verify_backup
+    from runtime_paths import data_root
+    backup_path = data_root() / "backups" / filename
+    if not backup_path.exists():
+        raise HTTPException(status_code=404, detail=f"Backup {filename!r} not found.")
+    ok, errors = verify_backup(backup_path)
+    return {"verified": ok, "filename": filename, "errors": errors}
+
+
+# ---------------------------------------------------------------------------
+# Health & Readiness endpoints (public — for load balancers / monitoring)
+# ---------------------------------------------------------------------------
+
+@app.get("/api/version")
+async def api_version():
+    """
+    Phase 22 — Returns the current API version and surface summary.
+    Public endpoint — no auth required.
+    """
+    return {
+        "api_version":  _API_VERSION,
+        "service":      "veritas",
+        "description":  "Veritas DPDPA Compliance Platform API",
+        "endpoints": {
+            "auth":      "/api/auth/*",
+            "orgs":      "/v1/orgs/*",
+            "events":    "/v1/{org_id}/events",
+            "scan":      "/v1/{org_id}/scan",
+            "investigate": "/v1/{org_id}/investigate",
+            "agents":    "/agents/*",
+            "agent_bootstrap": "/agent/*",
+            "evidence":  "/api/{org_id}/verdicts/*",
+            "audit_log": "/api/audit/logs",
+            "system":    "/api/system/health",
+            "health":    "/health",
+            "ready":     "/ready",
+        },
+    }
+
+
+@app.get("/health")
+async def health():
+    """
+    Liveness probe — returns 200 if the server process is running.
+    Does NOT check dependencies. Used by: load balancers, systemd, Docker.
+    """
+    return {"status": "ok", "service": "veritas", "version": _API_VERSION}
+
+
+@app.get("/ready")
+async def ready():
+    """
+    Readiness probe — returns 200 if the server is ready to serve requests.
+    Checks: evidence store, agent store, license.
+    Returns 503 if any critical dependency is unavailable.
+    """
+    checks: dict = {}
+    ok = True
+
+    # Evidence store
+    try:
+        from evidence_store.store import get_store
+        get_store().count("__healthcheck__")
+        checks["evidence_store"] = "ok"
+    except Exception as e:
+        checks["evidence_store"] = f"error: {e}"
+        ok = False
+
+    # Agent store
+    try:
+        from agent_store.store import get_agent_store
+        get_agent_store().count_users() if hasattr(get_agent_store(), 'count_users') else None
+        checks["agent_store"] = "ok"
+    except Exception:
+        try:
+            from agent_store.store import get_agent_store
+            _ = get_agent_store().list_agents()
+            checks["agent_store"] = "ok"
+        except Exception as e:
+            checks["agent_store"] = f"error: {e}"
+            ok = False
+
+    # License
+    try:
+        from license import validate_license
+        validate_license()
+        checks["license"] = "valid"
+    except Exception as e:
+        checks["license"] = f"error: {e}"
+        # License failure is non-fatal for readiness (server already started)
+
+    status_code = 200 if ok else 503
+    from fastapi.responses import JSONResponse
+    return JSONResponse({"ready": ok, "checks": checks}, status_code=status_code)
+
+
+@app.get("/api/system/health")
+async def system_health(_user: User = Depends(get_current_user)):
+    """
+    Detailed system health for the dashboard panel.
+    Requires authentication. Returns health of all subsystems + disk/version info.
+    """
+    import shutil
+    import sys
+    import platform as _platform
+
+    checks: dict = {}
+
+    # Evidence store
+    try:
+        from evidence_store.store import get_store
+        checks["evidence_store"] = {"status": "ok"}
+    except Exception as e:
+        checks["evidence_store"] = {"status": "error", "detail": str(e)}
+
+    # Agent store
+    try:
+        from agent_store.store import get_agent_store
+        agent_count = len(get_agent_store().list_agents())
+        checks["agent_store"] = {"status": "ok", "agents": agent_count}
+    except Exception as e:
+        checks["agent_store"] = {"status": "error", "detail": str(e)}
+
+    # License
+    try:
+        from license import LicenseError, validate_license, cert_fingerprint
+        lic = validate_license()
+        checks["license"] = {
+            "status": "valid",
+            "org": lic.org,
+            "tier": lic.tier,
+            "expiry": lic.expiry,
+            "days_remaining": lic.days_remaining,
+        }
+    except Exception as e:
+        checks["license"] = {"status": "error", "detail": str(e)}
+
+    # TLS
+    try:
+        from tls import cert_path, tls_mode, cert_fingerprint
+        mode = tls_mode()
+        if mode == "false":
+            checks["tls"] = {"status": "disabled"}
+        elif cert_path().exists():
+            fp = cert_fingerprint()
+            checks["tls"] = {"status": "active", "fingerprint": fp}
+        else:
+            checks["tls"] = {"status": "no_cert"}
+    except Exception as e:
+        checks["tls"] = {"status": "error", "detail": str(e)}
+
+    # Disk space
+    try:
+        from runtime_paths import data_root
+        usage = shutil.disk_usage(str(data_root()))
+        free_pct = round(usage.free / usage.total * 100, 1)
+        checks["disk"] = {
+            "status": "ok" if free_pct > 10 else "low",
+            "free_pct": free_pct,
+            "free_gb": round(usage.free / 1e9, 2),
+            "total_gb": round(usage.total / 1e9, 2),
+        }
+    except Exception as e:
+        checks["disk"] = {"status": "error", "detail": str(e)}
+
+    # Secrets file permissions
+    try:
+        from secret_manager import audit_secret_permissions
+        perm = audit_secret_permissions()
+        all_ok = all(v == "ok" for v in perm.values())
+        checks["secrets"] = {"status": "ok" if all_ok else "permissions_issue", "files": perm}
+    except Exception as e:
+        checks["secrets"] = {"status": "error", "detail": str(e)}
+
+    # AI subsystem
+    try:
+        from ai_config import ai_provider_info
+        ai_info = ai_provider_info()
+        checks["ai"] = {"status": "ok", **ai_info}
+    except Exception as e:
+        checks["ai"] = {"status": "error", "detail": str(e)}
+
+    # Runtime info
+    checks["runtime"] = {
+        "python": sys.version.split()[0],
+        "platform": _platform.system(),
+        "version": "1.0.0",
+    }
+
+    overall = all(
+        v.get("status") in ("ok", "valid", "active", "disabled")
+        for v in checks.values()
+        if isinstance(v, dict)
+    )
+    return {"healthy": overall, "checks": checks}
 
 
 # ---------------------------------------------------------------------------

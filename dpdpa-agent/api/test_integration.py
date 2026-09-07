@@ -20,26 +20,58 @@ from fastapi.testclient import TestClient
 
 import agent_store.store as agent_store_module
 import evidence_store.store as store_module
+import user_store.store as user_store_module
 from agent_store.store import get_agent_store, reset_agent_store
 from dashboard import live_feed
 from dashboard.server import app
+from user_store.store import get_user_store, reset_user_store
+from user_store.models import UserRole
 
 client = TestClient(app)
 
 
+def _make_admin(tmp_path):
+    """Create a SUPER_ADMIN test user and return a session cookie."""
+    from passlib.context import CryptContext
+    pw_hash = CryptContext(schemes=["bcrypt"], deprecated="auto").hash("testpass123!")
+    get_user_store().create_user("testadmin", "admin@test.io", pw_hash, UserRole.SUPER_ADMIN)
+    r = client.post("/api/auth/login", data={"username": "testadmin", "password": "testpass123!"})
+    assert r.status_code == 200, f"Login failed: {r.text}"
+    return r.cookies
+
+
 @pytest.fixture(autouse=True)
 def isolated_store(tmp_path, monkeypatch):
-    """Every test gets a fresh, isolated Evidence Store AND Agent Store —
-    never the real on-disk databases."""
+    """
+    Every test gets fresh, isolated databases — Evidence, Agent, and User stores.
+    Also logs in as SUPER_ADMIN so the module-level client has a valid session cookie.
+    """
     monkeypatch.setattr(store_module, "_DEFAULT_DB_PATH", tmp_path / "api_test_evidence.db")
     monkeypatch.setattr(agent_store_module, "_DEFAULT_DB_PATH", tmp_path / "api_test_agents.db")
+    monkeypatch.setattr(user_store_module, "_DEFAULT_DB_PATH", tmp_path / "api_test_users.db")
+    # Disable secure cookies for HTTP TestClient + use stable JWT secret
+    monkeypatch.setenv("VERITAS_SECURE_COOKIES", "false")
+    monkeypatch.setenv("VERITAS_JWT_SECRET", "test-jwt-secret-for-unit-tests-only")
     store_module.reset_store()
     reset_agent_store()
+    reset_user_store()
     live_feed._ws_clients.clear()
+
+    # Create test admin and log in — sets session cookie on module-level client
+    _make_admin(tmp_path)
+
     yield
     store_module.reset_store()
     reset_agent_store()
+    reset_user_store()
     live_feed._ws_clients.clear()
+    client.cookies.clear()
+
+
+@pytest.fixture()
+def auth_cookies(tmp_path):
+    """Returns the current session cookies (already set by isolated_store)."""
+    return client.cookies
 
 
 @pytest.fixture()
@@ -66,6 +98,7 @@ def edtech_token():
 class TestOrgValidation:
 
     def test_scan_unknown_org_returns_404(self):
+        # Auth is set via isolated_store fixture
         r = client.post("/v1/definitely_not_a_registered_org/scan", json={"text": "hello"})
         assert r.status_code == 404
         assert "definitely_not_a_registered_org" in r.json()["detail"]
@@ -77,7 +110,16 @@ class TestOrgValidation:
         )
         assert r.status_code == 401
 
+    def test_scan_unauthenticated_returns_401(self):
+        """Scan without session cookie should be rejected — use fresh unauthenticated client."""
+        from fastapi.testclient import TestClient
+        from dashboard.server import app as _app
+        fresh_client = TestClient(_app, cookies={})  # no session cookie
+        r = fresh_client.post("/v1/blinkit/scan", json={"text": "hello"})
+        assert r.status_code == 401
+
     def test_scan_known_org_accepted(self):
+        # client already has auth cookie from isolated_store fixture
         r = client.post("/v1/blinkit/scan", json={"text": "just a clean log line, nothing sensitive"})
         assert r.status_code == 200
 

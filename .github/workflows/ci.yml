@@ -1,0 +1,106 @@
+name: CI — Cross-Platform Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Tests · ${{ matrix.os }} · Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.11"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── Python ──────────────────────────────────────────────────────────
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: dpdpa-agent/requirements.txt
+
+      # ── pip cache for spaCy model (large download) ───────────────────────
+      - name: Cache spaCy model
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/AppData/Local/pip/Cache
+          key: spacy-lg-${{ runner.os }}-py${{ matrix.python-version }}-v1
+
+      # ── Install ──────────────────────────────────────────────────────────
+      - name: Install Python dependencies
+        working-directory: dpdpa-agent
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Install spaCy model (en_core_web_lg)
+        run: |
+          pip install https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl
+
+      # ── Tests ────────────────────────────────────────────────────────────
+      - name: Run test suite
+        working-directory: dpdpa-agent
+        env:
+          FORCE_LLM_FALLBACK: "1"
+          VERITAS_SECURE_COOKIES: "false"
+          VERITAS_JWT_SECRET: "ci-test-secret-key-github-actions-${{ matrix.os }}"
+          VERITAS_AI_MODE: "disabled"
+          VERITAS_TLS: "false"
+        run: |
+          python -m pytest -q --tb=short \
+            --ignore=dashboard/test_live_feed.py \
+            -p no:warnings
+        shell: bash
+
+      # ── Smoke test: import server + hit /health ──────────────────────────
+      - name: Smoke test — server startup
+        working-directory: dpdpa-agent
+        env:
+          FORCE_LLM_FALLBACK: "1"
+          VERITAS_SECURE_COOKIES: "false"
+          VERITAS_JWT_SECRET: "ci-smoke-secret"
+          VERITAS_AI_MODE: "disabled"
+          VERITAS_TLS: "false"
+        run: |
+          python - <<'EOF'
+          import os
+          from fastapi.testclient import TestClient
+          from dashboard.server import app
+
+          c = TestClient(app, raise_server_exceptions=False)
+
+          r = c.get("/health")
+          assert r.status_code == 200, f"/health returned {r.status_code}: {r.text}"
+          assert r.json()["status"] == "ok"
+
+          r = c.get("/api/auth/me")
+          assert r.status_code == 401, f"Unauthenticated /me should return 401, got {r.status_code}"
+
+          # Security headers
+          r = c.get("/health")
+          for h in ["x-content-type-options", "x-frame-options", "content-security-policy"]:
+              assert h in r.headers, f"Missing security header: {h}"
+
+          print(f"Smoke test PASSED on {os.name}")
+          EOF
+        shell: bash
+
+      # ── Upload test results as artifact ─────────────────────────────────
+      - name: Upload pytest results (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-results-${{ matrix.os }}-py${{ matrix.python-version }}
+          path: dpdpa-agent/.pytest_cache/
+          retention-days: 7

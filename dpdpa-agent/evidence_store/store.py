@@ -112,6 +112,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
 
+from db_encryption import decrypt_field, encrypt_field
 from llm_explainer.explainer import ExplainedVerdict
 from schemas.models import RemediationStatus
 
@@ -214,6 +215,7 @@ class EvidenceStore:
             """)
             self._migrate_add_tenant_id_column()
             self._migrate_add_violation_id_column()
+            self._migrate_add_case_tables()
             self._conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_verdict_id ON evidence(verdict_id)"
             )
@@ -248,7 +250,7 @@ class EvidenceStore:
         self._conn.execute("ALTER TABLE evidence ADD COLUMN tenant_id TEXT")
         rows = self._conn.execute("SELECT row_index, payload_json FROM evidence").fetchall()
         for row in rows:
-            payload = json.loads(row["payload_json"])
+            payload = json.loads(decrypt_field(row["payload_json"]))
             tenant_id = payload.get("tenant_id", "")
             self._conn.execute(
                 "UPDATE evidence SET tenant_id = ? WHERE row_index = ?",
@@ -284,6 +286,36 @@ class EvidenceStore:
                 )
         if tenant_ids:
             logger.info("Backfilled violation_id for %d tenant(s).", len(tenant_ids))
+
+    def _migrate_add_case_tables(self) -> None:
+        """Phase 13 migration: add case_metadata and case_comments tables."""
+        self._conn.executescript("""
+            CREATE TABLE IF NOT EXISTS case_metadata (
+                verdict_id   TEXT PRIMARY KEY,
+                tenant_id    TEXT NOT NULL,
+                assignee     TEXT,
+                priority     TEXT DEFAULT 'MEDIUM',
+                due_date     TEXT,
+                notes        TEXT,
+                updated_at   TEXT NOT NULL,
+                updated_by   TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS case_comments (
+                comment_id   TEXT PRIMARY KEY,
+                verdict_id   TEXT NOT NULL,
+                tenant_id    TEXT NOT NULL,
+                author_id    TEXT,
+                author_name  TEXT,
+                content      TEXT NOT NULL,
+                created_at   TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_case_verdict   ON case_metadata(verdict_id);
+            CREATE INDEX IF NOT EXISTS idx_case_tenant    ON case_metadata(tenant_id);
+            CREATE INDEX IF NOT EXISTS idx_comments_verdict ON case_comments(verdict_id);
+        """)
+        self._conn.commit()
 
     def _get_next_violation_id(self, tenant_id: str) -> int:
         """Next per-tenant sequential number: MAX(existing)+1, or 1 if this
@@ -328,7 +360,7 @@ class EvidenceStore:
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 str(ev.verdict.verdict_id),
-                payload_json,
+                encrypt_field(payload_json),   # store encrypted; hash was computed on plaintext
                 row_hash,
                 previous_hash,
                 ev.verdict.remediation_status.value,
@@ -371,7 +403,9 @@ class EvidenceStore:
 
         expected_previous = GENESIS_HASH
         for i, row in enumerate(rows):
-            expected_hash = _compute_hash(row["payload_json"], expected_previous)
+            # Decrypt before hashing — row_hash was computed on plaintext
+            plaintext_json = decrypt_field(row["payload_json"])
+            expected_hash = _compute_hash(plaintext_json, expected_previous)
             if expected_hash != row["row_hash"]:
                 logger.warning(
                     "Chain broken for tenant_id=%r at tenant-local index %d (global row_index=%d)",
@@ -472,7 +506,7 @@ class EvidenceStore:
 
         results = []
         for row in rows:
-            payload = json.loads(row["payload_json"])
+            payload = json.loads(decrypt_field(row["payload_json"]))
 
             # Apply payload-level filters (can't use SQL efficiently on JSON blob)
             if source_system and payload.get("source_system") != source_system:
@@ -509,7 +543,7 @@ class EvidenceStore:
         row = cursor.fetchone()
         if row is None:
             return None
-        payload = json.loads(row["payload_json"])
+        payload = json.loads(decrypt_field(row["payload_json"]))
         return {
             "violation_id": row["violation_id"],
             "row_index": row["row_index"] - 1,
@@ -536,7 +570,7 @@ class EvidenceStore:
         row = cursor.fetchone()
         if row is None:
             return None
-        payload = json.loads(row["payload_json"])
+        payload = json.loads(decrypt_field(row["payload_json"]))
         return {
             "violation_id": row["violation_id"],
             "row_index": row["row_index"] - 1,
@@ -551,6 +585,64 @@ class EvidenceStore:
         """Return total number of rows in the store for tenant_id."""
         cursor = self._conn.execute("SELECT COUNT(*) as n FROM evidence WHERE tenant_id = ?", (tenant_id,))
         return cursor.fetchone()["n"]
+
+    # ------------------------------------------------------------------
+    # Case Management (Phase 13)
+    # ------------------------------------------------------------------
+
+    def get_case(self, tenant_id: str, verdict_id: str) -> Optional[dict]:
+        row = self._conn.execute(
+            "SELECT * FROM case_metadata WHERE verdict_id = ? AND tenant_id = ?",
+            (verdict_id, tenant_id),
+        ).fetchone()
+        return dict(row) if row else None
+
+    def upsert_case(self, tenant_id: str, verdict_id: str, *, assignee=None,
+                    priority=None, due_date=None, notes=None, updated_by=None) -> dict:
+        """Create or update case metadata for a violation."""
+        import datetime as _dt
+        now = _dt.datetime.now(_dt.timezone.utc).isoformat()
+        existing = self.get_case(tenant_id, verdict_id)
+        if existing:
+            updates, params = [], []
+            for col, val in [("assignee", assignee), ("priority", priority),
+                              ("due_date", due_date), ("notes", notes)]:
+                if val is not None:
+                    updates.append(f"{col} = ?"); params.append(val)
+            updates += ["updated_at = ?", "updated_by = ?"]
+            params += [now, updated_by, verdict_id, tenant_id]
+            with self._lock:
+                self._conn.execute(
+                    f"UPDATE case_metadata SET {', '.join(updates)} WHERE verdict_id = ? AND tenant_id = ?",
+                    params)
+                self._conn.commit()
+        else:
+            with self._lock:
+                self._conn.execute(
+                    "INSERT INTO case_metadata (verdict_id,tenant_id,assignee,priority,due_date,notes,updated_at,updated_by) VALUES (?,?,?,?,?,?,?,?)",
+                    (verdict_id, tenant_id, assignee, priority or "MEDIUM", due_date, notes, now, updated_by))
+                self._conn.commit()
+        return self.get_case(tenant_id, verdict_id) or {}
+
+    def add_comment(self, tenant_id: str, verdict_id: str, content: str,
+                    author_id=None, author_name=None) -> dict:
+        import datetime as _dt
+        from uuid import uuid4 as _u4
+        cid = str(_u4())
+        now = _dt.datetime.now(_dt.timezone.utc).isoformat()
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO case_comments (comment_id,verdict_id,tenant_id,author_id,author_name,content,created_at) VALUES (?,?,?,?,?,?,?)",
+                (cid, verdict_id, tenant_id, author_id, author_name, content, now))
+            self._conn.commit()
+        return {"comment_id": cid, "verdict_id": verdict_id, "author_id": author_id,
+                "author_name": author_name, "content": content, "created_at": now}
+
+    def get_comments(self, tenant_id: str, verdict_id: str) -> list:
+        rows = self._conn.execute(
+            "SELECT * FROM case_comments WHERE verdict_id = ? AND tenant_id = ? ORDER BY created_at DESC",
+            (verdict_id, tenant_id)).fetchall()
+        return [dict(r) for r in rows]
 
     def close(self) -> None:
         """Close the SQLite connection."""

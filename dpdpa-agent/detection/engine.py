@@ -169,6 +169,31 @@ def _normalize_for_dedup(text: str) -> str:
     return text.strip(_DEDUP_STRIP_CHARS).lower()
 
 
+def _entity_type_validation_status(entity_type: str, matched_text: str) -> str:
+    """
+    Phase 10 (PII hardening): Apply checksum/structural validation to raw-snippet
+    matches by entity type, independent of org config.
+
+    This catches false positives from the low-confidence unspaced Aadhaar
+    pattern (random 12-digit numbers that aren't real Aadhaar numbers) and
+    from PAN pattern matches on strings that don't satisfy the structural rules.
+
+    Returns VALIDATED, FAILED_VALIDATION, or PATTERN_MATCH.
+    """
+    try:
+        if entity_type == "IN_AADHAAR":
+            from validators import is_valid_aadhaar
+            text = matched_text.replace(" ", "").strip()
+            if len(text) == 12 and text.isdigit():
+                return VALIDATED if is_valid_aadhaar(text) else FAILED_VALIDATION
+        elif entity_type == "IN_PAN":
+            from validators import is_valid_pan
+            return VALIDATED if is_valid_pan(matched_text.strip()) else FAILED_VALIDATION
+    except Exception:
+        pass
+    return PATTERN_MATCH
+
+
 def _scan_raw_snippet(raw_snippet: str, already_matched_texts: set) -> List[MatchedEntity]:
     """
     Runs the analyzer over raw_snippet. Matches whose normalized
@@ -183,12 +208,18 @@ def _scan_raw_snippet(raw_snippet: str, already_matched_texts: set) -> List[Matc
         matched_text = raw_snippet[r.start:r.end]
         if _normalize_for_dedup(matched_text) in already_matched_texts:
             continue
+        # Phase 10: apply entity-type checksum validation for raw matches
+        val_status = _entity_type_validation_status(r.entity_type, matched_text)
+        # Drop failed-validation unspaced Aadhaar (likely false positive)
+        if val_status == FAILED_VALIDATION and r.entity_type == "IN_AADHAAR":
+            continue
         matches.append(
             MatchedEntity(
                 field=FREE_TEXT_FIELD_LABEL,
                 entity_type=r.entity_type,
                 confidence=r.score,
                 matched_text=matched_text,
+                validation_status=val_status,
             )
         )
     return matches
