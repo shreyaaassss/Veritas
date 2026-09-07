@@ -52,10 +52,13 @@ jobs:
       - name: Run test suite
         working-directory: dpdpa-agent
         env:
-          FORCE_LLM_FALLBACK: "1"
+          # NOTE: do NOT set FORCE_LLM_FALLBACK here — the test suite mocks
+          # _call_llm/_call_llm_for_investigation directly; a global FORCE_LLM_FALLBACK
+          # would cause investigate()/explain_verdict() to return a fallback
+          # BEFORE the mocks are reached, breaking those tests.
+          VERITAS_AI_MODE: "disabled"     # prevents real API calls; mocks handle test cases
           VERITAS_SECURE_COOKIES: "false"
           VERITAS_JWT_SECRET: "ci-test-secret-key-github-actions-${{ matrix.os }}"
-          VERITAS_AI_MODE: "disabled"
           VERITAS_TLS: "false"
         run: |
           python -m pytest -q --tb=short \
@@ -67,10 +70,9 @@ jobs:
       - name: Smoke test — server startup
         working-directory: dpdpa-agent
         env:
-          FORCE_LLM_FALLBACK: "1"
+          VERITAS_AI_MODE: "disabled"
           VERITAS_SECURE_COOKIES: "false"
           VERITAS_JWT_SECRET: "ci-smoke-secret"
-          VERITAS_AI_MODE: "disabled"
           VERITAS_TLS: "false"
         run: |
           python - <<'EOF'
