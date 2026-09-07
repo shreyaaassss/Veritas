@@ -17,6 +17,7 @@ import user_store.store as user_store_module
 from agent_store.store import get_agent_store, reset_agent_store
 from dashboard import live_feed
 from dashboard.server import app
+from rate_limit import _limiter
 from user_store.store import get_user_store, reset_user_store
 from user_store.models import UserRole
 
@@ -47,6 +48,7 @@ def isolated_stores(tmp_path, monkeypatch):
     reset_agent_store()
     reset_user_store()
     live_feed._ws_clients.clear()
+    _limiter._windows.clear()   # prevent rate-limit state leaking between tests
 
     _make_admin()
 
@@ -55,6 +57,7 @@ def isolated_stores(tmp_path, monkeypatch):
     reset_agent_store()
     reset_user_store()
     live_feed._ws_clients.clear()
+    _limiter._windows.clear()
     client.cookies.clear()
 
 
