@@ -40,18 +40,24 @@ jobs:
       - name: Get machine fingerprint
         run: sudo veritas fingerprint
 
-      - name: Generate a test license (no fingerprint — any-machine)
+      - name: Generate test license using production key
+        env:
+          VERITAS_PRIVATE_KEY_B64: ${{ secrets.VERITAS_PRIVATE_KEY_B64 }}
         run: |
           python3 -m venv /tmp/licvenv
           /tmp/licvenv/bin/pip install cryptography --quiet
+
+          # Decode production private key from GitHub secret
+          echo "$VERITAS_PRIVATE_KEY_B64" | base64 -d > /tmp/ci_private_key.pem
+
+          # Generate any-machine license (no fingerprint — CI runner changes each run)
           /tmp/licvenv/bin/python3 tools/generate_license.py \
             --org "ci-test" \
             --tier enterprise \
             --expiry 2027-12-31 \
-            --key tools/private_key.pem \
+            --key /tmp/ci_private_key.pem \
             --out /tmp/ci-test.vlic
-          echo "License generated:"
-          cat /tmp/ci-test.vlic
+          echo "License generated."
 
       - name: Install license
         run: sudo veritas license /tmp/ci-test.vlic
