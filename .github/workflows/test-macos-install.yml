@@ -42,15 +42,16 @@ jobs:
 
       - name: Generate a test license (no fingerprint — any-machine)
         run: |
-          cd dpdpa-agent
-          pip3 install cryptography --quiet
-          python3 ../tools/generate_license.py \
+          python3 -m venv /tmp/licvenv
+          /tmp/licvenv/bin/pip install cryptography --quiet
+          /tmp/licvenv/bin/python3 tools/generate_license.py \
             --org "ci-test" \
             --tier enterprise \
             --expiry 2027-12-31 \
-            --key ../tools/private_key.pem \
+            --key tools/private_key.pem \
             --out /tmp/ci-test.vlic
-          echo "License generated."
+          echo "License generated:"
+          cat /tmp/ci-test.vlic
 
       - name: Install license
         run: sudo veritas license /tmp/ci-test.vlic
