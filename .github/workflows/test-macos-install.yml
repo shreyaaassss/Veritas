@@ -124,9 +124,10 @@ jobs:
           if [[ ! "$STATUS" =~ ^(200|302|303)$ ]]; then
             echo "=== Server error log (last 40 lines) ==="
             sudo tail -40 /var/log/veritas/veritas-error.log 2>/dev/null || true
-            echo "=== Also check if setup.html is in bundle ==="
-            ls /var/lib/veritas/tmp/ 2>/dev/null | head -5 || true
-            sudo find /var/lib/veritas/tmp -name "setup.html" 2>/dev/null || true
+            echo "=== Files in PyInstaller extraction dir ==="
+            sudo find /var/lib/veritas/tmp -maxdepth 3 -type f 2>/dev/null | sort | head -30 || true
+            echo "=== Binary contains setup.html? ==="
+            unzip -l /opt/veritas/veritas-runtime 2>/dev/null | grep -i "setup\|login\|html" | head -10 || true
             echo "=== Try /login page ==="
             curl -sko /dev/null -w "login page: %{http_code}\n" https://localhost:8000/login
             exit 1
