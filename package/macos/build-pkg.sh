@@ -83,7 +83,8 @@ PYEOF
       exit 1
     fi
     cp "$2" "$DATA_DIR/veritas.vlic"
-    chown _veritas:_veritas "$DATA_DIR/veritas.vlic" 2>/dev/null || true
+    xattr -c "$DATA_DIR/veritas.vlic" 2>/dev/null || true
+    chown _veritas:staff "$DATA_DIR/veritas.vlic" 2>/dev/null || true
     chmod 640 "$DATA_DIR/veritas.vlic"
     launchctl bootout system "$PLIST" 2>/dev/null || launchctl unload "$PLIST" 2>/dev/null || true
     sleep 2

@@ -58,6 +58,9 @@ a = Analysis(
     datas=[
         # Veritas bundled read-only assets
         ('dashboard/index.html',               'dashboard'),
+        ('dashboard/login.html',               'dashboard'),
+        ('dashboard/setup.html',               'dashboard'),
+        ('dashboard/static',                   'dashboard/static'),
         ('llm_explainer/statute_snippets.json','llm_explainer'),
         ('org_config/configs',                 'org_config/configs'),
 
@@ -121,6 +124,13 @@ a = Analysis(
         # Pydantic v2
         'pydantic',
         'pydantic.v1',
+        # httpx — required by weasel (spaCy CLI dep) at import time
+        'httpx', 'httpx._transports', 'httpx._transports.default',
+        'httpcore',
+        'anyio', 'anyio._backends._asyncio',
+        # Auth
+        'passlib', 'passlib.handlers', 'passlib.handlers.bcrypt',
+        'jose', 'jose.jwt',
     ],
     hookspath=[],
     hooksconfig={},
@@ -129,7 +139,6 @@ a = Analysis(
         # Test dependencies — not needed in production
         'pytest',
         'pytest_asyncio',
-        'httpx',
         '_pytest',
         # Jupyter / IPython — not needed
         'IPython',

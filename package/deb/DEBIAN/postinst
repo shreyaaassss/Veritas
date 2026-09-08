@@ -1,26 +1,41 @@
 #!/bin/bash
+# Veritas Linux post-install script
+# dpkg treats any non-zero exit as failure — we handle errors explicitly.
+
 set -e
 
-# Create system user veritas (no login, /opt/veritas home) if not exists
-if ! id veritas &>/dev/null; then
+# Create system user veritas (no login) if not exists
+if ! id veritas &>/dev/null 2>&1; then
     useradd --system --no-create-home --shell /usr/sbin/nologin \
         --home-dir /opt/veritas veritas
 fi
 
-# Set ownership and permissions
-chown -R veritas:veritas /opt/veritas /var/lib/veritas /var/log/veritas /etc/veritas
-chmod 700 /var/lib/veritas
+# Create runtime directories (idempotent)
+mkdir -p /var/lib/veritas /var/lib/veritas/tmp /var/log/veritas
 
-# Reload systemd and enable service
+# Fix ownership — || true so upgrade doesn't fail on locked files
+chown -R veritas:veritas /opt/veritas /var/lib/veritas /var/log/veritas \
+    /etc/veritas 2>/dev/null || true
+chmod 700 /var/lib/veritas
+chmod 755 /var/lib/veritas/tmp
+
+# Fix license file ownership if it was installed before postinst (upgrade)
+if [ -f /var/lib/veritas/veritas.vlic ]; then
+    chown veritas:veritas /var/lib/veritas/veritas.vlic 2>/dev/null || true
+    chmod 640 /var/lib/veritas/veritas.vlic
+fi
+
+# Reload systemd and enable (but don't start — needs license first)
 systemctl daemon-reload
 systemctl enable veritas
 
 echo ""
 echo "Veritas DPDPA Compliance Platform installed successfully!"
 echo ""
-echo "  Start:     sudo systemctl start veritas"
-echo "  Dashboard: http://localhost:8000"
-echo "  Setup:     http://localhost:8000/setup"
+echo "  1. sudo veritas fingerprint   → send to Veritas for your license"
+echo "  2. sudo veritas license /path/to/veritas.vlic"
+echo "  3. sudo veritas start"
+echo "  4. Open https://localhost:8000/setup"
 echo ""
-echo "CLI shortcut: veritas {start|stop|restart|status|logs|check}"
+echo "CLI: veritas {start|stop|restart|status|logs|fingerprint|license|check}"
 echo ""

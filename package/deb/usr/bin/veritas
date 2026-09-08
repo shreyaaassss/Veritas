@@ -69,7 +69,10 @@ PYEOF
       exit 1
     fi
     cp "$2" "$LICENSE_FILE"
-    chown veritas:veritas "$LICENSE_FILE"
+    # Strip quarantine/ACL attrs (macOS) then fix ownership
+    xattr -c "$LICENSE_FILE" 2>/dev/null || true
+    chown veritas:veritas "$LICENSE_FILE" 2>/dev/null || \
+      chown veritas:staff  "$LICENSE_FILE" 2>/dev/null || true
     chmod 640 "$LICENSE_FILE"
     systemctl restart veritas
     echo "License installed. Veritas is restarting..."

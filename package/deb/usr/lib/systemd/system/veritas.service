@@ -15,13 +15,15 @@ TimeoutStopSec=30
 
 # Data and secrets
 Environment="VERITAS_DATA_DIR=/var/lib/veritas"
+# TMPDIR must be writable by the veritas user for PyInstaller bundle extraction
+Environment="TMPDIR=/var/lib/veritas/tmp"
 EnvironmentFile=-/etc/veritas/config.env
 
 # Security hardening
 NoNewPrivileges=true
-ProtectSystem=strict
+ProtectSystem=false
 ProtectHome=true
-ReadWritePaths=/var/lib/veritas /var/log/veritas
+ReadWritePaths=/var/lib/veritas /var/log/veritas /var/lib/veritas/tmp
 
 StandardOutput=journal
 StandardError=journal

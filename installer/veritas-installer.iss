@@ -7,7 +7,9 @@
 
 #define AppName      "Veritas"
 #define AppFullName  "Veritas DPDPA Compliance Platform"
-#define AppVersion   "1.0.0"
+#ifndef AppVersion
+  #define AppVersion "1.0.0"
+#endif
 #define AppPublisher "Veritas Technologies"
 #define AppURL       "https://veritas.io"
 
@@ -24,7 +26,7 @@ DefaultGroupName={#AppName}
 DisableProgramGroupPage=no
 
 OutputDir=..\installer\output
-OutputBaseFilename=VeritasSetup-{#AppVersion}
+OutputBaseFilename=veritas_{#AppVersion}_windows_amd64
 
 ; Administrator required for Program Files + Windows Service
 PrivilegesRequired=admin

@@ -92,6 +92,57 @@ jobs:
         with:
           files: dist/veritas_*.pkg
 
+  # ── Windows .exe installer ────────────────────────────────────────────
+  build-windows-exe:
+    name: Windows installer (amd64)
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python dependencies
+        working-directory: dpdpa-agent
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+          pip install https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl
+
+      - name: Build PyInstaller runtime
+        working-directory: dpdpa-agent
+        run: python -m PyInstaller veritas.spec --noconfirm
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Build Go launcher
+        working-directory: veritas-launcher
+        run: |
+          go build -ldflags="-s -w" -o ../dpdpa-agent/dist/veritas-launcher.exe .
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Build Windows installer
+        shell: bash
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          mkdir -p installer/output
+          "/c/Program Files (x86)/Inno Setup 6/ISCC.exe" \
+            "/DAppVersion=${VERSION}" \
+            installer/veritas-installer.iss
+
+      - name: Upload installer to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: installer/output/veritas_*_windows_amd64.exe
+
   # ── Agent .deb (lightweight — no PyInstaller) ─────────────────────────
   build-agent-deb:
     name: Agent .deb (all architectures)
@@ -116,7 +167,7 @@ jobs:
   publish-release-notes:
     name: Publish release notes with install instructions
     runs-on: ubuntu-latest
-    needs: [build-linux-deb, build-macos-pkg, build-agent-deb]
+    needs: [build-linux-deb, build-macos-pkg, build-windows-exe, build-agent-deb]
     permissions:
       contents: write
     steps:
@@ -141,6 +192,12 @@ jobs:
             sudo dpkg -i veritas_${{ env.VER }}_amd64.deb
             sudo systemctl start veritas
             ```
+
+            **Windows (amd64):**
+            ```
+            Download veritas_${{ env.VER }}_windows_amd64.exe and run as Administrator
+            ```
+            The installer prompts for your `.vlic` license file during setup.
 
             **macOS (Apple Silicon):**
             ```bash
