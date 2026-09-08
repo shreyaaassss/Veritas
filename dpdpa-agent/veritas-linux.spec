@@ -18,10 +18,19 @@ spacy_datas, spacy_binaries, spacy_hiddenimports = collect_all('en_core_web_lg')
 spacy_core_datas = collect_data_files('spacy')
 presidio_datas   = collect_data_files('presidio_analyzer')
 presidio_datas  += collect_data_files('presidio_anonymizer')
-# Explicitly add presidio conf/ — collect_data_files sometimes misses it
-import pathlib as _pl, presidio_analyzer as _pa
-_pa_conf = str(_pl.Path(_pa.__file__).parent / 'conf')
-presidio_datas  += [(_pa_conf, 'presidio_analyzer/conf')]
+
+# Explicitly add each presidio_analyzer conf file (glob approach — most reliable)
+import glob as _glob, pathlib as _pl, presidio_analyzer as _pa
+_pa_pkg = _pl.Path(_pa.__file__).parent
+_pa_conf = _pa_pkg / 'conf'
+if _pa_conf.exists():
+    for _f in _pa_conf.rglob('*'):
+        if _f.is_file():
+            _rel = _f.relative_to(_pa_pkg)
+            presidio_datas += [(str(_f), str(_rel.parent))]
+    print(f'[SPEC] Added presidio conf files: {len(list(_pa_conf.rglob("*")))} files')
+else:
+    print(f'[SPEC] WARNING: presidio conf dir not found at {_pa_conf}')
 
 try:
     tldextract_datas = collect_data_files('tldextract')

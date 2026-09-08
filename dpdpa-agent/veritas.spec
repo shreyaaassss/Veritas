@@ -40,9 +40,18 @@ spacy_core_datas = collect_data_files('spacy')
 # Presidio (uses regex patterns and other data files)
 presidio_datas  = collect_data_files('presidio_analyzer')
 presidio_datas += collect_data_files('presidio_anonymizer')
+
 import pathlib as _pl, presidio_analyzer as _pa
-_pa_conf = str(_pl.Path(_pa.__file__).parent / 'conf')
-presidio_datas += [(_pa_conf, 'presidio_analyzer/conf')]
+_pa_pkg = _pl.Path(_pa.__file__).parent
+_pa_conf = _pa_pkg / 'conf'
+if _pa_conf.exists():
+    for _f in _pa_conf.rglob('*'):
+        if _f.is_file():
+            _rel = _f.relative_to(_pa_pkg)
+            presidio_datas += [(str(_f), str(_rel.parent))]
+    print(f'[SPEC] Added presidio conf files: {len(list(_pa_conf.rglob("*")))} files')
+else:
+    print(f'[SPEC] WARNING: presidio conf dir not found at {_pa_conf}')
 
 # tldextract (used by presidio, has snapshot data files)
 try:
