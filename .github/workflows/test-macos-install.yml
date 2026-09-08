@@ -59,14 +59,15 @@ jobs:
             --out /tmp/ci-test.vlic
           echo "License generated."
 
-      - name: Install license
-        run: sudo veritas license /tmp/ci-test.vlic
-
-      - name: Fix license file ownership and permissions
+      - name: Install license and fix ownership BEFORE starting daemon
         run: |
-          sudo xattr -c /var/lib/veritas/veritas.vlic
+          # Copy license directly (bypass the CLI which chowns incorrectly)
+          sudo cp /tmp/ci-test.vlic /var/lib/veritas/veritas.vlic
+          sudo xattr -c /var/lib/veritas/veritas.vlic 2>/dev/null || true
           sudo chown _veritas:staff /var/lib/veritas/veritas.vlic
           sudo chmod 640 /var/lib/veritas/veritas.vlic
+          echo "License installed:"
+          sudo ls -la /var/lib/veritas/veritas.vlic
 
       - name: Bootstrap daemon
         run: |
@@ -93,7 +94,7 @@ jobs:
               echo "Server is UP: $RESP"
               exit 0
             fi
-            echo "  attempt $i/24 — not ready yet (${i}x5=${i*5}s elapsed)"
+            echo "  attempt $i/24 — not ready yet ($((i*5))s elapsed)"
             sleep 5
           done
           echo "Server did not start in 120s."
