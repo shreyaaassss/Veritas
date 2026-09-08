@@ -28,9 +28,20 @@ PLIST=/Library/LaunchDaemons/com.veritas.daemon.plist
 DATA_DIR=/var/lib/veritas
 
 case "$1" in
-  start)    launchctl load -w $PLIST && echo "Veritas started — http://localhost:8000" ;;
-  stop)     launchctl unload $PLIST ;;
-  restart)  launchctl unload $PLIST; sleep 1; launchctl load -w $PLIST ;;
+  start)
+    launchctl bootout system "$PLIST" 2>/dev/null || true
+    sleep 1
+    launchctl bootstrap system "$PLIST" && echo "Veritas started — http://localhost:8000" || echo "Failed to start. Try: sudo launchctl bootstrap system $PLIST"
+    ;;
+  stop)
+    launchctl bootout system "$PLIST" 2>/dev/null || launchctl unload "$PLIST" 2>/dev/null || true
+    echo "Veritas stopped."
+    ;;
+  restart)
+    launchctl bootout system "$PLIST" 2>/dev/null || launchctl unload "$PLIST" 2>/dev/null || true
+    sleep 2
+    launchctl bootstrap system "$PLIST" && echo "Veritas restarted — http://localhost:8000"
+    ;;
   status)   launchctl list | grep veritas || echo "Veritas not running" ;;
   logs)     tail -f /var/log/veritas/veritas.log ;;
 
@@ -74,8 +85,9 @@ PYEOF
     cp "$2" "$DATA_DIR/veritas.vlic"
     chown _veritas:_veritas "$DATA_DIR/veritas.vlic" 2>/dev/null || true
     chmod 640 "$DATA_DIR/veritas.vlic"
-    launchctl unload $PLIST 2>/dev/null; sleep 1
-    launchctl load -w $PLIST
+    launchctl bootout system "$PLIST" 2>/dev/null || launchctl unload "$PLIST" 2>/dev/null || true
+    sleep 2
+    launchctl bootstrap system "$PLIST"
     echo "License installed. Veritas is restarting..."
     sleep 3
     launchctl list | grep -q veritas && echo "  Status: running" && echo "  Open: http://localhost:8000/setup"
