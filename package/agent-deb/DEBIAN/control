@@ -1,0 +1,15 @@
+Package: veritas-agent
+Version: 1.0.0
+Architecture: all
+Maintainer: Veritas <support@veritas.app>
+Depends: python3 (>= 3.8), python3-requests, python3-yaml, systemd
+Section: utils
+Priority: optional
+Homepage: https://github.com/shreyaaassss/Veritas
+Description: Veritas DPDPA Agent — telemetry forwarder
+ Lightweight log and event forwarder for the Veritas DPDPA Compliance Platform.
+ Reads from log files and Docker containers, forwards events to the Veritas
+ server for PII detection and compliance analysis.
+ .
+ Install this on every server you want to monitor. The Veritas server
+ (veritas package) must be installed and licensed separately.

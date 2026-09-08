@@ -3,8 +3,8 @@
 # Copy this file to agent-config.yaml and fill in your values.
 # Issue a registration key from the Veritas dashboard (Agents tab → Issue Registration Key).
 
-# Address of the Veritas appliance (or server/VM running Veritas)
-veritas_address: http://192.168.1.50:8000
+# Address of the Veritas Server — use https:// for production
+veritas_address: https://192.168.1.50:8000
 
 # One-time registration key issued from the Veritas dashboard.
 # Consumed on first start — remove or leave blank after the agent has registered.
@@ -12,6 +12,19 @@ registration_key: YOUR_ONE_TIME_KEY_HERE
 
 # Optional: human label shown in the Agents tab of the dashboard
 source_label: production-server-1
+
+# TLS configuration (for HTTPS connections to the Veritas Server)
+# ---------------------------------------------------------------
+tls:
+  # Path to the Veritas Server's TLS certificate (PEM format).
+  # Download from: GET https://<server>:8000/api/tls/cert
+  # Required when the server uses a self-signed certificate.
+  # Not needed if the server has a certificate signed by a trusted CA.
+  ca_cert: /etc/veritas/server.crt
+
+  # Set to false ONLY for local development (skips TLS verification — insecure).
+  # Never set to false in production.
+  verify: true
 
 # Log sources to tail. Add one entry per source.
 sources:

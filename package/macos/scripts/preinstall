@@ -1,0 +1,4 @@
+#!/bin/bash
+# Stop existing service if running
+launchctl unload /Library/LaunchDaemons/com.veritas.daemon.plist 2>/dev/null || true
+exit 0

@@ -1,0 +1,97 @@
+#!/bin/bash
+# Veritas CLI — manage the Veritas compliance service
+RUNTIME=/opt/veritas/veritas-runtime
+DATA_DIR=/var/lib/veritas
+
+case "$1" in
+  start)    systemctl start veritas && echo "Veritas started. Open http://localhost:8000" ;;
+  stop)     systemctl stop veritas ;;
+  restart)  systemctl restart veritas ;;
+  status)   systemctl status veritas ;;
+  logs)     journalctl -u veritas -f ;;
+  check)    sudo -u veritas VERITAS_DATA_DIR=$DATA_DIR $RUNTIME --check 2>&1 || python3 -c "
+import sys; sys.path.insert(0,'$RUNTIME'); from production_check import run_checks,print_report; r=run_checks(); print_report(r)" ;;
+
+  fingerprint)
+    python3 - <<'PYEOF'
+import hashlib, platform, socket, subprocess, uuid, sys
+
+def _disk_serial():
+    system = platform.system()
+    try:
+        if system == "Linux":
+            out = subprocess.check_output(
+                "lsblk -dno SERIAL /dev/sda 2>/dev/null || lsblk -dno SERIAL /dev/nvme0n1 2>/dev/null || echo NO_SERIAL",
+                shell=True, text=True, timeout=5,
+            ).strip()
+            return out or "NO_SERIAL"
+        elif system == "Darwin":
+            out = subprocess.check_output(
+                ["system_profiler", "SPHardwareDataType"], text=True, timeout=10,
+            )
+            for line in out.splitlines():
+                if "Serial Number" in line:
+                    return line.split(":")[-1].strip()
+    except Exception:
+        pass
+    return "NO_SERIAL"
+
+mac    = hex(uuid.getnode())
+host   = socket.gethostname()
+system = platform.system()
+serial = _disk_serial()
+raw    = f"{serial}:{mac}:{host}:{system}"
+fp     = hashlib.sha256(raw.encode()).hexdigest()
+
+print("Veritas Machine Fingerprint")
+print("=" * 44)
+print("Send this fingerprint to your Veritas contact")
+print("to receive your license file (veritas.vlic):")
+print()
+print(fp)
+print()
+print(f"System:   {system} {platform.release()}")
+print(f"Hostname: {host}")
+PYEOF
+    ;;
+
+  license)
+    LICENSE_FILE=/var/lib/veritas/veritas.vlic
+    if [ -z "$2" ]; then
+      echo "Usage: veritas license <path-to-veritas.vlic>"
+      echo "       Installs your license file and restarts Veritas."
+      exit 1
+    fi
+    cp "$2" "$LICENSE_FILE"
+    chown veritas:veritas "$LICENSE_FILE"
+    chmod 640 "$LICENSE_FILE"
+    systemctl restart veritas
+    echo "License installed. Veritas is restarting..."
+    sleep 2
+    systemctl is-active veritas && echo "  Status: running" && echo "  Open: http://localhost:8000/setup"
+    ;;
+
+  version)  echo "Veritas 1.0.0" ;;
+  *)
+    echo "Veritas DPDPA Compliance Platform v1.0.0"
+    echo ""
+    echo "Usage: veritas <command>"
+    echo ""
+    echo "Commands:"
+    echo "  start         Start the Veritas service"
+    echo "  stop          Stop the Veritas service"
+    echo "  restart       Restart the Veritas service"
+    echo "  status        Show service status"
+    echo "  logs          Stream service logs (Ctrl+C to stop)"
+    echo "  check         Run production acceptance checks"
+    echo "  fingerprint   Print machine fingerprint (send to Veritas for license)"
+    echo "  license <f>   Install license file and restart"
+    echo "  version       Print version"
+    echo ""
+    echo "Getting started:"
+    echo "  1. sudo veritas fingerprint   → send output to your Veritas contact"
+    echo "  2. sudo veritas license /path/to/veritas.vlic"
+    echo "  3. sudo veritas start"
+    echo "  4. Open http://localhost:8000/setup"
+    ;;
+esac

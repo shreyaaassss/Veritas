@@ -1,0 +1,14 @@
+Package: veritas
+Version: 1.0.0
+Architecture: amd64
+Maintainer: Veritas <support@veritas.app>
+Depends: systemd
+Recommends: curl
+Section: utils
+Priority: optional
+Homepage: https://github.com/shreyaaassss/Veritas
+Description: DPDPA Compliance Platform
+ Veritas is an on-premise, licensed compliance monitoring platform
+ for the Digital Personal Data Protection Act 2023.
+ Includes PII detection, breach investigation, audit logging, and a
+ real-time compliance dashboard.

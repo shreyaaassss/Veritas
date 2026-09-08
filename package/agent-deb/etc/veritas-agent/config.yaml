@@ -1,0 +1,34 @@
+# Veritas Agent Configuration
+# ============================
+# Edit this file, then: sudo systemctl restart veritas-agent
+
+# Veritas server address (where the compliance dashboard is running)
+veritas_address: https://your-veritas-server:8000
+
+# Your organisation ID (must match what's configured on the server)
+org_id: your_org_name
+
+# Registration key from the Veritas dashboard → Agents → Issue Key
+registration_key: ""
+
+# TLS (recommended)
+tls:
+  # Path to the server's TLS certificate (copy from the server or fetch below)
+  # Fetch with: curl -k https://your-server:8000/api/tls/cert -o /etc/veritas-agent/server.crt
+  ca_cert: /etc/veritas-agent/server.crt
+  verify: true
+
+# Label for this agent (appears in the dashboard)
+source_label: my-server-1
+
+# Log sources to monitor (add as many as needed)
+sources:
+  - type: file
+    path: /var/log/syslog
+    source_system: syslog
+  # - type: file
+  #   path: /var/log/app/app.log
+  #   source_system: my-app
+  # - type: docker
+  #   container: my-container
+  #   source_system: my-container-logs

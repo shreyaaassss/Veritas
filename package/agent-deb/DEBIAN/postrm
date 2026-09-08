@@ -1,0 +1,6 @@
+#!/bin/bash
+set -e
+if [ "$1" = "purge" ]; then
+    rm -rf /opt/veritas-agent /etc/veritas-agent
+    userdel veritas-agent 2>/dev/null || true
+fi

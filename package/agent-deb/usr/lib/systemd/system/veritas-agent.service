@@ -1,0 +1,26 @@
+[Unit]
+Description=Veritas DPDPA Agent — telemetry forwarder
+After=network.target
+Documentation=https://github.com/shreyaaassss/Veritas
+
+[Service]
+Type=simple
+User=veritas-agent
+Group=veritas-agent
+WorkingDirectory=/opt/veritas-agent
+ExecStart=/usr/bin/python3 /opt/veritas-agent/agent.py --config /etc/veritas-agent/config.yaml
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=15
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log/veritas-agent
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=veritas-agent
+
+[Install]
+WantedBy=multi-user.target

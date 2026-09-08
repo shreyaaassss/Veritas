@@ -1,0 +1,32 @@
+#!/bin/bash
+set -e
+
+# Create veritas system user if not exists
+if ! id _veritas &>/dev/null; then
+    dscl . -create /Users/_veritas
+    dscl . -create /Users/_veritas UserShell /usr/bin/false
+    dscl . -create /Users/_veritas RealName "Veritas Service"
+    dscl . -create /Users/_veritas UniqueID 398
+    dscl . -create /Users/_veritas PrimaryGroupID 398
+    dscl . -create /Users/_veritas NFSHomeDirectory /opt/veritas
+fi
+
+# Create data directory
+mkdir -p /var/lib/veritas /var/log/veritas
+chown -R _veritas:_veritas /var/lib/veritas /var/log/veritas /opt/veritas
+chmod 700 /var/lib/veritas
+
+# Install LaunchDaemon
+cp /tmp/com.veritas.daemon.plist /Library/LaunchDaemons/com.veritas.daemon.plist
+chown root:wheel /Library/LaunchDaemons/com.veritas.daemon.plist
+chmod 644 /Library/LaunchDaemons/com.veritas.daemon.plist
+
+# Load and start
+launchctl load -w /Library/LaunchDaemons/com.veritas.daemon.plist
+
+echo ""
+echo "Veritas installed successfully!"
+echo "  Dashboard: http://localhost:8000"
+echo "  Setup:     http://localhost:8000/setup"
+echo ""
+echo "CLI: veritas {start|stop|status|logs}"

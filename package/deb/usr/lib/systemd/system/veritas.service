@@ -1,0 +1,31 @@
+[Unit]
+Description=Veritas DPDPA Compliance Platform
+After=network.target
+Documentation=https://github.com/shreyaaassss/Veritas
+
+[Service]
+Type=simple
+User=veritas
+Group=veritas
+WorkingDirectory=/opt/veritas
+ExecStart=/opt/veritas/veritas-runtime
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+
+# Data and secrets
+Environment="VERITAS_DATA_DIR=/var/lib/veritas"
+EnvironmentFile=-/etc/veritas/config.env
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/veritas /var/log/veritas
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=veritas
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,174 @@
+name: Release — Build & Publish Packages
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  # ── Linux .deb ─────────────────────────────────────────────────────────
+  build-linux-deb:
+    name: Linux .deb (Ubuntu amd64)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        working-directory: dpdpa-agent
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+          pip install https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl
+
+      - name: Build PyInstaller binary
+        working-directory: dpdpa-agent
+        run: |
+          python -m PyInstaller veritas-linux.spec --noconfirm
+
+      - name: Build .deb package
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          chmod +x package/build-deb.sh
+          bash package/build-deb.sh dpdpa-agent/dist/veritas-runtime $VERSION amd64
+
+      - name: Upload .deb artifact (for release-notes job)
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-deb
+          path: dist/veritas_*.deb
+          retention-days: 1
+
+      - name: Upload .deb to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/veritas_*.deb
+
+  # ── macOS .pkg ────────────────────────────────────────────────────────
+  build-macos-pkg:
+    name: macOS .pkg (Apple Silicon arm64)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        working-directory: dpdpa-agent
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+          pip install https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl
+
+      - name: Build PyInstaller binary
+        working-directory: dpdpa-agent
+        run: |
+          python -m PyInstaller veritas-mac.spec --noconfirm
+
+      - name: Build .pkg installer
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          chmod +x package/macos/build-pkg.sh
+          bash package/macos/build-pkg.sh dpdpa-agent/dist/veritas-runtime $VERSION arm64
+
+      - name: Upload .pkg artifact (for release-notes job)
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-pkg
+          path: dist/veritas_*.pkg
+          retention-days: 1
+
+      - name: Upload .pkg to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/veritas_*.pkg
+
+  # ── Agent .deb (lightweight — no PyInstaller) ─────────────────────────
+  build-agent-deb:
+    name: Agent .deb (all architectures)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build veritas-agent .deb
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          chmod +x package/build-agent-deb.sh
+          bash package/build-agent-deb.sh $VERSION all
+
+      - name: Upload agent .deb to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/veritas-agent_*.deb
+
+  # ── Release notes ─────────────────────────────────────────────────────
+  publish-release-notes:
+    name: Publish release notes with install instructions
+    runs-on: ubuntu-latest
+    needs: [build-linux-deb, build-macos-pkg, build-agent-deb]
+    permissions:
+      contents: write
+    steps:
+      - name: Update release with install instructions
+        uses: softprops/action-gh-release@v2
+        with:
+          body: |
+            ## Veritas DPDPA Compliance Platform ${{ github.ref_name }}
+
+            ### Quick Install
+
+            **Linux (Ubuntu / Debian):**
+            ```bash
+            curl -sSL https://raw.githubusercontent.com/shreyaaassss/Veritas/main/install.sh | sudo bash
+            ```
+            Or manually:
+            ```bash
+            wget https://github.com/shreyaaassss/Veritas/releases/download/${{ github.ref_name }}/veritas_${{ github.ref_name }}_amd64.deb
+            sudo dpkg -i veritas_${{ github.ref_name }}_amd64.deb
+            sudo systemctl start veritas
+            ```
+
+            **macOS (Apple Silicon):**
+            ```bash
+            curl -sSL https://raw.githubusercontent.com/shreyaaassss/Veritas/main/install.sh | sudo bash
+            ```
+            Or manually download the `.pkg` from the assets below and double-click to install.
+
+            ### After Installation (Server)
+
+            1. `sudo veritas fingerprint` — copy the output, send to Veritas for your license
+            2. `sudo veritas license /path/to/veritas.vlic` — install license
+            3. `sudo veritas start` — start the server
+            4. Open http://localhost:8000/setup — create admin account
+
+            CLI: `veritas {start|stop|restart|status|logs|fingerprint|license|check}`
+
+            ### Agent Install (on each monitored server)
+
+            ```bash
+            # Download and install the agent (tiny, no ML models)
+            wget https://github.com/shreyaaassss/Veritas/releases/download/${{ github.ref_name }}/veritas-agent_${{ github.ref_name }}_all.deb
+            sudo dpkg -i veritas-agent_${{ github.ref_name }}_all.deb
+
+            # Fetch server TLS cert
+            sudo veritas-agent fetch-cert https://your-veritas-server:8000
+
+            # Configure (set server_url, org_id, registration_key)
+            sudo nano /etc/veritas-agent/config.yaml
+
+            # Start
+            sudo veritas-agent start
+            ```
+
+            Get a registration key from the Veritas dashboard → **Agents** tab → **Issue Key**.
+
+            ### Requirements
+
+            - **Server**: Ubuntu 20.04+ / Debian 11+ or macOS 12+, systemd, 2 GB RAM, 1 GB disk
+            - **Agent**: Ubuntu 18.04+, python3, python3-requests, python3-yaml (auto-installed)
+          append_body: false

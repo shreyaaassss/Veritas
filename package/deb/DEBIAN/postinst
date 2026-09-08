@@ -1,0 +1,26 @@
+#!/bin/bash
+set -e
+
+# Create system user veritas (no login, /opt/veritas home) if not exists
+if ! id veritas &>/dev/null; then
+    useradd --system --no-create-home --shell /usr/sbin/nologin \
+        --home-dir /opt/veritas veritas
+fi
+
+# Set ownership and permissions
+chown -R veritas:veritas /opt/veritas /var/lib/veritas /var/log/veritas /etc/veritas
+chmod 700 /var/lib/veritas
+
+# Reload systemd and enable service
+systemctl daemon-reload
+systemctl enable veritas
+
+echo ""
+echo "Veritas DPDPA Compliance Platform installed successfully!"
+echo ""
+echo "  Start:     sudo systemctl start veritas"
+echo "  Dashboard: http://localhost:8000"
+echo "  Setup:     http://localhost:8000/setup"
+echo ""
+echo "CLI shortcut: veritas {start|stop|restart|status|logs|check}"
+echo ""

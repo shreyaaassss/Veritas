@@ -1,0 +1,56 @@
+#!/bin/bash
+# Veritas Agent CLI
+CONFIG=/etc/veritas-agent/config.yaml
+
+case "$1" in
+  start)
+    systemctl start veritas-agent
+    echo "Veritas Agent started."
+    echo "Logs: journalctl -u veritas-agent -f"
+    ;;
+  stop)     systemctl stop veritas-agent ;;
+  restart)  systemctl restart veritas-agent ;;
+  status)   systemctl status veritas-agent ;;
+  logs)     journalctl -u veritas-agent -f ;;
+
+  fetch-cert)
+    # Download the server's TLS cert for local verification
+    if [ -z "$2" ]; then
+      echo "Usage: veritas-agent fetch-cert <server-url>"
+      echo "Example: sudo veritas-agent fetch-cert https://192.168.1.10:8000"
+      exit 1
+    fi
+    SERVER="$2"
+    CERT_OUT=/etc/veritas-agent/server.crt
+    echo "Fetching TLS certificate from $SERVER ..."
+    curl -sSk "$SERVER/api/tls/cert" -o "$CERT_OUT"
+    chown veritas-agent:veritas-agent "$CERT_OUT"
+    chmod 644 "$CERT_OUT"
+    echo "Certificate saved to $CERT_OUT"
+    echo "Edit $CONFIG to enable TLS verification."
+    ;;
+
+  version)  echo "Veritas Agent 1.0.0" ;;
+
+  *)
+    echo "Veritas Agent v1.0.0 — DPDPA telemetry forwarder"
+    echo ""
+    echo "Usage: veritas-agent <command>"
+    echo ""
+    echo "Commands:"
+    echo "  start           Start the agent service"
+    echo "  stop            Stop the agent service"
+    echo "  restart         Restart the agent service"
+    echo "  status          Show service status"
+    echo "  logs            Stream agent logs (Ctrl+C to stop)"
+    echo "  fetch-cert <url>  Download server TLS cert for verification"
+    echo "  version         Print version"
+    echo ""
+    echo "Config: $CONFIG"
+    echo ""
+    echo "Setup steps:"
+    echo "  1. Edit $CONFIG — set server_url, org_id, registration_key"
+    echo "  2. sudo veritas-agent fetch-cert https://your-server:8000"
+    echo "  3. sudo veritas-agent start"
+    ;;
+esac

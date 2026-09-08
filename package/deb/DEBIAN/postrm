@@ -1,0 +1,12 @@
+#!/bin/bash
+set -e
+
+if [ "$1" = "purge" ]; then
+    # Remove all data, logs, and configuration
+    rm -rf /var/lib/veritas /var/log/veritas /etc/veritas
+
+    # Remove veritas system user if exists
+    if id veritas &>/dev/null; then
+        userdel veritas || true
+    fi
+fi
