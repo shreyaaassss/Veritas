@@ -12,12 +12,16 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history needed so git describe --tags works
 
       - name: Get latest release tag
         id: tag
         run: |
-          TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v1.0.4")
+          git fetch --tags --force
+          TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v1.0.5")
           VER=${TAG#v}
+          echo "Using release: $TAG (binary version $VER)"
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "ver=$VER"  >> $GITHUB_OUTPUT
 
