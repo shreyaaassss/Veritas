@@ -8,8 +8,8 @@ on:
 jobs:
   # ── Linux .deb ─────────────────────────────────────────────────────────
   build-linux-deb:
-    name: Linux .deb (Ubuntu amd64)
-    runs-on: ubuntu-latest
+    name: Linux .deb (Ubuntu 22.04 amd64)
+    runs-on: ubuntu-22.04   # pin to 22.04 so binary links against GLIBC 2.35 (max compat)
     permissions:
       contents: write
     steps:
