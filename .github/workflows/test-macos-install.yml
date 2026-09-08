@@ -118,12 +118,19 @@ jobs:
       - name: Check setup page accessible
         run: |
           HTTP=$(curl -sk -w "\nHTTP_STATUS:%{http_code}" https://localhost:8000/setup 2>/dev/null || echo "CURL_FAILED")
-          echo "Setup page response:"
-          echo "$HTTP"
+          echo "Setup page response: $HTTP"
           STATUS=$(echo "$HTTP" | grep "HTTP_STATUS:" | cut -d: -f2)
           echo "Status code: $STATUS"
-          # 200 = setup page, 302/303 = redirect (already set up), both are fine
-          [[ "$STATUS" =~ ^(200|302|303)$ ]] || { echo "Unexpected status: $STATUS"; exit 1; }
+          if [[ ! "$STATUS" =~ ^(200|302|303)$ ]]; then
+            echo "=== Server error log (last 40 lines) ==="
+            sudo tail -40 /var/log/veritas/veritas-error.log 2>/dev/null || true
+            echo "=== Also check if setup.html is in bundle ==="
+            ls /var/lib/veritas/tmp/ 2>/dev/null | head -5 || true
+            sudo find /var/lib/veritas/tmp -name "setup.html" 2>/dev/null || true
+            echo "=== Try /login page ==="
+            curl -sko /dev/null -w "login page: %{http_code}\n" https://localhost:8000/login
+            exit 1
+          fi
 
       - name: Print install summary
         run: |
