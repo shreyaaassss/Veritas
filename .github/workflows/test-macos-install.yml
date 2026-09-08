@@ -1,0 +1,109 @@
+name: Test macOS .pkg Installation
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  test-macos-pkg:
+    name: Install & smoke-test veritas .pkg on macOS
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get latest release tag
+        id: tag
+        run: |
+          TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v1.0.4")
+          VER=${TAG#v}
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "ver=$VER"  >> $GITHUB_OUTPUT
+
+      - name: Download .pkg from release
+        run: |
+          TAG=${{ steps.tag.outputs.tag }}
+          VER=${{ steps.tag.outputs.ver }}
+          echo "Downloading veritas_${VER}_arm64.pkg ..."
+          curl -L \
+            "https://github.com/shreyaaassss/Veritas/releases/download/${TAG}/veritas_${VER}_arm64.pkg" \
+            -o /tmp/veritas.pkg
+          ls -lh /tmp/veritas.pkg
+
+      - name: Install .pkg
+        run: sudo installer -pkg /tmp/veritas.pkg -target /
+
+      - name: Verify CLI installed
+        run: veritas version
+
+      - name: Get machine fingerprint
+        run: sudo veritas fingerprint
+
+      - name: Generate a test license (no fingerprint — any-machine)
+        run: |
+          cd dpdpa-agent
+          pip3 install cryptography --quiet
+          python3 ../tools/generate_license.py \
+            --org "ci-test" \
+            --tier enterprise \
+            --expiry 2027-12-31 \
+            --key ../tools/private_key.pem \
+            --out /tmp/ci-test.vlic
+          echo "License generated."
+
+      - name: Install license
+        run: sudo veritas license /tmp/ci-test.vlic
+
+      - name: Fix license file ownership and permissions
+        run: |
+          sudo xattr -c /var/lib/veritas/veritas.vlic
+          sudo chown _veritas:staff /var/lib/veritas/veritas.vlic
+          sudo chmod 640 /var/lib/veritas/veritas.vlic
+
+      - name: Bootstrap daemon
+        run: |
+          sudo launchctl bootout system /Library/LaunchDaemons/com.veritas.daemon.plist 2>/dev/null || true
+          sleep 2
+          sudo launchctl bootstrap system /Library/LaunchDaemons/com.veritas.daemon.plist
+
+      - name: Wait for server to start (spaCy takes ~30s)
+        run: |
+          echo "Waiting for server..."
+          for i in $(seq 1 20); do
+            RESP=$(curl -sk https://localhost:8000/health 2>/dev/null)
+            if echo "$RESP" | grep -q '"status":"ok"'; then
+              echo "Server is UP: $RESP"
+              exit 0
+            fi
+            echo "  attempt $i/20 — not ready yet"
+            sleep 5
+          done
+          echo "Server did not start in time."
+          echo "=== Error log ==="
+          sudo tail -50 /var/log/veritas/veritas-error.log || true
+          exit 1
+
+      - name: Health check
+        run: |
+          HEALTH=$(curl -sk https://localhost:8000/health)
+          echo "Health: $HEALTH"
+          echo "$HEALTH" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d['status']=='ok', f'Bad health: {d}'"
+
+      - name: Ready endpoint
+        run: curl -sk https://localhost:8000/ready | python3 -m json.tool || true
+
+      - name: Check setup page accessible
+        run: |
+          HTTP=$(curl -sko /dev/null -w "%{http_code}" https://localhost:8000/setup)
+          echo "Setup page HTTP status: $HTTP"
+          [ "$HTTP" = "200" ] || exit 1
+
+      - name: Print install summary
+        run: |
+          echo "================================================"
+          echo "  Veritas macOS Install Test: PASSED"
+          echo "  Server:  https://localhost:8000"
+          echo "  License: CI any-machine enterprise"
+          echo "================================================"
+          sudo launchctl print system/com.veritas.daemon | grep -E "state|pid|exit" || true
