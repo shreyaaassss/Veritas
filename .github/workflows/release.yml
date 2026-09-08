@@ -26,6 +26,23 @@ jobs:
           pip install -r requirements.txt pyinstaller
           pip install https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl
 
+      - name: Verify presidio conf is accessible
+        working-directory: dpdpa-agent
+        run: |
+          python3 -c "
+          import pathlib, presidio_analyzer
+          from PyInstaller.utils.hooks import collect_data_files
+          pa_dir = pathlib.Path(presidio_analyzer.__file__).parent
+          conf = pa_dir / 'conf'
+          print(f'presidio_analyzer path: {pa_dir}')
+          print(f'conf dir exists: {conf.exists()}')
+          if conf.exists():
+              print(f'conf files: {list(conf.iterdir())}')
+          datas = collect_data_files('presidio_analyzer')
+          conf_datas = [d for d in datas if 'conf' in str(d[0])]
+          print(f'collect_data_files found conf entries: {conf_datas[:3]}')
+          "
+
       - name: Build PyInstaller binary
         working-directory: dpdpa-agent
         run: |
