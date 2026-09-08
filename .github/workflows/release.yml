@@ -120,6 +120,9 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Strip v-prefix from tag for filenames
+        run: echo "VER=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+
       - name: Update release with install instructions
         uses: softprops/action-gh-release@v2
         with:
@@ -128,14 +131,14 @@ jobs:
 
             ### Quick Install
 
-            **Linux (Ubuntu / Debian):**
+            **Linux (Ubuntu 22.04+ / Debian 11+):**
             ```bash
             curl -sSL https://raw.githubusercontent.com/shreyaaassss/Veritas/main/install.sh | sudo bash
             ```
             Or manually:
             ```bash
-            wget https://github.com/shreyaaassss/Veritas/releases/download/${{ github.ref_name }}/veritas_${{ github.ref_name }}_amd64.deb
-            sudo dpkg -i veritas_${{ github.ref_name }}_amd64.deb
+            wget https://github.com/shreyaaassss/Veritas/releases/download/${{ github.ref_name }}/veritas_${{ env.VER }}_amd64.deb
+            sudo dpkg -i veritas_${{ env.VER }}_amd64.deb
             sudo systemctl start veritas
             ```
 
@@ -143,11 +146,11 @@ jobs:
             ```bash
             curl -sSL https://raw.githubusercontent.com/shreyaaassss/Veritas/main/install.sh | sudo bash
             ```
-            Or manually download the `.pkg` from the assets below and double-click to install.
+            Or download `veritas_${{ env.VER }}_arm64.pkg` from the assets below and double-click.
 
             ### After Installation (Server)
 
-            1. `sudo veritas fingerprint` — copy the output, send to Veritas for your license
+            1. `sudo veritas fingerprint` — send the output to your Veritas contact
             2. `sudo veritas license /path/to/veritas.vlic` — install license
             3. `sudo veritas start` — start the server
             4. Open http://localhost:8000/setup — create admin account
@@ -157,17 +160,10 @@ jobs:
             ### Agent Install (on each monitored server)
 
             ```bash
-            # Download and install the agent (tiny, no ML models)
-            wget https://github.com/shreyaaassss/Veritas/releases/download/${{ github.ref_name }}/veritas-agent_${{ github.ref_name }}_all.deb
-            sudo dpkg -i veritas-agent_${{ github.ref_name }}_all.deb
-
-            # Fetch server TLS cert
+            wget https://github.com/shreyaaassss/Veritas/releases/download/${{ github.ref_name }}/veritas-agent_${{ env.VER }}_all.deb
+            sudo dpkg -i veritas-agent_${{ env.VER }}_all.deb
             sudo veritas-agent fetch-cert https://your-veritas-server:8000
-
-            # Configure (set server_url, org_id, registration_key)
-            sudo nano /etc/veritas-agent/config.yaml
-
-            # Start
+            sudo nano /etc/veritas-agent/config.yaml   # set server_url, org_id, registration_key
             sudo veritas-agent start
             ```
 
@@ -175,6 +171,6 @@ jobs:
 
             ### Requirements
 
-            - **Server**: Ubuntu 20.04+ / Debian 11+ or macOS 12+, systemd, 2 GB RAM, 1 GB disk
+            - **Server**: Ubuntu 22.04+ / Debian 11+ or macOS 12+, systemd, 2 GB RAM, 1 GB disk
             - **Agent**: Ubuntu 18.04+, python3, python3-requests, python3-yaml (auto-installed)
           append_body: false

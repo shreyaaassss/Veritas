@@ -48,17 +48,23 @@ def get_disk_serial_windows() -> str:
 
 
 def get_disk_serial_linux() -> str:
-    """Get disk serial on Linux via lsblk."""
-    try:
-        output = subprocess.check_output(
-            "lsblk -dno SERIAL /dev/sda",
-            shell=True,
-            stderr=subprocess.DEVNULL,
-            timeout=10,
-        ).decode("utf-8", errors="replace").strip()
-        return output if output else "NO_SERIAL"
-    except Exception:
-        return "NO_SERIAL"
+    """
+    Get disk serial on Linux via lsblk.
+    Tries sda → nvme0n1 → vda → xvda to cover bare-metal, cloud NVMe,
+    KVM and Xen instances. Must stay in sync with dpdpa-agent/license.py.
+    """
+    for dev in ("/dev/sda", "/dev/nvme0n1", "/dev/vda", "/dev/xvda"):
+        try:
+            output = subprocess.check_output(
+                ["lsblk", "-dno", "SERIAL", dev],
+                stderr=subprocess.DEVNULL,
+                timeout=5,
+            ).decode("utf-8", errors="replace").strip()
+            if output:
+                return output
+        except Exception:
+            pass
+    return "NO_SERIAL"
 
 
 def get_disk_serial_macos() -> str:

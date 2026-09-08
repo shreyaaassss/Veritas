@@ -81,6 +81,16 @@ class LicenseInfo:
 # ---------------------------------------------------------------------------
 
 def _disk_serial() -> str:
+    """
+    Return the primary disk serial number. Must produce the same value as
+    tools/fingerprint.py on every platform (they are kept in sync).
+
+    Linux: tries sda → nvme0n1 → vda → xvda in order; returns first non-empty
+           serial found. This covers bare-metal (sda/sdb), cloud NVMe (nvme0n1),
+           KVM/QEMU (vda) and older Xen EC2 (xvda).
+    macOS: reads hardware serial from system_profiler.
+    Windows: reads disk serial from WMIC.
+    """
     system = platform.system()
     try:
         if system == "Windows":
@@ -92,11 +102,25 @@ def _disk_serial() -> str:
             serials = [l for l in lines if l.lower() != "serialnumber" and l]
             return serials[0] if serials else "NO_SERIAL"
         elif system == "Linux":
+            for dev in ("/dev/sda", "/dev/nvme0n1", "/dev/vda", "/dev/xvda"):
+                try:
+                    out = subprocess.check_output(
+                        ["lsblk", "-dno", "SERIAL", dev],
+                        stderr=subprocess.DEVNULL, timeout=5,
+                    ).decode("utf-8", errors="replace").strip()
+                    if out:
+                        return out
+                except Exception:
+                    pass
+            return "NO_SERIAL"
+        elif system == "Darwin":
             out = subprocess.check_output(
-                "lsblk -dno SERIAL /dev/sda",
-                shell=True, stderr=subprocess.DEVNULL, timeout=10,
-            ).decode("utf-8", errors="replace").strip()
-            return out if out else "NO_SERIAL"
+                ["system_profiler", "SPHardwareDataType"],
+                stderr=subprocess.DEVNULL, timeout=10,
+            ).decode("utf-8", errors="replace")
+            for line in out.splitlines():
+                if "Serial Number" in line:
+                    return line.split(":")[-1].strip()
     except Exception:
         pass
     return "NO_SERIAL"

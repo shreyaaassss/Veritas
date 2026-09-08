@@ -18,22 +18,28 @@ import hashlib, platform, socket, subprocess, uuid, sys
 
 def _disk_serial():
     system = platform.system()
-    try:
-        if system == "Linux":
-            out = subprocess.check_output(
-                "lsblk -dno SERIAL /dev/sda 2>/dev/null || lsblk -dno SERIAL /dev/nvme0n1 2>/dev/null || echo NO_SERIAL",
-                shell=True, text=True, timeout=5,
-            ).strip()
-            return out or "NO_SERIAL"
-        elif system == "Darwin":
+    if system == "Linux":
+        for dev in ("/dev/sda", "/dev/nvme0n1", "/dev/vda", "/dev/xvda"):
+            try:
+                out = subprocess.check_output(
+                    ["lsblk", "-dno", "SERIAL", dev],
+                    stderr=subprocess.DEVNULL, timeout=5, text=True,
+                ).strip()
+                if out:
+                    return out
+            except Exception:
+                pass
+        return "NO_SERIAL"
+    elif system == "Darwin":
+        try:
             out = subprocess.check_output(
                 ["system_profiler", "SPHardwareDataType"], text=True, timeout=10,
             )
             for line in out.splitlines():
                 if "Serial Number" in line:
                     return line.split(":")[-1].strip()
-    except Exception:
-        pass
+        except Exception:
+            pass
     return "NO_SERIAL"
 
 mac    = hex(uuid.getnode())
