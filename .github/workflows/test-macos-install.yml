@@ -116,9 +116,13 @@ jobs:
 
       - name: Check setup page accessible
         run: |
-          HTTP=$(curl -sko /dev/null -w "%{http_code}" https://localhost:8000/setup)
-          echo "Setup page HTTP status: $HTTP"
-          [ "$HTTP" = "200" ] || exit 1
+          HTTP=$(curl -sk -w "\nHTTP_STATUS:%{http_code}" https://localhost:8000/setup 2>/dev/null || echo "CURL_FAILED")
+          echo "Setup page response:"
+          echo "$HTTP"
+          STATUS=$(echo "$HTTP" | grep "HTTP_STATUS:" | cut -d: -f2)
+          echo "Status code: $STATUS"
+          # 200 = setup page, 302/303 = redirect (already set up), both are fine
+          [[ "$STATUS" =~ ^(200|302|303)$ ]] || { echo "Unexpected status: $STATUS"; exit 1; }
 
       - name: Print install summary
         run: |
