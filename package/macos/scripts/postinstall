@@ -1,32 +1,71 @@
 #!/bin/bash
+# Veritas macOS post-install script
+# Runs as root after package payload is installed.
+
 set -e
 
-# Create veritas system user if not exists
-if ! id _veritas &>/dev/null; then
-    dscl . -create /Users/_veritas
-    dscl . -create /Users/_veritas UserShell /usr/bin/false
-    dscl . -create /Users/_veritas RealName "Veritas Service"
-    dscl . -create /Users/_veritas UniqueID 398
-    dscl . -create /Users/_veritas PrimaryGroupID 398
-    dscl . -create /Users/_veritas NFSHomeDirectory /opt/veritas
+PLIST_SRC=/opt/veritas/com.veritas.daemon.plist
+PLIST_DST=/Library/LaunchDaemons/com.veritas.daemon.plist
+DATA_DIR=/var/lib/veritas
+LOG_DIR=/var/log/veritas
+USER=_veritas
+
+# ── 1. Create _veritas system user (if not already present) ──────────────────
+if ! id "$USER" &>/dev/null; then
+    # Find an unused UID in the 300-499 range (safe system range on macOS)
+    USED_UIDS=$(dscl . -list /Users UniqueID | awk '{print $2}')
+    NEW_UID=398
+    while echo "$USED_UIDS" | grep -q "^${NEW_UID}$"; do
+        NEW_UID=$((NEW_UID + 1))
+    done
+
+    dscl . -create /Users/$USER
+    dscl . -create /Users/$USER UserShell /usr/bin/false
+    dscl . -create /Users/$USER RealName "Veritas Service"
+    dscl . -create /Users/$USER UniqueID "$NEW_UID"
+    dscl . -create /Users/$USER PrimaryGroupID 20   # 'staff' group (always exists)
+    dscl . -create /Users/$USER NFSHomeDirectory /opt/veritas
 fi
 
-# Create data directory
-mkdir -p /var/lib/veritas /var/log/veritas
-chown -R _veritas:_veritas /var/lib/veritas /var/log/veritas /opt/veritas
-chmod 700 /var/lib/veritas
+# ── 2. Create runtime directories ────────────────────────────────────────────
+mkdir -p "$DATA_DIR" "$DATA_DIR/tmp" "$LOG_DIR"
+chown -R "$USER":staff "$DATA_DIR" "$LOG_DIR" /opt/veritas
+chmod 700 "$DATA_DIR"
+chmod 755 "$DATA_DIR/tmp"   # PyInstaller extracts here; needs to be traversable
 
-# Install LaunchDaemon
-cp /tmp/com.veritas.daemon.plist /Library/LaunchDaemons/com.veritas.daemon.plist
-chown root:wheel /Library/LaunchDaemons/com.veritas.daemon.plist
-chmod 644 /Library/LaunchDaemons/com.veritas.daemon.plist
+# ── 3. Install LaunchDaemon plist ─────────────────────────────────────────────
+# The plist is installed to /opt/veritas/ by the package payload
+cp "$PLIST_SRC" "$PLIST_DST"
+chown root:wheel "$PLIST_DST"
+chmod 644 "$PLIST_DST"
 
-# Load and start
-launchctl load -w /Library/LaunchDaemons/com.veritas.daemon.plist
+# ── 4. Load the daemon ────────────────────────────────────────────────────────
+# Use launchctl bootstrap (Catalina+); fall back to load for older macOS
+if launchctl print system/com.veritas.daemon &>/dev/null 2>&1; then
+    # Already loaded — bootout first then bootstrap
+    launchctl bootout system "$PLIST_DST" 2>/dev/null || true
+fi
+
+if launchctl bootstrap system "$PLIST_DST" 2>/dev/null; then
+    LOADED=true
+elif launchctl load -w "$PLIST_DST" 2>/dev/null; then
+    LOADED=true
+else
+    LOADED=false
+fi
 
 echo ""
-echo "Veritas installed successfully!"
+echo "Veritas DPDPA Compliance Platform installed successfully!"
+echo ""
+if [ "$LOADED" = "true" ]; then
+    echo "  Service: started"
+else
+    echo "  Service: not started (start manually with: sudo veritas start)"
+fi
 echo "  Dashboard: http://localhost:8000"
-echo "  Setup:     http://localhost:8000/setup"
 echo ""
-echo "CLI: veritas {start|stop|status|logs}"
+echo "Getting started:"
+echo "  1. sudo veritas fingerprint"
+echo "  2. sudo veritas license /path/to/veritas.vlic"
+echo "  3. sudo veritas start"
+echo "  4. Open http://localhost:8000/setup"

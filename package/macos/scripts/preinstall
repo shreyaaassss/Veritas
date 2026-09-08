@@ -1,4 +1,10 @@
 #!/bin/bash
-# Stop existing service if running
-launchctl unload /Library/LaunchDaemons/com.veritas.daemon.plist 2>/dev/null || true
+# Stop existing Veritas service before upgrade (graceful, never fails)
+PLIST=/Library/LaunchDaemons/com.veritas.daemon.plist
+
+# Try modern bootout first, then legacy unload
+launchctl bootout system "$PLIST" 2>/dev/null || \
+launchctl unload -w "$PLIST" 2>/dev/null || \
+true
+
 exit 0

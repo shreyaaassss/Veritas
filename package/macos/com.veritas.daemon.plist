@@ -4,26 +4,43 @@
 <dict>
     <key>Label</key>
     <string>com.veritas.daemon</string>
+
     <key>ProgramArguments</key>
     <array>
         <string>/opt/veritas/veritas-runtime</string>
     </array>
+
     <key>EnvironmentVariables</key>
     <dict>
         <key>VERITAS_DATA_DIR</key>
         <string>/var/lib/veritas</string>
+        <key>TMPDIR</key>
+        <string>/var/lib/veritas/tmp</string>
     </dict>
+
     <key>WorkingDirectory</key>
     <string>/opt/veritas</string>
+
+    <!-- Run as _veritas user (created by postinstall) -->
+    <key>UserName</key>
+    <string>_veritas</string>
+
     <key>RunAtLoad</key>
     <true/>
+
     <key>KeepAlive</key>
-    <true/>
+    <dict>
+        <!-- Restart on crash but not on clean exit (e.g. license failure) -->
+        <key>Crashed</key>
+        <true/>
+    </dict>
+
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+
     <key>StandardOutPath</key>
     <string>/var/log/veritas/veritas.log</string>
     <key>StandardErrorPath</key>
     <string>/var/log/veritas/veritas-error.log</string>
-    <key>UserName</key>
-    <string>_veritas</string>
 </dict>
 </plist>
