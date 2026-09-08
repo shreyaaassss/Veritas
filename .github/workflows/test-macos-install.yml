@@ -74,21 +74,35 @@ jobs:
           sleep 2
           sudo launchctl bootstrap system /Library/LaunchDaemons/com.veritas.daemon.plist
 
-      - name: Wait for server to start (spaCy takes ~30s)
+      - name: Check daemon status immediately after bootstrap
+        run: |
+          sleep 5
+          echo "=== launchctl status ==="
+          sudo launchctl print system/com.veritas.daemon 2>&1 | grep -E "state|pid|exit|environment|username" || true
+          echo "=== Error log so far ==="
+          sudo cat /var/log/veritas/veritas-error.log 2>/dev/null || echo "(no error log yet)"
+          echo "=== Stdout log so far ==="
+          sudo cat /var/log/veritas/veritas.log 2>/dev/null || echo "(no stdout log yet)"
+
+      - name: Wait for server to start (spaCy takes ~60s on CI)
         run: |
           echo "Waiting for server..."
-          for i in $(seq 1 20); do
-            RESP=$(curl -sk https://localhost:8000/health 2>/dev/null)
+          for i in $(seq 1 24); do
+            RESP=$(curl -sk https://localhost:8000/health 2>/dev/null || echo "")
             if echo "$RESP" | grep -q '"status":"ok"'; then
               echo "Server is UP: $RESP"
               exit 0
             fi
-            echo "  attempt $i/20 — not ready yet"
+            echo "  attempt $i/24 — not ready yet (${i}x5=${i*5}s elapsed)"
             sleep 5
           done
-          echo "Server did not start in time."
-          echo "=== Error log ==="
-          sudo tail -50 /var/log/veritas/veritas-error.log || true
+          echo "Server did not start in 120s."
+          echo "=== Full error log ==="
+          sudo cat /var/log/veritas/veritas-error.log 2>/dev/null || true
+          echo "=== Stdout log ==="
+          sudo cat /var/log/veritas/veritas.log 2>/dev/null || true
+          echo "=== launchctl final state ==="
+          sudo launchctl print system/com.veritas.daemon 2>&1 || true
           exit 1
 
       - name: Health check
