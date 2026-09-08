@@ -38,8 +38,11 @@ spacy_datas, spacy_binaries, spacy_hiddenimports = collect_all('en_core_web_lg')
 spacy_core_datas = collect_data_files('spacy')
 
 # Presidio (uses regex patterns and other data files)
-presidio_datas = collect_data_files('presidio_analyzer')
+presidio_datas  = collect_data_files('presidio_analyzer')
 presidio_datas += collect_data_files('presidio_anonymizer')
+import pathlib as _pl, presidio_analyzer as _pa
+_pa_conf = str(_pl.Path(_pa.__file__).parent / 'conf')
+presidio_datas += [(_pa_conf, 'presidio_analyzer/conf')]
 
 # tldextract (used by presidio, has snapshot data files)
 try:

@@ -130,13 +130,13 @@ jobs:
         run: choco install innosetup --no-progress -y
 
       - name: Build Windows installer
-        shell: bash
+        shell: pwsh
         run: |
-          VERSION=${GITHUB_REF_NAME#v}
-          mkdir -p installer/output
-          "/c/Program Files (x86)/Inno Setup 6/ISCC.exe" \
-            "/DAppVersion=${VERSION}" \
-            installer/veritas-installer.iss
+          $VERSION = $env:GITHUB_REF_NAME.TrimStart('v')
+          New-Item -ItemType Directory -Force installer/output | Out-Null
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          & $iscc "/DAppVersion=$VERSION" "installer\veritas-installer.iss"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Upload installer to release
         uses: softprops/action-gh-release@v2
