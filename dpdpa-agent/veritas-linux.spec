@@ -30,6 +30,9 @@ a = Analysis(
     binaries=spacy_binaries,
     datas=[
         ('dashboard/index.html',               'dashboard'),
+        ('dashboard/login.html',               'dashboard'),
+        ('dashboard/setup.html',               'dashboard'),
+        ('dashboard/static',                   'dashboard/static'),
         ('llm_explainer/statute_snippets.json','llm_explainer'),
         ('org_config/configs',                 'org_config/configs'),
         *spacy_datas,
