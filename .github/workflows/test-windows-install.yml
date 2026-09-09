@@ -32,44 +32,35 @@ jobs:
           Set-MpPreference -DisableRealtimeMonitoring $true -ErrorAction SilentlyContinue
           Write-Host "Defender real-time monitoring disabled"
 
-      - name: Download Windows installer
+      - name: Install Python dependencies
+        working-directory: dpdpa-agent
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+          pip install https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl
+
+      - name: Build veritas-runtime.exe (PyInstaller)
+        working-directory: dpdpa-agent
+        run: python -m PyInstaller veritas.spec --noconfirm
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Build veritas-launcher.exe (Go)
+        working-directory: veritas-launcher
+        run: go build -ldflags="-s -w" -o ..\dpdpa-agent\dist\veritas-launcher.exe .
+
+      - name: Install built binaries to Program Files
         shell: pwsh
         run: |
-          $tag = "${{ steps.tag.outputs.tag }}"
-          $ver = "${{ steps.tag.outputs.ver }}"
-          $url = "https://github.com/shreyaaassss/Veritas/releases/download/$tag/veritas_${ver}_windows_amd64.exe"
-          Write-Host "Downloading $url ..."
-          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-          Invoke-WebRequest $url -OutFile "C:\veritas-setup.exe" -UseBasicParsing
-          $sz = [math]::Round((Get-Item "C:\veritas-setup.exe").Length / 1MB)
-          Write-Host "Downloaded: ${sz}MB"
-
-      - name: Extract installer with 7-Zip (bypass Inno Setup for CI speed)
-        shell: pwsh
-        run: |
-          # 7-Zip can extract Inno Setup installers directly
-          # This is much faster than running the full installer in CI
-          Write-Host "Extracting installer contents with 7-Zip..."
-          $extractDir = "C:\veritas-extracted"
-          & "C:\Program Files\7-Zip\7z.exe" x "C:\veritas-setup.exe" -o"$extractDir" -y | Select-String -Pattern "Everything|Error|Warning"
-
-          # Create install directory and copy binaries
-          $installDir = "C:\Program Files\Veritas"
-          New-Item -ItemType Directory -Force -Path $installDir | Out-Null
-
-          # Find and copy the executables (7-Zip extracts to flat structure)
-          $runtime = Get-ChildItem $extractDir -Recurse -Filter "veritas-runtime.exe" | Select-Object -First 1
-          $launcher = Get-ChildItem $extractDir -Recurse -Filter "veritas-launcher.exe" | Select-Object -First 1
-
-          if ($runtime) {
-            Copy-Item $runtime.FullName "$installDir\veritas-runtime.exe"
-            Write-Host "RUNTIME_EXE: OK ($([math]::Round($runtime.Length/1MB))MB)"
-          } else { throw "veritas-runtime.exe not found in installer" }
-
-          if ($launcher) {
-            Copy-Item $launcher.FullName "$installDir\veritas-launcher.exe"
-            Write-Host "LAUNCHER_EXE: OK ($([math]::Round($launcher.Length/1KB))KB)"
-          } else { throw "veritas-launcher.exe not found in installer" }
+          $dir = "C:\Program Files\Veritas"
+          New-Item -ItemType Directory -Force -Path $dir | Out-Null
+          Copy-Item "dpdpa-agent\dist\veritas-runtime.exe"  "$dir\veritas-runtime.exe"
+          Copy-Item "dpdpa-agent\dist\veritas-launcher.exe" "$dir\veritas-launcher.exe"
+          Write-Host "RUNTIME_EXE:  $(Test-Path "$dir\veritas-runtime.exe")"
+          Write-Host "LAUNCHER_EXE: $(Test-Path "$dir\veritas-launcher.exe")"
 
       - name: Register Windows Service
         shell: pwsh
