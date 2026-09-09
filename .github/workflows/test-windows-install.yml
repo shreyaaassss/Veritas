@@ -106,12 +106,13 @@ jobs:
             & "C:\Program Files\Veritas\veritas-launcher.exe" run 2>&1
           }
 
-          # Poll health endpoint while launcher runs in background
+          # Server starts in ~5-10s on Windows (TLS cert gen + spaCy warm)
+          Start-Sleep -Seconds 30
           $started = $false
-          for ($i = 1; $i -le 20; $i++) {
-            Start-Sleep -Seconds 15
+          for ($i = 1; $i -le 15; $i++) {
+            Start-Sleep -Seconds 10
             try {
-              $r = Invoke-WebRequest "http://localhost:8000/health" -UseBasicParsing -TimeoutSec 8
+              $r = Invoke-WebRequest "https://localhost:8000/health" -UseBasicParsing -TimeoutSec 8 -SkipCertificateCheck
               Write-Host "HEALTH_HTTP: $($r.StatusCode)"
               Write-Host "HEALTH_BODY: $($r.Content)"
               $started = $true
@@ -133,7 +134,7 @@ jobs:
         shell: pwsh
         run: |
           try {
-            $r = Invoke-WebRequest "http://localhost:8000/setup" -UseBasicParsing -TimeoutSec 10
+            $r = Invoke-WebRequest "https://localhost:8000/setup" -UseBasicParsing -TimeoutSec 10 -SkipCertificateCheck
             Write-Host "SETUP_HTTP: $($r.StatusCode)"
           } catch {
             Write-Host "SETUP_HTTP: $($_.Exception.Response.StatusCode.value__)"
