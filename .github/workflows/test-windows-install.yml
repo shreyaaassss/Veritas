@@ -72,38 +72,23 @@ jobs:
           if (-not $svc) { throw "Service registration failed" }
 
       - name: Generate CI test license (any-machine)
-        shell: bash
+        shell: pwsh
         run: |
-          python3 -m venv /tmp/licvenv
-          /tmp/licvenv/bin/pip install cryptography --quiet
-          /tmp/licvenv/bin/python3 tools/generate_license.py \
-            --org "ci-windows-test" \
-            --tier enterprise \
-            --expiry 2027-12-31 \
-            --key tools/private_key.pem \
-            --out /tmp/ci-win.vlic
-          echo "License generated"
-        env:
-          VERITAS_PRIVATE_KEY_B64: ${{ secrets.VERITAS_PRIVATE_KEY_B64 }}
+          pip install cryptography --quiet
+          python tools/generate_license.py `
+            --org "ci-windows-test" `
+            --tier enterprise `
+            --expiry 2027-12-31 `
+            --key tools/private_key.pem `
+            --out "C:\ci-win.vlic"
+          Write-Host "License generated: $(Test-Path 'C:\ci-win.vlic')"
 
       - name: Install license
         shell: pwsh
         run: |
           $dir = "C:\Program Files\Veritas"
-          Copy-Item "C:\Users\runneradmin\AppData\Local\Temp\ci-win.vlic" "$dir\veritas.vlic" -ErrorAction SilentlyContinue
-          # Try alternate path
-          $src = (Get-ChildItem "C:\*\ci-win.vlic" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1).FullName
-          if (-not $src) { $src = "/tmp/ci-win.vlic" }
-          Copy-Item $src "$dir\veritas.vlic" -ErrorAction SilentlyContinue
+          Copy-Item "C:\ci-win.vlic" "$dir\veritas.vlic"
           Write-Host "License installed: $(Test-Path "$dir\veritas.vlic")"
-
-      - name: Find and install license (robust path)
-        shell: bash
-        run: |
-          INSTALL_DIR="C:/Program Files/Veritas"
-          cp /tmp/ci-win.vlic "$INSTALL_DIR/veritas.vlic"
-          echo "License at: $INSTALL_DIR/veritas.vlic"
-          ls -la "$INSTALL_DIR/veritas.vlic"
 
       - name: Start Veritas service (after license is installed)
         shell: pwsh
