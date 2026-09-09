@@ -92,20 +92,22 @@ jobs:
           echo "License at: $INSTALL_DIR/veritas.vlic"
           ls -la "$INSTALL_DIR/veritas.vlic"
 
-      - name: Start Veritas service
+      - name: Start Veritas service (after license is installed)
         shell: pwsh
         run: |
-          Write-Host "Starting VeritasService..."
+          Write-Host "Starting VeritasService (license now present)..."
+          # Service was registered but not started (no license at install time)
+          # Now that license is in place, start it
           try {
             Start-Service "VeritasService" -ErrorAction Stop
             Write-Host "SERVICE_START: OK"
           } catch {
-            Write-Host "SERVICE_START_ERR: $_"
-            # Try launcher directly
+            Write-Host "SERVICE_START_WARN: $_ — trying launcher..."
             & "C:\Program Files\Veritas\veritas-launcher.exe" start 2>&1
           }
+          Start-Sleep -Seconds 3
           $svc = Get-Service "VeritasService" -ErrorAction SilentlyContinue
-          Write-Host "Service status: $($svc.Status)"
+          Write-Host "SERVICE_STATUS: $($svc.Status)"
 
       - name: Wait for spaCy model to load (~90s)
         shell: pwsh

@@ -70,11 +70,14 @@ Name: "{group}\Uninstall Veritas";        Filename: "{uninstallexe}"
 Name: "{autodesktop}\Veritas Dashboard";  Filename: "http://localhost:8000"; IconFilename: "{app}\veritas-launcher.exe"; Tasks: desktopicon
 
 [Run]
-; Register and start the Windows Service
+; Register the Windows Service (always)
 Filename: "{app}\veritas-launcher.exe"; Parameters: "install"; StatusMsg: "Registering Veritas Windows Service..."; Flags: runhidden waituntilterminated
-Filename: "{app}\veritas-launcher.exe"; Parameters: "start";   StatusMsg: "Starting Veritas...";                    Flags: runhidden waituntilterminated
 
-; Offer to open dashboard when installer finishes
+; Only start the service if a license file was provided — prevents hang when
+; running silently in CI (no license = service crashes immediately on start)
+Filename: "{app}\veritas-launcher.exe"; Parameters: "start"; StatusMsg: "Starting Veritas..."; Flags: runhidden waituntilterminated; Check: LicFileSelected
+
+; Offer to open dashboard when installer finishes (interactive only)
 Filename: "http://localhost:8000"; Description: "Open Veritas Dashboard in browser (wait ~60s for first startup)"; Flags: postinstall shellexec skipifsilent unchecked
 
 [UninstallRun]
@@ -84,6 +87,14 @@ Filename: "{app}\veritas-launcher.exe"; Parameters: "uninstall"; Flags: runhidde
 [Code]
 var
   LicFilePage: TInputFileWizardPage;
+
+{ ---- Check if user selected a license file (used in [Run] Check:) ---- }
+
+function LicFileSelected: Boolean;
+begin
+  Result := (LicFilePage.Values[0] <> '');
+end;
+
 
 { ---- Wizard setup ---- }
 
