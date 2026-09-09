@@ -1,7 +1,7 @@
 # Veritas DPDPA Compliance Platform — Installation & Setup Guide
 
-**Version:** 1.0.2  
-**Supported OS:** Ubuntu 22.04+, macOS 12+ (Apple Silicon), Windows 10/11
+**Version:** 1.0.12  
+**Supported OS:** Ubuntu 22.04+, macOS 12+ (Apple Silicon), Windows Server 2019/2022 / Windows 10/11
 
 ---
 
@@ -15,17 +15,18 @@
 6. [First-Boot Setup](#first-boot-setup)
 7. [Agent Deployment](#agent-deployment)
 8. [License Management](#license-management)
-9. [Veritas CLI Reference](#veritas-cli-reference)
+9. [CLI Reference](#cli-reference)
+10. [Troubleshooting](#troubleshooting)
 
 ---
 
 ## Overview
 
-Veritas runs entirely on your infrastructure — nothing leaves your network except optional AI investigation calls (which send no raw PII). There are two components:
+Veritas runs entirely on your infrastructure — no data leaves your network except optional AI investigation calls (which send no raw PII). Two components:
 
 | Component | Purpose | Installs on |
 |---|---|---|
-| **Veritas Server** | Compliance dashboard, PII detection engine, evidence store | Your compliance hub (1 machine) |
+| **Veritas Server** | Compliance dashboard, PII detection, evidence store | Your compliance hub (1 machine) |
 | **Veritas Agent** | Lightweight log forwarder | Every server you want to monitor |
 
 ---
@@ -36,25 +37,26 @@ Veritas runs entirely on your infrastructure — nothing leaves your network exc
 
 | | Server | Agent |
 |---|---|---|
-| OS | Ubuntu 22.04+ / macOS 12+ / Windows 10+ | Ubuntu 18.04+ / any Linux |
-| RAM | 2 GB minimum, 4 GB recommended | 128 MB |
-| Disk | 2 GB free | 50 MB |
-| Network | Outbound HTTPS (optional, for AI) | Outbound to Veritas server |
+| **OS** | Ubuntu 22.04+ / macOS 12+ / Windows 10+ | Ubuntu 18.04+ or any Linux |
+| **RAM** | 2 GB minimum, 4 GB recommended | 128 MB |
+| **Disk** | 2 GB free | 50 MB |
+| **Network** | Outbound HTTPS (optional, for AI) | Outbound to Veritas server |
 
 ### Get Your License
 
-Veritas requires a machine-bound license file (`.vlic`). Before installing:
+Veritas requires a machine-bound license. Workflow:
 
 1. Install Veritas (steps below)
-2. Run `sudo veritas fingerprint` — copy the 64-character hash
-3. Email the hash to your Veritas contact
-4. You will receive a `veritas.vlic` file by email
+2. Run `sudo veritas fingerprint` (Linux/macOS) or `veritas fingerprint` (Windows)
+3. Send the 64-character hash to your Veritas contact
+4. You receive a `veritas.vlic` file
+5. Install it with `sudo veritas license /path/to/veritas.vlic`
 
 ---
 
 ## Linux Installation
 
-### Quick Install (Recommended)
+### Quick Install
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/shreyaaassss/Veritas/main/install.sh | sudo bash
@@ -63,50 +65,28 @@ curl -sSL https://raw.githubusercontent.com/shreyaaassss/Veritas/main/install.sh
 ### Manual Install
 
 ```bash
-# Download the package
-wget https://github.com/shreyaaassss/Veritas/releases/download/v1.0.2/veritas_1.0.2_amd64.deb
-
-# Install
-sudo dpkg -i veritas_1.0.2_amd64.deb
+wget https://github.com/shreyaaassss/Veritas/releases/download/v1.0.12/veritas_1.0.12_amd64.deb
+sudo dpkg -i veritas_1.0.12_amd64.deb
 ```
 
-### Verify Installation
+### Complete Setup Flow
 
 ```bash
-veritas version
-# → Veritas 1.0.0
-```
-
-### Get Machine Fingerprint (for license)
-
-```bash
+# 1. Get machine fingerprint — send output to your Veritas contact
 sudo veritas fingerprint
-```
 
-Output:
-```
-Veritas Machine Fingerprint
-============================================
-Send this fingerprint to your Veritas contact
-to receive your license file (veritas.vlic):
-
-b25543081e323ffb14bb40ce657fb43805f1094a...
-
-System:   Linux 6.8.0-aws
-Hostname: my-server
-```
-
-### Install License and Start
-
-```bash
-# Install your license file
+# 2. Install your license file (received from Veritas contact)
 sudo veritas license /path/to/veritas.vlic
 
-# Start the service
+# 3. Start the service
 sudo veritas start
 
-# Check status
+# 4. Check status
 sudo veritas status
+
+# 5. Open dashboard in browser
+# https://localhost:8000/setup  (first time — create admin account)
+# https://localhost:8000        (after setup)
 ```
 
 ### Service Management
@@ -115,24 +95,25 @@ sudo veritas status
 sudo veritas start       # Start
 sudo veritas stop        # Stop
 sudo veritas restart     # Restart
-sudo veritas status      # Show status
+sudo veritas status      # Status
 sudo veritas logs        # Stream live logs (Ctrl+C to stop)
-sudo veritas check       # Run production health checks
+sudo veritas check       # Run health checks
 ```
 
 ### Configuration
 
-Edit `/etc/veritas/config.env`:
+Edit `/etc/veritas/config.env` then restart:
 
 ```bash
 sudo nano /etc/veritas/config.env
+sudo veritas restart
 ```
 
 ```env
-# TLS (recommended for production)
-VERITAS_TLS=auto
+# TLS (auto-generated self-signed cert by default)
+# VERITAS_TLS=false       # Disable TLS (dev only)
 
-# AI Investigation — optional (no raw PII is ever sent)
+# AI Investigation (optional — no raw PII is ever sent)
 # ANTHROPIC_API_KEY=sk-ant-...
 # VERITAS_AI_MODE=external
 
@@ -140,13 +121,19 @@ VERITAS_TLS=auto
 # VERITAS_PORT=8000
 ```
 
-After changes: `sudo veritas restart`
+### Accessing the Dashboard
+
+The server runs on HTTPS with a self-signed certificate.
+
+- In Chrome: navigate to `https://localhost:8000` → type **`thisisunsafe`** on the warning page
+- In Firefox: click **Advanced → Accept Risk**
+- In Safari: click **Show Details → visit this website**
 
 ---
 
 ## macOS Installation
 
-### Quick Install (Recommended)
+### Quick Install
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/shreyaaassss/Veritas/main/install.sh | sudo bash
@@ -154,52 +141,51 @@ curl -sSL https://raw.githubusercontent.com/shreyaaassss/Veritas/main/install.sh
 
 ### Manual Install
 
-1. Download `veritas_1.0.2_arm64.pkg` from [GitHub Releases](https://github.com/shreyaaassss/Veritas/releases/tag/v1.0.2)
-2. Double-click the `.pkg` file
-3. Follow the installer prompts
-
-Or via terminal:
-
 ```bash
 # Download
-curl -L https://github.com/shreyaaassss/Veritas/releases/download/v1.0.2/veritas_1.0.2_arm64.pkg \
+curl -L https://github.com/shreyaaassss/Veritas/releases/download/v1.0.12/veritas_1.0.12_arm64.pkg \
   -o /tmp/veritas.pkg
 
-# Install
+# Install (requires admin password)
 sudo installer -pkg /tmp/veritas.pkg -target /
 ```
 
-### Get Machine Fingerprint (for license)
+Or double-click `veritas_1.0.12_arm64.pkg` in Finder.
+
+### Complete Setup Flow
 
 ```bash
+# 1. Get machine fingerprint
 sudo veritas fingerprint
-```
 
-### Install License and Start
+# 2. Install license
+sudo veritas license ~/Downloads/veritas.vlic
 
-```bash
-# Install license
-sudo veritas license /path/to/veritas.vlic
-
-# Start the service
+# 3. Start service
 sudo veritas start
+
+# 4. Check status
+sudo veritas status
+
+# 5. Open dashboard
+open https://localhost:8000/setup
 ```
 
 ### Service Management
 
 ```bash
-sudo veritas start       # Start (loads LaunchDaemon)
+sudo veritas start       # Start (launchctl bootstrap)
 sudo veritas stop        # Stop
 sudo veritas restart     # Restart
-sudo veritas status      # Show running status
-sudo veritas logs        # Tail /var/log/veritas/veritas.log
+sudo veritas status      # Status
+sudo veritas logs        # Tail service log
 ```
 
 ### Logs Location
 
 ```
-/var/log/veritas/veritas.log
-/var/log/veritas/veritas-error.log
+/var/log/veritas/veritas.log        # stdout
+/var/log/veritas/veritas-error.log  # stderr (includes startup messages)
 ```
 
 ---
@@ -208,58 +194,55 @@ sudo veritas logs        # Tail /var/log/veritas/veritas.log
 
 ### Install
 
-1. Download `VeritasSetup-1.0.0.exe` from your Veritas contact (or GitHub Releases)
-2. Double-click the installer
-3. Follow the setup wizard — choose install directory (default: `C:\Program Files\Veritas\`)
-4. The installer registers Veritas as a Windows Service (auto-start)
+1. Download **`veritas_1.0.12_windows_amd64.exe`** from [GitHub Releases](https://github.com/shreyaaassss/Veritas/releases/latest)
+2. Right-click → **Run as Administrator**
+3. Follow the setup wizard:
+   - Choose install directory (default: `C:\Program Files\Veritas\`)
+   - Select your `.vlic` license file when prompted *(or skip and install later)*
+4. The installer registers Veritas as a Windows Service (auto-start on boot)
 
-### Get Machine Fingerprint (for license)
+> **Note:** If you skip the license during install, place your `.vlic` file at
+> `C:\Program Files\Veritas\veritas.vlic` then restart the service.
+
+### Get Machine Fingerprint
 
 Open **Command Prompt as Administrator**:
 
 ```cmd
-cd "C:\Program Files\Veritas"
-veritas-fingerprint.exe
+"C:\Program Files\Veritas\veritas-launcher.exe" fingerprint
 ```
 
-Output:
-```
-Veritas Machine Fingerprint
-===========================
-Send this to support@veritas.io with your order:
+Or run the standalone fingerprint tool:
 
-b25543081e323ffb14bb40ce657fb43805f1094a...
-
-System:   Windows 11
-Hostname: MY-PC
+```powershell
+python tools\fingerprint.py
 ```
 
-### Install License
+### Install License After Setup
 
-Copy your `veritas.vlic` to:
+```powershell
+# Copy license to install directory
+Copy-Item "C:\path\to\veritas.vlic" "C:\Program Files\Veritas\veritas.vlic"
+
+# Restart the service
+Restart-Service -Name "VeritasService"
 ```
-C:\ProgramData\Veritas\veritas.vlic
-```
-
-Then restart the service:
-
-```cmd
-net stop VeritasService
-net start VeritasService
-```
-
-Or via Services panel: `services.msc` → **Veritas DPDPA Platform** → Restart
 
 ### Service Management
 
+Via **Services panel** (`services.msc`): look for **Veritas DPDPA Platform**
+
+Or via command line (as Administrator):
+
 ```cmd
-net start VeritasService    # Start
-net stop VeritasService     # Stop
+net start VeritasService
+net stop VeritasService
 ```
 
-Or use the Go launcher CLI:
+Or via the Go launcher:
 
 ```cmd
+cd "C:\Program Files\Veritas"
 veritas-launcher.exe start
 veritas-launcher.exe stop
 veritas-launcher.exe status
@@ -267,7 +250,19 @@ veritas-launcher.exe status
 
 ### Access Dashboard
 
-Open your browser: **http://localhost:8000**
+Open your browser: **http://localhost:8000/setup**
+
+> Windows uses HTTP by default. TLS can be enabled by setting `VERITAS_TLS=true`
+> in the environment before starting the service.
+
+### Logs Location
+
+```
+C:\Program Files\Veritas\veritas.log
+C:\Program Files\Veritas\veritas-error.log
+```
+
+Or view via Windows Event Viewer → Application logs.
 
 ---
 
@@ -275,58 +270,55 @@ Open your browser: **http://localhost:8000**
 
 After starting Veritas for the first time on any platform:
 
-1. Open your browser and go to **http://localhost:8000/setup**
+1. Open **https://localhost:8000/setup** (Linux/macOS) or **http://localhost:8000/setup** (Windows)
 2. Create your administrator account:
-   - Username (minimum 3 characters)
+   - Username (min 3 characters)
    - Email address
-   - Password (minimum 8 characters)
+   - Password (min 8 characters)
 3. Click **Create Administrator**
-4. Log in at **http://localhost:8000**
+4. Log in at `https://localhost:8000`
 
-> The `/setup` page is only available when no users exist. Once an admin is created, this page returns 403.
+> The `/setup` page is only available when no users exist. Once an admin is created, this page returns a redirect to the login page.
 
 ### Upload Your Organisation Config
 
-1. Log in to the dashboard
-2. Go to **Settings → Org Config**
-3. Upload your `org_config.yaml` or use the web form
-4. The org config defines which PII fields to monitor, retention policies, and source systems
+1. Log in → **Settings → Org Config**
+2. Upload your `org_config.yaml` defining which fields to monitor, retention policies, and source systems
 
 ---
 
 ## Agent Deployment
 
-The Veritas Agent is a lightweight Python service (~9 KB package) that reads log files and Docker container logs, forwarding events to the Veritas Server for PII analysis.
-
-> Install one agent on each server you want to monitor.
+Install the Veritas Agent on each server you want to monitor. The agent is a lightweight log forwarder (~9 KB package, no ML models).
 
 ### Step 1 — Install the Agent
 
 **Ubuntu / Debian:**
+
 ```bash
-wget https://github.com/shreyaaassss/Veritas/releases/download/v1.0.2/veritas-agent_1.0.2_all.deb
-sudo dpkg -i veritas-agent_1.0.2_all.deb
+wget https://github.com/shreyaaassss/Veritas/releases/download/v1.0.12/veritas-agent_1.0.12_all.deb
+sudo dpkg -i veritas-agent_1.0.12_all.deb
 ```
 
-The agent requires Python 3.8+ (installed automatically as a dependency).
+Dependencies (`python3`, `python3-requests`, `python3-yaml`) are installed automatically.
 
-### Step 2 — Get a Registration Key
+### Step 2 — Issue a Registration Key
 
-On the Veritas dashboard:
+On the Veritas **dashboard**:
 1. Go to **Agents** tab
 2. Click **Issue Registration Key**
 3. Select your org ID
-4. Copy the key (format: `XXXXXXXXXXXXXXXXXXXXXXXX`)
+4. Copy the key (format: `XXXXXXXXXXXXXXXXXXXXXXXX`, one-time use)
 
-### Step 3 — Fetch the Server's TLS Certificate
+### Step 3 — Fetch the Server TLS Certificate
 
 ```bash
 sudo veritas-agent fetch-cert https://your-veritas-server:8000
 ```
 
-This downloads the server's TLS certificate to `/etc/veritas-agent/server.crt` for secure communication.
+This downloads the server certificate to `/etc/veritas-agent/server.crt`.
 
-> If your server runs without TLS (development only), skip this step and set `verify: false` in the config.
+> Skip if your server runs without TLS and set `verify: false` in the config.
 
 ### Step 4 — Configure the Agent
 
@@ -338,10 +330,10 @@ sudo nano /etc/veritas-agent/config.yaml
 # Veritas server address
 veritas_address: https://your-veritas-server:8000
 
-# Your organisation ID (must match what's on the server)
+# Your organisation ID (must match what's configured on the server)
 org_id: your_org_name
 
-# Registration key from the dashboard → Agents → Issue Key
+# Registration key from the dashboard (one-time use, consumed on first connect)
 registration_key: "AkBOPDQygiU4fjZTdXAI4w"
 
 # TLS verification
@@ -349,7 +341,7 @@ tls:
   ca_cert: /etc/veritas-agent/server.crt
   verify: true
 
-# Label for this agent (shows in dashboard)
+# Label shown in the dashboard
 source_label: production-web-server
 
 # Log sources to monitor
@@ -362,7 +354,7 @@ sources:
     path: /var/log/nginx/access.log
     source_system: nginx
 
-  # Docker container logs
+  # Docker container logs:
   # - type: docker
   #   container: my-api-container
   #   source_system: api-service
@@ -378,26 +370,10 @@ sudo veritas-agent start
 
 ```bash
 sudo veritas-agent status
-# ● veritas-agent.service - Veritas DPDPA Agent
-#      Active: active (running)
-
 sudo veritas-agent logs
-# Tail live agent logs
 ```
 
-Within seconds, the agent appears in the Veritas dashboard under the **Agents** tab with status **Active**.
-
-### Agent CLI Reference
-
-```bash
-sudo veritas-agent start              # Start agent
-sudo veritas-agent stop               # Stop agent
-sudo veritas-agent restart            # Restart agent
-sudo veritas-agent status             # Show service status
-sudo veritas-agent logs               # Stream live logs
-sudo veritas-agent fetch-cert <url>   # Download server TLS cert
-sudo veritas-agent version            # Print version
-```
+The agent appears in the Veritas dashboard under **Agents** within seconds.
 
 ---
 
@@ -405,38 +381,38 @@ sudo veritas-agent version            # Print version
 
 ### How Licensing Works
 
-1. Veritas computes a **machine fingerprint** — a SHA-256 hash of hardware identifiers (disk serial, MAC address, hostname)
-2. You send this fingerprint to Veritas
-3. Veritas generates a `.vlic` file signed with an RSA-2048 private key (never leaves Veritas)
-4. Your server validates the signature and fingerprint on every start
+1. Veritas computes a **machine fingerprint** — SHA-256 of disk serial + MAC address + hostname
+2. You send the fingerprint to Veritas
+3. Veritas signs a `.vlic` file with an RSA-2048 private key (never leaves Veritas)
+4. The binary validates the signature and fingerprint on every startup
 
-### Transferring a License to a New Machine
-
-If you replace a server, the fingerprint changes and the old license will not work. Contact your Veritas representative with the new machine's fingerprint to receive a replacement license.
-
-### License File Location
+### License File Locations
 
 | Platform | Path |
 |---|---|
 | Linux | `/var/lib/veritas/veritas.vlic` |
 | macOS | `/var/lib/veritas/veritas.vlic` |
-| Windows | `C:\ProgramData\Veritas\veritas.vlic` |
+| Windows | `C:\Program Files\Veritas\veritas.vlic` |
+
+### Transferring a License (New Machine)
+
+The fingerprint changes if you replace hardware or migrate to a new VM. Contact your Veritas representative with the new machine's fingerprint to receive a replacement license.
 
 ---
 
-## Veritas CLI Reference
+## CLI Reference
 
 ### Server CLI (`veritas`)
 
 | Command | Description |
 |---|---|
-| `sudo veritas start` | Start the Veritas service |
-| `sudo veritas stop` | Stop the Veritas service |
-| `sudo veritas restart` | Restart the Veritas service |
+| `sudo veritas start` | Start the service |
+| `sudo veritas stop` | Stop the service |
+| `sudo veritas restart` | Restart the service |
 | `sudo veritas status` | Show service status |
-| `sudo veritas logs` | Stream live service logs |
-| `sudo veritas fingerprint` | Print machine fingerprint for license generation |
-| `sudo veritas license <file>` | Install a `.vlic` license file and restart |
+| `sudo veritas logs` | Stream live logs |
+| `sudo veritas fingerprint` | Print machine fingerprint for license |
+| `sudo veritas license <file>` | Install a `.vlic` file and restart |
 | `sudo veritas check` | Run production acceptance checks |
 | `veritas version` | Print version |
 
@@ -448,7 +424,7 @@ If you replace a server, the fingerprint changes and the old license will not wo
 | `sudo veritas-agent stop` | Stop the agent |
 | `sudo veritas-agent restart` | Restart the agent |
 | `sudo veritas-agent status` | Show service status |
-| `sudo veritas-agent logs` | Stream live agent logs |
+| `sudo veritas-agent logs` | Stream live logs |
 | `sudo veritas-agent fetch-cert <url>` | Download server TLS certificate |
 | `veritas-agent version` | Print version |
 
@@ -456,26 +432,66 @@ If you replace a server, the fingerprint changes and the old license will not wo
 
 ## Troubleshooting
 
-### Server won't start — "License not found"
-Run `sudo veritas fingerprint`, send the output to your Veritas contact, and install the received `.vlic` with `sudo veritas license /path/to/veritas.vlic`.
+### "License not found" at startup
 
-### Server won't start — "This license was issued for a different server"
-The machine fingerprint has changed (new hardware, VM migration). Request a new license with the current fingerprint.
+Run `sudo veritas fingerprint`, send to your Veritas contact, install the `.vlic`:
+```bash
+sudo veritas license /path/to/veritas.vlic
+```
 
-### Dashboard not accessible
-Check the service is running: `sudo veritas status`  
-Check the port: `ss -tlnp | grep 8000`  
-Check logs: `sudo veritas logs`
+### "This license was issued for a different server"
+
+The machine fingerprint changed (hardware change, VM migration). Request a new license with the current fingerprint from `sudo veritas fingerprint`.
+
+### Dashboard not loading (browser shows security warning)
+
+The server uses a self-signed TLS certificate. Accept it in your browser:
+- **Chrome:** type `thisisunsafe` on the warning page
+- **Firefox:** Advanced → Accept Risk
+- **Safari:** Show Details → Visit Website
+
+### Dashboard returns 500 on /setup or /login
+
+You are likely running an older version. Update to v1.0.12+:
+```bash
+curl -sSL https://raw.githubusercontent.com/shreyaaassss/Veritas/main/install.sh | sudo bash
+```
+
+### PII scan returns 500 Internal Server Error
+
+Update to v1.0.12+. Earlier versions had a missing `presidio_analyzer/conf/` directory in the PyInstaller bundle.
 
 ### Agent not appearing in dashboard
-1. Check agent is running: `sudo veritas-agent status`
-2. Check config has correct `veritas_address` and `registration_key`
-3. Check TLS cert: `sudo veritas-agent fetch-cert https://your-server:8000`
-4. View agent logs: `sudo veritas-agent logs`
 
-### Agent registration key already used
-Each key can only be used once. Issue a new key from the dashboard → **Agents** → **Issue Key**.
+1. `sudo veritas-agent status` — is the agent running?
+2. Check config: `cat /etc/veritas-agent/config.yaml` — correct `veritas_address` and `registration_key`?
+3. Registration keys are **one-time use**. Issue a new key from the dashboard if needed.
+4. `sudo veritas-agent fetch-cert https://your-server:8000` — refresh TLS cert
+5. `sudo veritas-agent logs` — check for connection errors
+
+### Linux: Service crashes with "Could not create temporary directory"
+
+This is fixed in v1.0.7+. If upgrading from an older version:
+```bash
+sudo mkdir -p /etc/systemd/system/veritas.service.d
+sudo tee /etc/systemd/system/veritas.service.d/override.conf <<EOF
+[Service]
+Environment=TMPDIR=/var/lib/veritas/tmp
+ProtectSystem=false
+EOF
+sudo systemctl daemon-reload && sudo systemctl restart veritas
+```
+
+### License file permissions error (Linux/macOS)
+
+```bash
+sudo chown veritas:veritas /var/lib/veritas/veritas.vlic   # Linux
+sudo chown _veritas:staff  /var/lib/veritas/veritas.vlic   # macOS
+sudo chmod 640 /var/lib/veritas/veritas.vlic
+sudo systemctl restart veritas   # Linux
+sudo veritas restart             # macOS
+```
 
 ---
 
-*Veritas DPDPA Compliance Platform · v1.0.2 · For support, contact your Veritas representative.*
+*Veritas DPDPA Compliance Platform · v1.0.12 · For support, contact your Veritas representative.*
