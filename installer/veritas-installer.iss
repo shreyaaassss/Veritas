@@ -70,15 +70,17 @@ Name: "{group}\Uninstall Veritas";        Filename: "{uninstallexe}"
 Name: "{autodesktop}\Veritas Dashboard";  Filename: "http://localhost:8000"; IconFilename: "{app}\veritas-launcher.exe"; Tasks: desktopicon
 
 [Run]
-; Register the Windows Service (always)
+; Register as Windows Service with auto-start on boot
 Filename: "{app}\veritas-launcher.exe"; Parameters: "install"; StatusMsg: "Registering Veritas Windows Service..."; Flags: runhidden waituntilterminated
 
-; Only start the service if a license file was provided — prevents hang when
-; running silently in CI (no license = service crashes immediately on start)
-Filename: "{app}\veritas-launcher.exe"; Parameters: "start"; StatusMsg: "Starting Veritas..."; Flags: runhidden waituntilterminated; Check: LicFileSelected
+; Service is registered but NOT auto-started:
+;   1. Run: veritas-launcher.exe fingerprint  → get machine hash → send to Veritas
+;   2. Place your veritas.vlic in: {app}\
+;   3. Run: veritas-launcher.exe start
+; The service also starts automatically on next Windows reboot.
 
-; Offer to open dashboard when installer finishes (interactive only)
-Filename: "http://localhost:8000"; Description: "Open Veritas Dashboard in browser (wait ~60s for first startup)"; Flags: postinstall shellexec skipifsilent unchecked
+; Offer to open fingerprint tool when installer finishes (interactive only)
+Filename: "{app}\veritas-launcher.exe"; Parameters: "fingerprint"; Description: "Get machine fingerprint (needed for license)"; Flags: postinstall runhidden waituntilterminated skipifsilent unchecked
 
 [UninstallRun]
 Filename: "{app}\veritas-launcher.exe"; Parameters: "stop";      Flags: runhidden waituntilterminated; RunOnceId: "StopSvc"
@@ -87,14 +89,6 @@ Filename: "{app}\veritas-launcher.exe"; Parameters: "uninstall"; Flags: runhidde
 [Code]
 var
   LicFilePage: TInputFileWizardPage;
-
-{ ---- Check if user selected a license file (used in [Run] Check:) ---- }
-
-function LicFileSelected: Boolean;
-begin
-  Result := (LicFilePage.Values[0] <> '');
-end;
-
 
 { ---- Wizard setup ---- }
 

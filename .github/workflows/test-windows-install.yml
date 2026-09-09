@@ -101,17 +101,11 @@ jobs:
       - name: Start Veritas service (after license is installed)
         shell: pwsh
         run: |
-          Write-Host "Starting VeritasService (license now present)..."
-          # Service was registered but not started (no license at install time)
-          # Now that license is in place, start it
-          try {
-            Start-Service "VeritasService" -ErrorAction Stop
-            Write-Host "SERVICE_START: OK"
-          } catch {
-            Write-Host "SERVICE_START_WARN: $_ — trying launcher..."
-            & "C:\Program Files\Veritas\veritas-launcher.exe" start 2>&1
-          }
-          Start-Sleep -Seconds 3
+          Write-Host "Starting VeritasService (license installed, now starting)..."
+          # Installer registers service but does NOT start it (correct behavior)
+          # Start it now that the license is in place
+          & "C:\Program Files\Veritas\veritas-launcher.exe" start 2>&1
+          Start-Sleep -Seconds 5
           $svc = Get-Service "VeritasService" -ErrorAction SilentlyContinue
           Write-Host "SERVICE_STATUS: $($svc.Status)"
 
