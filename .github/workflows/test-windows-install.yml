@@ -107,30 +107,36 @@ jobs:
           $svc = Get-Service "Veritas" -ErrorAction SilentlyContinue
           Write-Host "SERVICE_STATUS: $($svc.Status)"
 
-      - name: Wait for spaCy model to load (~90s)
+      - name: Wait for spaCy model to load (Windows needs ~150s)
         shell: pwsh
         run: |
-          Write-Host "Waiting 90s for spaCy model..."
-          Start-Sleep -Seconds 90
+          Write-Host "Waiting 150s for spaCy model to load on Windows..."
+          Start-Sleep -Seconds 150
+          $svc = Get-Service "Veritas" -ErrorAction SilentlyContinue
+          Write-Host "Service after wait: $($svc.Status)"
 
-      - name: Health check
+      - name: Health check (assert 200)
         shell: pwsh
         run: |
           Write-Host "=== HEALTH CHECK ==="
           $svc = Get-Service "Veritas" -ErrorAction SilentlyContinue
           Write-Host "SERVICE_STATUS: $($svc.Status)"
+          if ($svc.Status -ne "Running") { throw "Service not running" }
 
-          for ($i = 1; $i -le 10; $i++) {
+          $got200 = $false
+          for ($i = 1; $i -le 20; $i++) {
             try {
-              $r = Invoke-WebRequest "http://localhost:8000/health" -UseBasicParsing -TimeoutSec 10
+              $r = Invoke-WebRequest "http://localhost:8000/health" -UseBasicParsing -TimeoutSec 15
               Write-Host "HEALTH_HTTP: $($r.StatusCode)"
               Write-Host "HEALTH_BODY: $($r.Content)"
+              $got200 = $true
               break
             } catch {
-              Write-Host "  attempt $i/10 — $($_.Exception.Message)"
-              Start-Sleep -Seconds 10
+              Write-Host "  attempt $i/20 — $($_.Exception.Message)"
+              Start-Sleep -Seconds 15
             }
           }
+          if (-not $got200) { throw "Health endpoint never returned 200 after 5 min" }
 
       - name: Check setup page
         shell: pwsh
