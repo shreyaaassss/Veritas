@@ -77,7 +77,7 @@ a = Analysis(
         'jose', 'jose.jwt',
     ],
     hookspath=[],
-    runtime_hooks=['pyi_rth_spacy.py'],
+    runtime_hooks=['pyi_rth_spacy.py', 'pyi_rth_presidio.py'],
     excludes=['pytest', 'pytest_asyncio', '_pytest', 'IPython', 'matplotlib', 'PIL'],
     cipher=block_cipher,
     noarchive=False,
