@@ -73,15 +73,21 @@ jobs:
 
       - name: Generate CI test license (any-machine)
         shell: pwsh
+        env:
+          VERITAS_PRIVATE_KEY_B64: ${{ secrets.VERITAS_PRIVATE_KEY_B64 }}
         run: |
           pip install cryptography --quiet
+          # Decode private key from secret
+          $keyBytes = [Convert]::FromBase64String($env:VERITAS_PRIVATE_KEY_B64)
+          [System.IO.File]::WriteAllBytes("C:\ci_private_key.pem", $keyBytes)
           python tools/generate_license.py `
             --org "ci-windows-test" `
             --tier enterprise `
             --expiry 2027-12-31 `
-            --key tools/private_key.pem `
+            --key "C:\ci_private_key.pem" `
             --out "C:\ci-win.vlic"
           Write-Host "License generated: $(Test-Path 'C:\ci-win.vlic')"
+          Remove-Item "C:\ci_private_key.pem" -Force
 
       - name: Install license
         shell: pwsh
