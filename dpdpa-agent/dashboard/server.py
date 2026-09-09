@@ -707,7 +707,7 @@ async def system_health(_user: User = Depends(get_current_user)):
 
     # License
     try:
-        from license import LicenseError, validate_license, cert_fingerprint
+        from license import LicenseError, validate_license
         lic = validate_license()
         checks["license"] = {
             "status": "valid",
