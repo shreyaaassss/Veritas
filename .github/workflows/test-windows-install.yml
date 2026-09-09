@@ -67,7 +67,7 @@ jobs:
         run: |
           Write-Host "Registering VeritasService..."
           & "C:\Program Files\Veritas\veritas-launcher.exe" install 2>&1
-          $svc = Get-Service "VeritasService" -ErrorAction SilentlyContinue
+          $svc = Get-Service "Veritas" -ErrorAction SilentlyContinue
           Write-Host "SERVICE_REGISTERED: $($null -ne $svc)"
           if (-not $svc) { throw "Service registration failed" }
 
@@ -113,7 +113,7 @@ jobs:
           # Start it now that the license is in place
           & "C:\Program Files\Veritas\veritas-launcher.exe" start 2>&1
           Start-Sleep -Seconds 5
-          $svc = Get-Service "VeritasService" -ErrorAction SilentlyContinue
+          $svc = Get-Service "Veritas" -ErrorAction SilentlyContinue
           Write-Host "SERVICE_STATUS: $($svc.Status)"
 
       - name: Wait for spaCy model to load (~90s)
@@ -126,7 +126,7 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "=== HEALTH CHECK ==="
-          $svc = Get-Service "VeritasService" -ErrorAction SilentlyContinue
+          $svc = Get-Service "Veritas" -ErrorAction SilentlyContinue
           Write-Host "SERVICE_STATUS: $($svc.Status)"
 
           for ($i = 1; $i -le 10; $i++) {
@@ -158,5 +158,5 @@ jobs:
           Write-Host "================================================"
           Write-Host "  Veritas Windows Install Test COMPLETE"
           Write-Host "================================================"
-          Get-Service "VeritasService" -ErrorAction SilentlyContinue
+          Get-Service "Veritas" -ErrorAction SilentlyContinue
           Get-ChildItem "C:\Program Files\Veritas\" | Select-Object Name, Length
