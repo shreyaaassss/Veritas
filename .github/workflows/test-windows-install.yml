@@ -26,6 +26,12 @@ jobs:
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "ver=$VER"  >> $GITHUB_OUTPUT
 
+      - name: Disable Windows Defender real-time scanning (speeds up large installer)
+        shell: pwsh
+        run: |
+          Set-MpPreference -DisableRealtimeMonitoring $true -ErrorAction SilentlyContinue
+          Write-Host "Defender real-time monitoring disabled"
+
       - name: Download Windows installer
         shell: pwsh
         run: |
