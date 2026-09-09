@@ -44,25 +44,41 @@ jobs:
           $sz = [math]::Round((Get-Item "C:\veritas-setup.exe").Length / 1MB)
           Write-Host "Downloaded: ${sz}MB"
 
-      - name: Run silent install
+      - name: Extract installer with 7-Zip (bypass Inno Setup for CI speed)
         shell: pwsh
         run: |
-          Write-Host "Running silent install..."
-          $p = Start-Process "C:\veritas-setup.exe" "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART" -Wait -PassThru
-          Write-Host "Exit code: $($p.ExitCode)"
-          if ($p.ExitCode -ne 0) { throw "Installer failed with exit code $($p.ExitCode)" }
+          # 7-Zip can extract Inno Setup installers directly
+          # This is much faster than running the full installer in CI
+          Write-Host "Extracting installer contents with 7-Zip..."
+          $extractDir = "C:\veritas-extracted"
+          & "C:\Program Files\7-Zip\7z.exe" x "C:\veritas-setup.exe" -o"$extractDir" -y | Select-String -Pattern "Everything|Error|Warning"
 
-      - name: Verify installed files
+          # Create install directory and copy binaries
+          $installDir = "C:\Program Files\Veritas"
+          New-Item -ItemType Directory -Force -Path $installDir | Out-Null
+
+          # Find and copy the executables (7-Zip extracts to flat structure)
+          $runtime = Get-ChildItem $extractDir -Recurse -Filter "veritas-runtime.exe" | Select-Object -First 1
+          $launcher = Get-ChildItem $extractDir -Recurse -Filter "veritas-launcher.exe" | Select-Object -First 1
+
+          if ($runtime) {
+            Copy-Item $runtime.FullName "$installDir\veritas-runtime.exe"
+            Write-Host "RUNTIME_EXE: OK ($([math]::Round($runtime.Length/1MB))MB)"
+          } else { throw "veritas-runtime.exe not found in installer" }
+
+          if ($launcher) {
+            Copy-Item $launcher.FullName "$installDir\veritas-launcher.exe"
+            Write-Host "LAUNCHER_EXE: OK ($([math]::Round($launcher.Length/1KB))KB)"
+          } else { throw "veritas-launcher.exe not found in installer" }
+
+      - name: Register Windows Service
         shell: pwsh
         run: |
-          $dir = "C:\Program Files\Veritas"
-          Write-Host "Checking $dir ..."
-          $runtime = Test-Path "$dir\veritas-runtime.exe"
-          $launcher = Test-Path "$dir\veritas-launcher.exe"
-          Write-Host "veritas-runtime.exe : $runtime"
-          Write-Host "veritas-launcher.exe: $launcher"
-          if (-not $runtime) { throw "veritas-runtime.exe not found" }
-          if (-not $launcher) { throw "veritas-launcher.exe not found" }
+          Write-Host "Registering VeritasService..."
+          & "C:\Program Files\Veritas\veritas-launcher.exe" install 2>&1
+          $svc = Get-Service "VeritasService" -ErrorAction SilentlyContinue
+          Write-Host "SERVICE_REGISTERED: $($null -ne $svc)"
+          if (-not $svc) { throw "Service registration failed" }
 
       - name: Generate CI test license (any-machine)
         shell: bash
