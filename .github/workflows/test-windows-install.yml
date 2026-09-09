@@ -1,0 +1,153 @@
+name: Test Windows Installer
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  test-windows:
+    name: Install & smoke-test veritas on Windows
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get latest release tag
+        id: tag
+        shell: bash
+        run: |
+          git fetch --tags --force
+          TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v1.0.12")
+          VER=${TAG#v}
+          echo "Using release: $TAG (version $VER)"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "ver=$VER"  >> $GITHUB_OUTPUT
+
+      - name: Download Windows installer
+        shell: pwsh
+        run: |
+          $tag = "${{ steps.tag.outputs.tag }}"
+          $ver = "${{ steps.tag.outputs.ver }}"
+          $url = "https://github.com/shreyaaassss/Veritas/releases/download/$tag/veritas_${ver}_windows_amd64.exe"
+          Write-Host "Downloading $url ..."
+          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+          Invoke-WebRequest $url -OutFile "C:\veritas-setup.exe" -UseBasicParsing
+          $sz = [math]::Round((Get-Item "C:\veritas-setup.exe").Length / 1MB)
+          Write-Host "Downloaded: ${sz}MB"
+
+      - name: Run silent install
+        shell: pwsh
+        run: |
+          Write-Host "Running silent install..."
+          $p = Start-Process "C:\veritas-setup.exe" "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART" -Wait -PassThru
+          Write-Host "Exit code: $($p.ExitCode)"
+          if ($p.ExitCode -ne 0) { throw "Installer failed with exit code $($p.ExitCode)" }
+
+      - name: Verify installed files
+        shell: pwsh
+        run: |
+          $dir = "C:\Program Files\Veritas"
+          Write-Host "Checking $dir ..."
+          $runtime = Test-Path "$dir\veritas-runtime.exe"
+          $launcher = Test-Path "$dir\veritas-launcher.exe"
+          Write-Host "veritas-runtime.exe : $runtime"
+          Write-Host "veritas-launcher.exe: $launcher"
+          if (-not $runtime) { throw "veritas-runtime.exe not found" }
+          if (-not $launcher) { throw "veritas-launcher.exe not found" }
+
+      - name: Generate CI test license (any-machine)
+        shell: bash
+        run: |
+          python3 -m venv /tmp/licvenv
+          /tmp/licvenv/bin/pip install cryptography --quiet
+          /tmp/licvenv/bin/python3 tools/generate_license.py \
+            --org "ci-windows-test" \
+            --tier enterprise \
+            --expiry 2027-12-31 \
+            --key tools/private_key.pem \
+            --out /tmp/ci-win.vlic
+          echo "License generated"
+        env:
+          VERITAS_PRIVATE_KEY_B64: ${{ secrets.VERITAS_PRIVATE_KEY_B64 }}
+
+      - name: Install license
+        shell: pwsh
+        run: |
+          $dir = "C:\Program Files\Veritas"
+          Copy-Item "C:\Users\runneradmin\AppData\Local\Temp\ci-win.vlic" "$dir\veritas.vlic" -ErrorAction SilentlyContinue
+          # Try alternate path
+          $src = (Get-ChildItem "C:\*\ci-win.vlic" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1).FullName
+          if (-not $src) { $src = "/tmp/ci-win.vlic" }
+          Copy-Item $src "$dir\veritas.vlic" -ErrorAction SilentlyContinue
+          Write-Host "License installed: $(Test-Path "$dir\veritas.vlic")"
+
+      - name: Find and install license (robust path)
+        shell: bash
+        run: |
+          INSTALL_DIR="C:/Program Files/Veritas"
+          cp /tmp/ci-win.vlic "$INSTALL_DIR/veritas.vlic"
+          echo "License at: $INSTALL_DIR/veritas.vlic"
+          ls -la "$INSTALL_DIR/veritas.vlic"
+
+      - name: Start Veritas service
+        shell: pwsh
+        run: |
+          Write-Host "Starting VeritasService..."
+          try {
+            Start-Service "VeritasService" -ErrorAction Stop
+            Write-Host "SERVICE_START: OK"
+          } catch {
+            Write-Host "SERVICE_START_ERR: $_"
+            # Try launcher directly
+            & "C:\Program Files\Veritas\veritas-launcher.exe" start 2>&1
+          }
+          $svc = Get-Service "VeritasService" -ErrorAction SilentlyContinue
+          Write-Host "Service status: $($svc.Status)"
+
+      - name: Wait for spaCy model to load (~90s)
+        shell: pwsh
+        run: |
+          Write-Host "Waiting 90s for spaCy model..."
+          Start-Sleep -Seconds 90
+
+      - name: Health check
+        shell: pwsh
+        run: |
+          Write-Host "=== HEALTH CHECK ==="
+          $svc = Get-Service "VeritasService" -ErrorAction SilentlyContinue
+          Write-Host "SERVICE_STATUS: $($svc.Status)"
+
+          for ($i = 1; $i -le 10; $i++) {
+            try {
+              $r = Invoke-WebRequest "http://localhost:8000/health" -UseBasicParsing -TimeoutSec 10
+              Write-Host "HEALTH_HTTP: $($r.StatusCode)"
+              Write-Host "HEALTH_BODY: $($r.Content)"
+              break
+            } catch {
+              Write-Host "  attempt $i/10 — $($_.Exception.Message)"
+              Start-Sleep -Seconds 10
+            }
+          }
+
+      - name: Check setup page
+        shell: pwsh
+        run: |
+          try {
+            $r = Invoke-WebRequest "http://localhost:8000/setup" -UseBasicParsing -TimeoutSec 10
+            Write-Host "SETUP_HTTP: $($r.StatusCode)"
+          } catch {
+            Write-Host "SETUP_HTTP: $($_.Exception.Response.StatusCode.value__)"
+          }
+
+      - name: Print summary
+        shell: pwsh
+        run: |
+          Write-Host ""
+          Write-Host "================================================"
+          Write-Host "  Veritas Windows Install Test COMPLETE"
+          Write-Host "================================================"
+          Get-Service "VeritasService" -ErrorAction SilentlyContinue
+          Get-ChildItem "C:\Program Files\Veritas\" | Select-Object Name, Length
