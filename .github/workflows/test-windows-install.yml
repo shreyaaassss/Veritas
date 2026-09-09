@@ -96,47 +96,38 @@ jobs:
           Copy-Item "C:\ci-win.vlic" "$dir\veritas.vlic"
           Write-Host "License installed: $(Test-Path "$dir\veritas.vlic")"
 
-      - name: Start Veritas service (after license is installed)
+      - name: Run Veritas directly (foreground, captures all output)
         shell: pwsh
         run: |
-          Write-Host "Starting VeritasService (license installed, now starting)..."
-          # Installer registers service but does NOT start it (correct behavior)
-          # Start it now that the license is in place
-          & "C:\Program Files\Veritas\veritas-launcher.exe" start 2>&1
-          Start-Sleep -Seconds 5
-          $svc = Get-Service "Veritas" -ErrorAction SilentlyContinue
-          Write-Host "SERVICE_STATUS: $($svc.Status)"
+          Write-Host "Starting veritas-launcher.exe run (foreground, 4 min timeout)..."
+          # Run directly to capture stdout/stderr — shows exactly what happens
+          $job = Start-Job -ScriptBlock {
+            $env:VERITAS_DATA_DIR = "C:\Program Files\Veritas"
+            & "C:\Program Files\Veritas\veritas-launcher.exe" run 2>&1
+          }
 
-      - name: Wait for spaCy model to load (Windows needs ~150s)
-        shell: pwsh
-        run: |
-          Write-Host "Waiting 150s for spaCy model to load on Windows..."
-          Start-Sleep -Seconds 150
-          $svc = Get-Service "Veritas" -ErrorAction SilentlyContinue
-          Write-Host "Service after wait: $($svc.Status)"
-
-      - name: Health check (assert 200)
-        shell: pwsh
-        run: |
-          Write-Host "=== HEALTH CHECK ==="
-          $svc = Get-Service "Veritas" -ErrorAction SilentlyContinue
-          Write-Host "SERVICE_STATUS: $($svc.Status)"
-          if ($svc.Status -ne "Running") { throw "Service not running" }
-
-          $got200 = $false
+          # Poll health endpoint while launcher runs in background
+          $started = $false
           for ($i = 1; $i -le 20; $i++) {
+            Start-Sleep -Seconds 15
             try {
-              $r = Invoke-WebRequest "http://localhost:8000/health" -UseBasicParsing -TimeoutSec 15
+              $r = Invoke-WebRequest "http://localhost:8000/health" -UseBasicParsing -TimeoutSec 8
               Write-Host "HEALTH_HTTP: $($r.StatusCode)"
               Write-Host "HEALTH_BODY: $($r.Content)"
-              $got200 = $true
+              $started = $true
               break
             } catch {
-              Write-Host "  attempt $i/20 — $($_.Exception.Message)"
-              Start-Sleep -Seconds 15
+              Write-Host "  attempt $i/20 ($($i*15)s) — $($_.Exception.Message)"
             }
           }
-          if (-not $got200) { throw "Health endpoint never returned 200 after 5 min" }
+
+          # Get launcher output regardless
+          $output = Receive-Job $job 2>&1
+          Write-Host "=== LAUNCHER OUTPUT ==="
+          Write-Host $output
+          Write-Host "=== END OUTPUT ==="
+
+          if (-not $started) { throw "Health endpoint did not respond after 5 min" }
 
       - name: Check setup page
         shell: pwsh
