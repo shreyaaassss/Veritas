@@ -84,7 +84,7 @@ func supervise(rt string) {
 	for {
 		logf("Starting %s ...", filepath.Base(rt))
 
-		cmd := exec.Command(rt, "--violation-rate", "0")
+		cmd := exec.Command(rt)
 		cmd.Env = append(os.Environ(), "VERITAS_DATA_DIR="+dataDir())
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
