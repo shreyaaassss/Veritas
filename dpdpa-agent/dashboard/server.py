@@ -766,6 +766,7 @@ async def system_health(_user: User = Depends(get_current_user)):
 
     # Runtime info
     checks["runtime"] = {
+        "status": "ok",
         "python": sys.version.split()[0],
         "platform": _platform.system(),
         "version": "1.0.0",
