@@ -9,7 +9,7 @@ Veritas is an on-premise compliance monitoring platform for India's Digital Pers
 4. [How it works](#4-how-it-works)
 5. [Example: deploying in a real company](#5-example-deploying-in-a-real-company)
 
-Related documents: `IMPLEMENTATION_ORDER.md` (roadmap and backlog), `LINUX_TEST_FINDINGS.md`, `LICENSE_PORTAL_REVIEW.md`, `veritas-demo/SIMULATION_PLAN.md`, `INSTALL.md` (install steps).
+Related documents: `docs/ENTERPRISE_TELEMETRY_SPEC.md` (the intended enterprise agent and telemetry model), `IMPLEMENTATION_ORDER.md` (roadmap and backlog), `LINUX_TEST_FINDINGS.md`, `LICENSE_PORTAL_REVIEW.md`, `veritas-demo/SIMULATION_PLAN.md`, `INSTALL.md` (install steps).
 
 ---
 

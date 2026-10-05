@@ -48,7 +48,7 @@ These change runtime behaviour, so they come after the install path is proven an
 
 ## Milestone 4: Enterprise agent and telemetry alignment (next)
 
-Source: the product spec "Enterprise Telemetry, Agent & Compliance Flow" (agent is a thin telemetry bridge, all compliance logic stays in Core, Kubernetes via DaemonSet, plain servers as OS services, sanitization optional and later).
+Source: the product spec "Enterprise Telemetry, Agent & Compliance Flow", stored at `docs/ENTERPRISE_TELEMETRY_SPEC.md` (agent is a thin telemetry bridge, all compliance logic stays in Core, Kubernetes via DaemonSet, plain servers as OS services, sanitization optional and later).
 
 ### Where we stand against that spec (assessed 2026-10-06)
 
@@ -117,7 +117,7 @@ Start by reproducing the defects on a local `kind` cluster, then fix them.
 
 - Remove Raspberry Pi wording from docs and install scripts (spec: enterprise software, not an appliance requirement).
 - Update `PROJECT_OVERVIEW.md` and `INSTALL.md` to reflect the agent changes.
-- Store the enterprise telemetry spec in the repo (suggested: `docs/ENTERPRISE_TELEMETRY_SPEC.md`) so the plan has a stable reference.
+- ~~Store the enterprise telemetry spec in the repo~~ Done: `docs/ENTERPRISE_TELEMETRY_SPEC.md`.
 
 ### Decisions needed before Phase B
 
