@@ -33,7 +33,7 @@ from schemas.models import (
 
 def make_valid_event(**overrides) -> dict:
     base = {
-        "tenant_id": "blinkit",
+        "tenant_id": "retail_co",
         "event_id": str(uuid.uuid4()),
         "source_type": "log",
         "source_system": "order-service",
@@ -47,7 +47,7 @@ def make_valid_event(**overrides) -> dict:
 
 def make_valid_verdict(**overrides) -> dict:
     base = {
-        "tenant_id": "blinkit",
+        "tenant_id": "retail_co",
         "verdict_id": str(uuid.uuid4()),
         "event_id": str(uuid.uuid4()),
         "rule_id": "EXPOSURE_001",
@@ -74,7 +74,7 @@ class TestEventValidation:
     def test_valid_event_instantiates(self):
         """A correctly formed event must instantiate without errors."""
         event = Event(**make_valid_event())
-        assert event.tenant_id == "blinkit"
+        assert event.tenant_id == "retail_co"
         assert isinstance(event.event_id, uuid.UUID)
         assert event.source_type == SourceType.LOG
         assert event.source_system == "order-service"
@@ -151,7 +151,7 @@ class TestVerdictValidation:
     def test_valid_verdict_instantiates(self):
         """A correctly formed verdict must instantiate without errors."""
         verdict = Verdict(**make_valid_verdict())
-        assert verdict.tenant_id == "blinkit"
+        assert verdict.tenant_id == "retail_co"
         assert isinstance(verdict.verdict_id, uuid.UUID)
         assert verdict.rule_id == RuleId.EXPOSURE_001
         assert verdict.severity == Severity.HIGH

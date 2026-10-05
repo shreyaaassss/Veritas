@@ -7,13 +7,11 @@ scope, and for how long.
 
 WHAT CHANGED IN PHASE 0:
   - `SourceSystem` enum import and `TABLE_TO_SOURCE_SYSTEM` dict are REMOVED.
-    Both were Blinkit-specific. `source_system` is now a free-form `str`
+    Both were specific to one customer. `source_system` is now a free-form `str`
     whose valid values are org-defined (from Org Config). The loader no
     longer needs to translate from mock table names to enum values — it
     reads source_system directly from the org's config file.
-  - `table_name` is retained as Optional[str] for backward compatibility
-    with existing seed data, but is not required. New config-driven entries
-    do not need it.
+  - Entries are built from each org's uploaded config; nothing is seeded.
 
 Phase 4's Rule Engine calls get_registry_entry() synchronously, per event,
 on a live stream. This module must stay fast (in-memory) and side-effect free.
@@ -102,25 +100,6 @@ class RegistryEntry(BaseModel):
             "the org's events carry in their source_system field."
         )
     )
-    table_name: Optional[str] = Field(
-        default=None,
-        description=(
-            "Optional: the underlying table or data store name for auditor-readable "
-            "reporting. Not required for config-driven entries."
-        )
-    )
-    is_seeded_violation: bool = Field(
-        default=False,
-        description=(
-            "True if this specific entry was deliberately seeded to be caught "
-            "as a violation by Phase 4's rule engine (demo/test purposes)."
-        )
-    )
-    violation_note: Optional[str] = Field(
-        default=None,
-        description="If is_seeded_violation is True, a short human-readable note on why."
-    )
-
     @field_validator("created_at", mode="before")
     @classmethod
     def parse_created_at(cls, v):

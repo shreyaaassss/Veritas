@@ -119,11 +119,11 @@ import re
 # KNOWN LIMITATION, documented rather than silently patched over:
 # Presidio's spaCy-backed PERSON recognizer assigns a flat 0.85 confidence
 # to ANY token spaCy's NER tags as a proper noun, regardless of whether it
-# actually looks like a human name — verified directly: 'BLK-431682' and
+# actually looks like a human name — verified directly: 'ORD-431682' and
 # 'Green Meadows' both score identically to 'Priya Nair' (0.85). This is a
 # genuine spaCy/Presidio precision limitation on short, isolated,
 # capitalized tokens evaluated WITHOUT surrounding sentence context (the
-# same string scanned inside a full sentence, e.g. "order BLK-431682
+# same string scanned inside a full sentence, e.g. "order ORD-431682
 # status", does NOT false-positive — context resolves it). Since Phase 3
 # scans individual field VALUES in isolation (by design — see engine.py's
 # _scan_fields, which needs per-field attribution), we lose that
@@ -131,22 +131,15 @@ import re
 #
 # We do NOT attempt a general solution here (that would require a much
 # better-tuned or fine-tuned NER model, out of MVP scope). Instead we
-# apply one narrow, explicit filter: a token matching Blinkit's own
-# ID-shape convention (uppercase-letter prefix + hyphen + digits, e.g.
-# order IDs "BLK-431682", partner IDs "DP-4471") is suppressed from
-# PERSON results. This is intentionally narrow — it does not attempt to
-# filter "Green Meadows" (a building name inside an address field, also
-# a real false positive, documented separately in detection/README.md)
-# because that would require distinguishing place names from person
-# names, which is a harder problem than filtering a known, fixed ID
-# format. Real name matches (two capitalized words, no digits/hyphen)
-# are completely unaffected by this filter.
-_ID_SHAPE_PATTERN = re.compile(r"^[A-Z]{2,5}-\d+$")
-
-
-def _is_known_id_shape(text: str) -> bool:
-    """True if text matches Blinkit's ID convention (e.g. 'BLK-431682', 'DP-4471')."""
-    return bool(_ID_SHAPE_PATTERN.match(text.strip()))
+# apply one narrow, explicit filter: any PERSON match that contains a digit
+# (order IDs such as "ABC-431682", partner IDs such as "XY-4471", ...) is
+# suppressed. A real person's name does not contain digits, and this rule is
+# not tied to any one organisation's ID format. It is intentionally narrow: it
+# does not attempt to filter "Green Meadows" (a building name inside an
+# address field, also a real false positive, documented separately in
+# detection/README.md) because that would require distinguishing place names
+# from person names, which is a harder problem. Real name matches (two
+# capitalized words, no digits) are completely unaffected by this filter.
 
 
 def analyze_text(text: str) -> list:
@@ -155,9 +148,8 @@ def analyze_text(text: str) -> list:
     Returns Presidio's raw RecognizerResult list (entity_type, start, end, score).
     Empty/whitespace-only text returns an empty list without invoking the analyzer.
 
-    Applies one narrow post-filter: suppresses PERSON matches where the
-    ENTIRE matched text is a known Blinkit ID shape (e.g. order/partner
-    IDs like 'BLK-431682', 'DP-4471') — see _is_known_id_shape docstring
+    Applies one narrow post-filter: suppresses PERSON matches whose matched
+    text contains a digit (e.g. IDs like 'ABC-431682') — see the comment above
     for why this exists and what it deliberately does NOT cover.
     """
     if not text or not text.strip():
@@ -168,7 +160,7 @@ def analyze_text(text: str) -> list:
     filtered = []
     for r in results:
         matched_text = text[r.start:r.end]
-        if r.entity_type == "PERSON" and (any(c.isdigit() for c in matched_text) or _is_known_id_shape(matched_text)):
+        if r.entity_type == "PERSON" and any(c.isdigit() for c in matched_text):
             continue
         filtered.append(r)
     return filtered

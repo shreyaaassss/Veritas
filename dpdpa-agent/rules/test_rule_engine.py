@@ -49,7 +49,7 @@ from schemas.models import Event, RuleId, Severity, SourceType
 def fresh_registry():
     """Every test starts with a clean, freshly-loaded registry (matches Phase 1's test pattern)."""
     _reset_cache()
-    load_registry(force_reload=True)
+    load_registry("retail_co", force_reload=True)
     yield
     _reset_cache()
 
@@ -96,8 +96,7 @@ class TestSeededRetentionViolation:
         is_past_retention() helper on the same underlying data.
         """
         from registry.loader import get_registry_entry
-        entry = get_registry_entry("blinkit", "aadhaar", "delivery-partner-service")
-        assert entry.is_seeded_violation is True
+        entry = get_registry_entry("retail_co", "aadhaar", "delivery-partner-service")
         assert entry.is_past_retention() is True
 
 
@@ -145,7 +144,7 @@ class TestSeededMarketingPurposeCase:
         documented tension — both facts are true simultaneously.
         """
         from registry.loader import get_registry_entry
-        entry = get_registry_entry("blinkit", "phone", "marketing-analytics")
+        entry = get_registry_entry("retail_co", "phone", "marketing-analytics")
         assert entry is not None
         assert entry.forbids_raw_pii() is True
 
@@ -246,7 +245,7 @@ class TestUnregisteredFieldHandling:
         combo guaranteed absent from the registry.
         """
         event = Event(
-            tenant_id="blinkit",
+            tenant_id="retail_co",
             event_id="11111111-1111-1111-1111-111111111111",
             source_type=SourceType.API,
             source_system="order-service",
@@ -281,7 +280,7 @@ class TestUnregisteredFieldHandling:
     def test_unregistered_field_severity_uses_medium_default_for_non_high_category(self):
         """email is MEDIUM sensitivity -> unregistered email field gets MEDIUM, not the HIGH override."""
         event = Event(
-            tenant_id="blinkit",
+            tenant_id="retail_co",
             event_id="22222222-2222-2222-2222-222222222222",
             source_type=SourceType.API,
             source_system="order-service",
@@ -306,7 +305,7 @@ class TestUnregisteredFieldHandling:
         aadhaar/pan must still get HIGH severity, not the MEDIUM default.
         """
         event = Event(
-            tenant_id="blinkit",
+            tenant_id="retail_co",
             event_id="33333333-3333-3333-3333-333333333333",
             source_type=SourceType.API,
             source_system="order-service",  # aadhaar not registered here
@@ -405,13 +404,13 @@ class TestCleanEventsProduceNoVerdicts:
         test's real value is the explicit contains_pii check below.
         """
         event = Event(
-            tenant_id="blinkit",
+            tenant_id="retail_co",
             event_id="44444444-4444-4444-4444-444444444444",
             source_type=SourceType.LOG,
             source_system="order-service",
             timestamp="2026-08-21T00:00:00Z",
             raw_snippet="order confirmed",
-            fields={"order_id": "BLK-999999"},
+            fields={"order_id": "ORD-999999"},
         )
         detected = DetectedEvent(event=event, contains_pii=False, matched_entities=[])
         assert evaluate_event(detected) == []
@@ -589,7 +588,7 @@ if __name__ == "__main__":
         methods = [m for m in dir(instance) if m.startswith("test_")]
         for method_name in methods:
             _reset_cache()
-            load_registry(force_reload=True)
+            load_registry("retail_co", force_reload=True)
             try:
                 getattr(instance, method_name)()
                 print(f"  ✅ {cls.__name__}::{method_name}")

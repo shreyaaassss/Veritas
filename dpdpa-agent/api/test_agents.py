@@ -61,7 +61,7 @@ def isolated_stores(tmp_path, monkeypatch):
     client.cookies.clear()
 
 
-def _register_agent(org_id: str = "blinkit", source_label: str = "test-service") -> tuple[str, str]:
+def _register_agent(org_id: str = "retail_co", source_label: str = "test-service") -> tuple[str, str]:
     """Helper: issue key → register agent. Returns (agent_id, auth_token)."""
     # Issue key via API
     key_resp = client.post("/agents/issue-key", json={"org_id": org_id})
@@ -85,11 +85,11 @@ def _register_agent(org_id: str = "blinkit", source_label: str = "test-service")
 class TestIssueKey:
 
     def test_valid_org_returns_key(self):
-        r = client.post("/agents/issue-key", json={"org_id": "blinkit"})
+        r = client.post("/agents/issue-key", json={"org_id": "retail_co"})
         assert r.status_code == 200
         data = r.json()
         assert "key" in data
-        assert data["org_id"] == "blinkit"
+        assert data["org_id"] == "retail_co"
         assert data["expires_in_seconds"] == 1800
 
     def test_unknown_org_returns_404(self):
@@ -98,8 +98,8 @@ class TestIssueKey:
         assert "nonexistent_org_xyz" in r.json()["detail"]
 
     def test_keys_are_different_on_each_call(self):
-        r1 = client.post("/agents/issue-key", json={"org_id": "blinkit"})
-        r2 = client.post("/agents/issue-key", json={"org_id": "blinkit"})
+        r1 = client.post("/agents/issue-key", json={"org_id": "retail_co"})
+        r2 = client.post("/agents/issue-key", json={"org_id": "retail_co"})
         assert r1.json()["key"] != r2.json()["key"]
 
     def test_missing_org_id_returns_422(self):
@@ -114,7 +114,7 @@ class TestIssueKey:
 class TestRegisterAgent:
 
     def test_valid_key_returns_identity(self):
-        key_resp = client.post("/agents/issue-key", json={"org_id": "blinkit"})
+        key_resp = client.post("/agents/issue-key", json={"org_id": "retail_co"})
         key = key_resp.json()["key"]
 
         r = client.post("/agent/register", json={"registration_key": key, "source_label": "order-service"})
@@ -122,11 +122,11 @@ class TestRegisterAgent:
         data = r.json()
         assert data["agent_id"].startswith("VERITAS-AGENT-")
         assert len(data["auth_token"]) > 0
-        assert data["org_id"] == "blinkit"
-        assert data["event_endpoint"] == "/v1/blinkit/events"
+        assert data["org_id"] == "retail_co"
+        assert data["event_endpoint"] == "/v1/retail_co/events"
 
     def test_used_key_rejected(self):
-        key_resp = client.post("/agents/issue-key", json={"org_id": "blinkit"})
+        key_resp = client.post("/agents/issue-key", json={"org_id": "retail_co"})
         key = key_resp.json()["key"]
 
         client.post("/agent/register", json={"registration_key": key})
@@ -143,7 +143,7 @@ class TestRegisterAgent:
         from datetime import timedelta, timezone
         import agent_store.store as store_mod
 
-        key_resp = client.post("/agents/issue-key", json={"org_id": "blinkit"})
+        key_resp = client.post("/agents/issue-key", json={"org_id": "retail_co"})
         key = key_resp.json()["key"]
 
         # Advance clock past expiry
@@ -155,7 +155,7 @@ class TestRegisterAgent:
         assert "expired" in r.json()["detail"].lower()
 
     def test_source_label_optional(self):
-        key_resp = client.post("/agents/issue-key", json={"org_id": "blinkit"})
+        key_resp = client.post("/agents/issue-key", json={"org_id": "retail_co"})
         key = key_resp.json()["key"]
         r = client.post("/agent/register", json={"registration_key": key})
         assert r.status_code == 200
@@ -221,17 +221,17 @@ class TestListAgents:
         assert len(r.json()["agents"]) == 2
 
     def test_org_id_filter_works(self):
-        _register_agent("blinkit", "svc-a")
+        _register_agent("retail_co", "svc-a")
         _register_agent("edtech_co", "svc-b")
 
-        r_blinkit = client.get("/agents?org_id=blinkit")
+        r_retail_co = client.get("/agents?org_id=retail_co")
         r_edtech = client.get("/agents?org_id=edtech_co")
 
-        blinkit_agents = r_blinkit.json()["agents"]
+        retail_co_agents = r_retail_co.json()["agents"]
         edtech_agents = r_edtech.json()["agents"]
 
-        assert len(blinkit_agents) == 1
-        assert blinkit_agents[0]["org_id"] == "blinkit"
+        assert len(retail_co_agents) == 1
+        assert retail_co_agents[0]["org_id"] == "retail_co"
         assert len(edtech_agents) == 1
         assert edtech_agents[0]["org_id"] == "edtech_co"
 
@@ -248,7 +248,7 @@ class TestGetAgent:
         assert r.status_code == 200
         data = r.json()
         assert data["agent_id"] == agent_id
-        assert data["org_id"] == "blinkit"
+        assert data["org_id"] == "retail_co"
         assert data["source_label"] == "order-service"
         assert data["status"] == "ACTIVE"
 
@@ -285,14 +285,14 @@ class TestEventsEndpointAuth:
 
     def test_no_auth_header_returns_401(self):
         r = client.post(
-            "/v1/blinkit/events",
+            "/v1/retail_co/events",
             json={"source_type": "log", "source_system": "x", "raw_snippet": "hello"},
         )
         assert r.status_code == 401
 
     def test_invalid_token_returns_401(self):
         r = client.post(
-            "/v1/blinkit/events",
+            "/v1/retail_co/events",
             headers={"Authorization": "Bearer not-a-real-token"},
             json={"source_type": "log", "source_system": "x", "raw_snippet": "hello"},
         )
@@ -303,7 +303,7 @@ class TestEventsEndpointAuth:
         client.post(f"/agents/{agent_id}/revoke")
 
         r = client.post(
-            "/v1/blinkit/events",
+            "/v1/retail_co/events",
             headers={"Authorization": f"Bearer {token}"},
             json={"source_type": "log", "source_system": "x", "raw_snippet": "hello"},
         )
@@ -311,11 +311,11 @@ class TestEventsEndpointAuth:
         assert "revoked" in r.json()["detail"].lower()
 
     def test_token_from_wrong_org_returns_403(self):
-        # Register agent for edtech_co, try to submit to blinkit
+        # Register agent for edtech_co, try to submit to retail_co
         _, edtech_token = _register_agent("edtech_co", "edtech-svc")
 
         r = client.post(
-            "/v1/blinkit/events",
+            "/v1/retail_co/events",
             headers={"Authorization": f"Bearer {edtech_token}"},
             json={"source_type": "log", "source_system": "x", "raw_snippet": "hello"},
         )
@@ -323,10 +323,10 @@ class TestEventsEndpointAuth:
         assert "not authorized" in r.json()["detail"].lower() or "edtech_co" in r.json()["detail"]
 
     def test_valid_token_and_correct_org_accepted(self):
-        _, token = _register_agent("blinkit")
+        _, token = _register_agent("retail_co")
 
         r = client.post(
-            "/v1/blinkit/events",
+            "/v1/retail_co/events",
             headers={"Authorization": f"Bearer {token}"},
             json={
                 "source_type": "log",
@@ -337,11 +337,11 @@ class TestEventsEndpointAuth:
         assert r.status_code == 200
 
     def test_valid_token_increments_event_counter(self):
-        agent_id, token = _register_agent("blinkit")
+        agent_id, token = _register_agent("retail_co")
 
         for _ in range(3):
             client.post(
-                "/v1/blinkit/events",
+                "/v1/retail_co/events",
                 headers={"Authorization": f"Bearer {token}"},
                 json={"source_type": "log", "source_system": "x", "raw_snippet": "clean line"},
             )
@@ -351,7 +351,7 @@ class TestEventsEndpointAuth:
 
     def test_malformed_bearer_header_returns_401(self):
         r = client.post(
-            "/v1/blinkit/events",
+            "/v1/retail_co/events",
             headers={"Authorization": "Token abc123"},  # wrong scheme
             json={"source_type": "log", "source_system": "x", "raw_snippet": "hello"},
         )

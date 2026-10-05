@@ -7,14 +7,14 @@
 #
 # EdTech Co is a fictional education platform managing student records,
 # admissions data, and parent/guardian contacts under India's DPDPA.
-# Their PII profile is fundamentally different from Blinkit's:
+# Their PII profile is fundamentally different from Retail Co's:
 #   - Identity: APAAR ID (Academic Bank of Credits ID, not Aadhaar/PAN)
 #   - Purpose: academic_records, admissions, parental_consent (not orders/KYC)
 #   - Source systems: student_portal, admissions_service, guardian_portal (not microservices)
 #   - Linkage risk: name+school+dob is re-identifying at population scale (k-anonymity)
 #
 # PROOF OF GENERICITY: get_org_config("edtech_co") returns this config from
-# the same running code that handles "blinkit". No branching logic.
+# the same running code that handles "retail_co". No branching logic.
 
 org_id: edtech_co
 
@@ -47,7 +47,7 @@ identifiers:
     validator: none
 
 # PII fields EdTech Co collects across their source systems.
-# Note: entirely different field names and source systems from Blinkit.
+# Note: entirely different field names and source systems from Retail Co.
 fields:
   # ------------------------------------------------------------------
   # student_portal: student profile data

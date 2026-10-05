@@ -1,6 +1,6 @@
 # DPDPA Compliance Monitoring Agent
 
-An autonomous, real-time compliance monitoring agent for India's **Digital Personal Data Protection Act (DPDPA)**. Built around **Blinkit** as the example organization, the system ingests streaming application logs and API payloads, evaluates them against core DPDPA rules, and surfaces violations on a live dashboard with AI-generated explanations and remediation guidance.
+An autonomous, real-time compliance monitoring agent for India's **Digital Personal Data Protection Act (DPDPA)**. Configured per organisation through an uploaded org config, the system ingests streaming application logs and API payloads, evaluates them against core DPDPA rules, and surfaces violations on a live dashboard with AI-generated explanations and remediation guidance.
 
 **Primary user:** Priya — a compliance auditor running monthly DPDPA audits.
 

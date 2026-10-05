@@ -176,6 +176,23 @@ def get_org_config(org_id: str) -> Optional[OrgConfig]:
     return config
 
 
+def get_org_config_version_time(org_id: str) -> Optional[datetime]:
+    """
+    UTC time the latest stored config version for org_id was uploaded,
+    parsed from its filename (e.g. '2026-08-21T00-00-00Z.yaml'). Returns
+    None if the org has no config or the filename is not a timestamp.
+    Used as the default start of the retention clock for fields that do
+    not declare data_since.
+    """
+    path = _latest_config_path(org_id)
+    if path is None:
+        return None
+    try:
+        return datetime.strptime(path.stem, "%Y-%m-%dT%H-%M-%SZ").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+
 def list_org_config_versions(org_id: str) -> List[str]:
     """
     List all stored config versions for an org, oldest first.

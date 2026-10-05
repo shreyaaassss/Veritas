@@ -5,7 +5,7 @@ These tests verify every exit criterion stated in the Phase 0 spec.
 They must ALL pass before Phase 0 is considered complete.
 
 Exit criteria tested here:
-  1. get_org_config("blinkit") and get_org_config("edtech_co") return correct,
+  1. get_org_config("retail_co") and get_org_config("edtech_co") return correct,
      distinct configs from the same code (no branching on org_id).
   2. Uploading deliberately broken configs is rejected with specific,
      actionable error messages.
@@ -93,18 +93,18 @@ def clean_test_org_configs():
 
 class TestGetOrgConfig:
     """
-    Exit criterion 1: get_org_config("blinkit") and get_org_config("edtech_co")
+    Exit criterion 1: get_org_config("retail_co") and get_org_config("edtech_co")
     both return correct, distinct configs from the same running code.
-    No branching logic anywhere that checks if org_id == "blinkit".
+    No branching logic anywhere that checks if org_id == "retail_co".
     """
 
-    def test_get_blinkit_config_returns_config(self):
-        config = get_org_config("blinkit")
-        assert config is not None, "get_org_config('blinkit') must return a config"
-        assert config.org_id == "blinkit"
+    def test_get_retail_co_config_returns_config(self):
+        config = get_org_config("retail_co")
+        assert config is not None, "get_org_config('retail_co') must return a config"
+        assert config.org_id == "retail_co"
 
-    def test_blinkit_config_has_expected_source_systems(self):
-        config = get_org_config("blinkit")
+    def test_retail_co_config_has_expected_source_systems(self):
+        config = get_org_config("retail_co")
         assert config is not None
         source_systems = {f.source_system for f in config.fields}
         assert "order-service" in source_systems
@@ -112,8 +112,8 @@ class TestGetOrgConfig:
         assert "support-ticketing" in source_systems
         assert "marketing-analytics" in source_systems
 
-    def test_blinkit_config_has_aadhaar_field(self):
-        config = get_org_config("blinkit")
+    def test_retail_co_config_has_aadhaar_field(self):
+        config = get_org_config("retail_co")
         assert config is not None
         field_names = {f.field_name for f in config.fields}
         assert "aadhaar" in field_names
@@ -122,8 +122,8 @@ class TestGetOrgConfig:
         assert aadhaar.retention_days == 180
         assert aadhaar.source_system == "delivery-partner-service"
 
-    def test_blinkit_has_marketing_analytics_field_with_deidentified_scope(self):
-        config = get_org_config("blinkit")
+    def test_retail_co_has_marketing_analytics_field_with_deidentified_scope(self):
+        config = get_org_config("retail_co")
         assert config is not None
         marketing_fields = [
             f for f in config.fields if f.source_system == "marketing-analytics"
@@ -157,16 +157,16 @@ class TestGetOrgConfig:
 
     def test_two_configs_are_distinct(self):
         """The same code returns correct, DIFFERENT configs for different orgs."""
-        blinkit = get_org_config("blinkit")
+        retail_co = get_org_config("retail_co")
         edtech = get_org_config("edtech_co")
-        assert blinkit is not None
+        assert retail_co is not None
         assert edtech is not None
-        assert blinkit.org_id != edtech.org_id
-        blinkit_fields = {f.field_name for f in blinkit.fields}
+        assert retail_co.org_id != edtech.org_id
+        retail_co_fields = {f.field_name for f in retail_co.fields}
         edtech_fields = {f.field_name for f in edtech.fields}
         # The configs should have distinct fields — they're genuinely different orgs
-        assert "aadhaar" in blinkit_fields
-        assert "apaar_id" not in blinkit_fields
+        assert "aadhaar" in retail_co_fields
+        assert "apaar_id" not in retail_co_fields
         assert "apaar_id" in edtech_fields
         assert "aadhaar" not in edtech_fields
 
@@ -174,8 +174,8 @@ class TestGetOrgConfig:
         config = get_org_config("org_that_does_not_exist_xyz")
         assert config is None
 
-    def test_blinkit_has_linkage_rules(self):
-        config = get_org_config("blinkit")
+    def test_retail_co_has_linkage_rules(self):
+        config = get_org_config("retail_co")
         assert config is not None
         assert len(config.linkage_rules) > 0
 
@@ -394,7 +394,7 @@ class TestTenantIdRequired:
 
     def _valid_event_dict(self, **overrides) -> dict:
         base = {
-            "tenant_id": "blinkit",
+            "tenant_id": "retail_co",
             "event_id": str(uuid.uuid4()),
             "source_type": "log",
             "source_system": "order-service",
@@ -407,7 +407,7 @@ class TestTenantIdRequired:
 
     def _valid_verdict_dict(self, event_id: str | None = None, **overrides) -> dict:
         base = {
-            "tenant_id": "blinkit",
+            "tenant_id": "retail_co",
             "verdict_id": str(uuid.uuid4()),
             "event_id": event_id or str(uuid.uuid4()),
             "rule_id": "EXPOSURE_001",
@@ -426,7 +426,7 @@ class TestTenantIdRequired:
 
     def test_event_with_tenant_id_is_valid(self):
         event = Event(**self._valid_event_dict())
-        assert event.tenant_id == "blinkit"
+        assert event.tenant_id == "retail_co"
 
     def test_event_without_tenant_id_fails(self):
         d = self._valid_event_dict()
@@ -442,7 +442,7 @@ class TestTenantIdRequired:
 
     def test_verdict_with_tenant_id_is_valid(self):
         verdict = Verdict(**self._valid_verdict_dict())
-        assert verdict.tenant_id == "blinkit"
+        assert verdict.tenant_id == "retail_co"
 
     def test_verdict_without_tenant_id_fails(self):
         d = self._valid_verdict_dict()

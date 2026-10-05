@@ -32,7 +32,7 @@ FALSE-POSITIVE TRADE-OFFS (documented per the plan's requirement):
   the recognizer's base score. We accept this trade-off for the MVP:
   our own generators (Phase 2) always emit Aadhaar values as spaced
   4-4-4 groups ("XXXX XXXX XXXX"), and order IDs are emitted in a
-  visually distinct "BLK-XXXXXX" format (see ingestion/fixtures.py
+  visually distinct "ORD-XXXXXX" format (see ingestion/fixtures.py
   fake_order_id), so in practice the spaced-digit pattern used here does
   not collide with our own order ID shape. A production system would
   need a tighter checksum-based Aadhaar validator (Verhoeff algorithm)
@@ -45,7 +45,7 @@ FALSE-POSITIVE TRADE-OFFS (documented per the plan's requirement):
   PAN vs. other alphanumeric strings: the pattern
   [A-Z]{5}[0-9]{4}[A-Z]{1} (exactly 5 letters + 4 digits + 1 letter, 10
   chars total) is distinctive enough that generic alphanumeric strings
-  (order IDs like "BLK-431682", hashed IDs like "hcid_d8ba0b4b") do not
+  (order IDs like "ORD-431682", hashed IDs like "hcid_d8ba0b4b") do not
   match it — hashed IDs are lowercase, order IDs contain a hyphen and
   fewer trailing digits in the wrong position. Verified by test.
 """

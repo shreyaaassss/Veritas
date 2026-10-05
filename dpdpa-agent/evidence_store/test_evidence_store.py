@@ -6,7 +6,7 @@ Critical tests:
   (b) Update a status, confirm verify_chain() still passes.
 
 Every store method now requires tenant_id — all calls below pass it
-explicitly ("blinkit", matching _make_explained_verdict's default) so this
+explicitly ("retail_co", matching _make_explained_verdict's default) so this
 file continues to exercise the single-tenant behavior it always has.
 Cross-tenant isolation itself (two tenants' chains/queries never touching
 each other) is covered separately in
@@ -29,7 +29,7 @@ from schemas.models import (
 from llm_explainer.explainer import ExplainedVerdict
 from evidence_store.store import EvidenceStore
 
-TENANT_ID = "blinkit"
+TENANT_ID = "retail_co"
 
 
 def _make_explained_verdict(

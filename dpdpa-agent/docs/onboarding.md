@@ -1,6 +1,6 @@
 # Integrate Veritas in 4 Steps
 
-Veritas is a config-driven DPDPA compliance engine. The detection logic, validators, linkage-risk analysis, tamper-evident evidence chain, and dashboard are all **built once and shared by every organisation** — what makes it *yours* is a single YAML config. Everything below is real, working behavior on the current codebase (Blinkit and EdTech Co both run on it today, with zero code differences between them).
+Veritas is a config-driven DPDPA compliance engine. The detection logic, validators, linkage-risk analysis, tamper-evident evidence chain, and dashboard are all **built once and shared by every organisation** — what makes it *yours* is a single YAML config. Everything below is real, working behavior on the current codebase (Retail Co and EdTech Co both run on it today, with zero code differences between them).
 
 ---
 

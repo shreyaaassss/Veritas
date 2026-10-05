@@ -5,7 +5,7 @@
 
 ## What This System Is
 
-An autonomous, real-time DPDPA compliance monitoring agent built around **Blinkit** as the example organization. It ingests streaming telemetry (application logs, API payloads), evaluates events against core DPDPA compliance rules, flags violations on a live dashboard, and maintains an immutable audit evidence store.
+An autonomous, real-time DPDPA compliance monitoring agent configured per organisation (no customer-specific code). It ingests streaming telemetry (application logs, API payloads), evaluates events against core DPDPA compliance rules, flags violations on a live dashboard, and maintains an immutable audit evidence store.
 
 **Primary user persona:** Priya — a compliance auditor running monthly DPDPA audits. She needs a live feed of violations broken down by source system and a point-in-time audit export.
 
@@ -70,7 +70,7 @@ Every other Verdict field is immutable and will be covered by a SHA-256 hash cha
 
 ---
 
-## Source Systems in Scope (Blinkit)
+## Source Systems in Scope (Retail Co)
 
 | System | `source_system` value |
 |---|---|

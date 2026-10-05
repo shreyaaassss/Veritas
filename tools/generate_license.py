@@ -16,7 +16,7 @@ Usage:
 
     # Without fingerprint (dev/demo mode — any machine can run it):
     python tools/generate_license.py \
-        --org "blinkit" \
+        --org "example_org" \
         --expiry "2027-01-01" \
         --tier "professional" \
         --key tools/private_key.pem \

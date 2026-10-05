@@ -33,14 +33,14 @@ from user_store.store import get_user_store, reset_user_store
 
 def _create_client_for_role(role: UserRole, grant_orgs=None) -> TestClient:
     """Returns an authenticated TestClient for the given role.
-    Non-SUPER_ADMIN roles get explicit org grants for blinkit + edtech_co by default
+    Non-SUPER_ADMIN roles get explicit org grants for retail_co + edtech_co by default
     so they can exercise org-scoped endpoints in tests."""
     from passlib.context import CryptContext
     username = f"test_{role.value.lower()}"
     pw_hash = CryptContext(schemes=["bcrypt"], deprecated="auto").hash("testpass!")
     u = get_user_store().create_user(username, f"{username}@test.io", pw_hash, role)
     if role != UserRole.SUPER_ADMIN:
-        for oid in (grant_orgs or ["blinkit", "edtech_co"]):
+        for oid in (grant_orgs or ["retail_co", "edtech_co"]):
             get_user_store().grant_org_access(u.user_id, oid)
     c = TestClient(app)
     r = c.post("/api/auth/login", data={"username": username, "password": "testpass!"})
@@ -99,7 +99,7 @@ class TestUnauthenticated:
 
     def test_unauthenticated_scan_returns_401(self):
         fresh = TestClient(app)
-        r = fresh.post("/v1/blinkit/scan", json={"text": "hello"})
+        r = fresh.post("/v1/retail_co/scan", json={"text": "hello"})
         assert r.status_code == 401
 
     def test_unauthenticated_agents_returns_401(self):
@@ -123,11 +123,11 @@ class TestViewerPermissions:
         assert r.status_code == 200
 
     def test_viewer_cannot_scan(self, viewer):
-        r = viewer.post("/v1/blinkit/scan", json={"text": "test"})
+        r = viewer.post("/v1/retail_co/scan", json={"text": "test"})
         assert r.status_code == 403
 
     def test_viewer_cannot_issue_key(self, viewer):
-        r = viewer.post("/agents/issue-key", json={"org_id": "blinkit"})
+        r = viewer.post("/agents/issue-key", json={"org_id": "retail_co"})
         assert r.status_code == 403
 
     def test_viewer_cannot_revoke_agent(self, viewer):
@@ -139,11 +139,11 @@ class TestViewerPermissions:
         assert r.status_code == 403
 
     def test_viewer_cannot_update_verdict_status(self, viewer):
-        r = viewer.post("/api/blinkit/verdicts/fake-id/status", json={"status": "ACKNOWLEDGED"})
+        r = viewer.post("/api/retail_co/verdicts/fake-id/status", json={"status": "ACKNOWLEDGED"})
         assert r.status_code == 403
 
     def test_viewer_cannot_investigate(self, viewer):
-        r = viewer.post("/v1/blinkit/investigate", json={"text": "@1 what happened?"})
+        r = viewer.post("/v1/retail_co/investigate", json={"text": "@1 what happened?"})
         assert r.status_code == 403
 
     def test_viewer_cannot_manage_users(self, viewer):
@@ -162,19 +162,19 @@ class TestAuditorPermissions:
         assert r.status_code == 200
 
     def test_auditor_can_scan(self, auditor):
-        r = auditor.post("/v1/blinkit/scan", json={"text": "clean log line"})
+        r = auditor.post("/v1/retail_co/scan", json={"text": "clean log line"})
         assert r.status_code == 200
 
     def test_auditor_can_read_verdicts(self, auditor):
-        r = auditor.get("/api/blinkit/verdicts")
+        r = auditor.get("/api/retail_co/verdicts")
         assert r.status_code == 200
 
     def test_auditor_can_verify_chain(self, auditor):
-        r = auditor.get("/api/blinkit/verify-chain")
+        r = auditor.get("/api/retail_co/verify-chain")
         assert r.status_code == 200
 
     def test_auditor_cannot_issue_key(self, auditor):
-        r = auditor.post("/agents/issue-key", json={"org_id": "blinkit"})
+        r = auditor.post("/agents/issue-key", json={"org_id": "retail_co"})
         assert r.status_code == 403
 
     def test_auditor_cannot_revoke_agent(self, auditor):
@@ -182,7 +182,7 @@ class TestAuditorPermissions:
         assert r.status_code == 403
 
     def test_auditor_cannot_update_verdict_status(self, auditor):
-        r = auditor.post("/api/blinkit/verdicts/fake-id/status", json={"status": "ACKNOWLEDGED"})
+        r = auditor.post("/api/retail_co/verdicts/fake-id/status", json={"status": "ACKNOWLEDGED"})
         assert r.status_code == 403
 
     def test_auditor_cannot_manage_users(self, auditor):
@@ -197,11 +197,11 @@ class TestAuditorPermissions:
 class TestComplianceAdminPermissions:
 
     def test_compliance_admin_can_scan(self, compliance_admin):
-        r = compliance_admin.post("/v1/blinkit/scan", json={"text": "test"})
+        r = compliance_admin.post("/v1/retail_co/scan", json={"text": "test"})
         assert r.status_code == 200
 
     def test_compliance_admin_can_issue_key(self, compliance_admin):
-        r = compliance_admin.post("/agents/issue-key", json={"org_id": "blinkit"})
+        r = compliance_admin.post("/agents/issue-key", json={"org_id": "retail_co"})
         assert r.status_code == 200
 
     def test_compliance_admin_can_revoke_agent(self, compliance_admin):
@@ -224,10 +224,10 @@ class TestSuperAdminPermissions:
         assert super_admin.get("/v1/orgs").status_code == 200
 
     def test_super_admin_can_scan(self, super_admin):
-        assert super_admin.post("/v1/blinkit/scan", json={"text": "test"}).status_code == 200
+        assert super_admin.post("/v1/retail_co/scan", json={"text": "test"}).status_code == 200
 
     def test_super_admin_can_issue_key(self, super_admin):
-        assert super_admin.post("/agents/issue-key", json={"org_id": "blinkit"}).status_code == 200
+        assert super_admin.post("/agents/issue-key", json={"org_id": "retail_co"}).status_code == 200
 
     def test_super_admin_can_manage_users(self, super_admin):
         r = super_admin.get("/api/auth/users")
@@ -285,15 +285,15 @@ class TestOrgIsolation:
         """An AUDITOR granted access to org A cannot access org B's data."""
         from passlib.context import CryptContext
         pw_hash = CryptContext(schemes=["bcrypt"], deprecated="auto").hash("testpass!")
-        # Create user with access to blinkit only
+        # Create user with access to retail_co only
         u = get_user_store().create_user("auditor_a", "a@test.io", pw_hash, UserRole.AUDITOR)
-        get_user_store().grant_org_access(u.user_id, "blinkit")
+        get_user_store().grant_org_access(u.user_id, "retail_co")
         c = TestClient(app)
         r = c.post("/api/auth/login", data={"username": "auditor_a", "password": "testpass!"})
         assert r.status_code == 200
 
-        # Can access blinkit
-        r = c.get("/api/blinkit/verdicts")
+        # Can access retail_co
+        r = c.get("/api/retail_co/verdicts")
         assert r.status_code == 200
 
         # Cannot access edtech_co (no membership)
@@ -306,7 +306,7 @@ class TestOrgIsolation:
 
     def test_super_admin_can_access_all_orgs(self, super_admin):
         """SUPER_ADMIN has wildcard access — no explicit memberships needed."""
-        assert super_admin.get("/api/blinkit/verdicts").status_code == 200
+        assert super_admin.get("/api/retail_co/verdicts").status_code == 200
         assert super_admin.get("/api/edtech_co/verdicts").status_code == 200
 
     def test_my_orgs_returns_only_accessible_orgs(self, tmp_path):
@@ -314,12 +314,12 @@ class TestOrgIsolation:
         from passlib.context import CryptContext
         pw_hash = CryptContext(schemes=["bcrypt"], deprecated="auto").hash("testpass!")
         u = get_user_store().create_user("limited", "lim@test.io", pw_hash, UserRole.COMPLIANCE_ADMIN)
-        get_user_store().grant_org_access(u.user_id, "blinkit")  # only blinkit, not edtech_co
+        get_user_store().grant_org_access(u.user_id, "retail_co")  # only retail_co, not edtech_co
         c = TestClient(app)
         c.post("/api/auth/login", data={"username": "limited", "password": "testpass!"})
         r = c.get("/api/auth/my-orgs")
         assert r.status_code == 200
-        assert r.json()["org_ids"] == ["blinkit"]
+        assert r.json()["org_ids"] == ["retail_co"]
         assert "edtech_co" not in r.json()["org_ids"]
 
     def test_grant_and_revoke_org_access(self, super_admin):
@@ -329,13 +329,13 @@ class TestOrgIsolation:
         u = get_user_store().create_user("target2", "t2@test.io", pw_hash, UserRole.AUDITOR)
 
         # Grant access
-        r = super_admin.post(f"/api/auth/users/{u.user_id}/orgs/blinkit")
+        r = super_admin.post(f"/api/auth/users/{u.user_id}/orgs/retail_co")
         assert r.status_code == 201
 
         # Verify access
-        assert get_user_store().has_org_access(u.user_id, "blinkit")
+        assert get_user_store().has_org_access(u.user_id, "retail_co")
 
         # Revoke access
-        r = super_admin.delete(f"/api/auth/users/{u.user_id}/orgs/blinkit")
+        r = super_admin.delete(f"/api/auth/users/{u.user_id}/orgs/retail_co")
         assert r.status_code == 200
-        assert not get_user_store().has_org_access(u.user_id, "blinkit")
+        assert not get_user_store().has_org_access(u.user_id, "retail_co")

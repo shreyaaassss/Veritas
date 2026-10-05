@@ -39,7 +39,8 @@ WHAT IS EXPLICITLY OUT OF SCOPE IN PHASE 0:
 from __future__ import annotations
 
 import re
-from typing import List, Literal
+from datetime import date, datetime, timezone
+from typing import Any, List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -178,6 +179,36 @@ class OrgField(BaseModel):
             "their events carry in source_system."
         )
     )
+    data_since: Optional[datetime] = Field(
+        default=None,
+        description=(
+            "Optional ISO date/datetime: when the data this field covers in this "
+            "source_system started being held. Retention (RETENTION_001) is "
+            "measured from this date. If omitted, retention is measured from "
+            "when this org config version was uploaded, i.e. data is treated as "
+            "newly collected. Set it when onboarding a system that already holds "
+            "older data."
+        )
+    )
+
+    @field_validator("data_since", mode="before")
+    @classmethod
+    def parse_data_since(cls, v: Any) -> Any:
+        """Accept YAML dates, datetimes and ISO strings; normalise to UTC-aware."""
+        if v is None or v == "":
+            return None
+        if isinstance(v, datetime):
+            dt = v
+        elif isinstance(v, date):
+            dt = datetime(v.year, v.month, v.day)
+        elif isinstance(v, str):
+            try:
+                dt = datetime.fromisoformat(v.strip().replace("Z", "+00:00"))
+            except ValueError as e:
+                raise ValueError(f"data_since {v!r} is not a valid ISO date/datetime") from e
+        else:
+            raise ValueError(f"data_since must be an ISO date/datetime, got {type(v).__name__}")
+        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
 
 # ---------------------------------------------------------------------------

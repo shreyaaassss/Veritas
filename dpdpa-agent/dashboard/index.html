@@ -2166,10 +2166,12 @@ const MAX_FEED = 100;
 let currentOrgId = localStorage.getItem('veritas_org_id') || '';
 
 function formatOrgDisplayName(orgId) {
-  if (orgId === 'blinkit') return 'E-Commerce';
-  if (orgId === 'edtech_co') return 'EdTech';
-  if (orgId === 'acme_bank') return 'Acme Bank';
-  return orgId;
+  // Org ids are slugs (a-z, 0-9, _). Show them as readable titles.
+  return String(orgId || '')
+    .split('_')
+    .filter(Boolean)
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
 }
 
 // ---- Org selector ----
@@ -2871,45 +2873,14 @@ const SIM_EXAMPLES = {
     label: 'Exposure — raw PAN + phone pasted into a log line',
     org: null,
     body: () => ({
-      text: '[2026-08-22T09:14:02Z] DEBUG order-service: fetched customer record {name: "Rohan Verma", phone: "9876543210", pan: "ABCDE1234F"}'
+      text: '[2026-08-22T09:14:02Z] DEBUG app-service: fetched customer record {name: "Rohan Verma", phone: "9876543210", pan: "ABCDE1234F"}'
     })
   },
-  purpose: {
-    label: 'Purpose Limitation — raw phone leaked into a marketing event',
+  aadhaar: {
+    label: 'Exposure — raw Aadhaar number in a free-text note',
     org: null,
     body: () => ({
-      fields: {
-        hashed_customer_id: 'hcid_9f2a1b7e3c',
-        campaign_segment: 'dormant_30d',
-        event_type: 'push_notification',
-        phone: '9123456780'
-      },
-      source_system: 'marketing-analytics'
-    })
-  },
-  retention: {
-    label: 'Retention — delivery-partner record kept 240 days (>180-day limit)',
-    org: 'blinkit',
-    body: () => ({
-      fields: {
-        name: 'Suresh K.',
-        aadhaar: '5521 8890 3347',
-        onboarded_at: new Date(Date.now() - 240 * 24 * 60 * 60 * 1000).toISOString(),
-        partner_id: 'DP-4471'
-      },
-      source_system: 'delivery-partner-service'
-    })
-  },
-  linkage: {
-    label: 'Linkage — student name + school + DOB re-identify a minor',
-    org: 'edtech_co',
-    body: () => ({
-      fields: {
-        student_name: 'Ananya Bhat',
-        school_name: 'Delhi Public School RK Puram',
-        dob: '2011-03-14'
-      },
-      source_system: 'support_ticket_system'
+      text: 'support note: customer verified identity with Aadhaar 2345 6789 0124'
     })
   }
 };

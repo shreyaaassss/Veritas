@@ -53,6 +53,7 @@ def validate_org_config(raw: Dict[str, Any]) -> List[str]:
          as a valid regex (or known built-in alias); no duplicate name values.
       3. fields list: each entry has field_name, pii_category, declared_purpose,
          consent_scope, retention_days (positive integer > 0), source_system;
+         optional data_since must be an ISO date/datetime if present;
          no duplicate (source_system, field_name) entries.
       4. linkage_rules (if present): each entry has fields list (>= 2 fields)
          and risk label; every field in linkage_rules[].fields exists in fields.
@@ -149,6 +150,25 @@ def validate_org_config(raw: Dict[str, Any]) -> List[str]:
                         f"Each field_name must be unique within its source_system."
                     )
                 seen_field_keys.add(key)
+
+            data_since = f.get("data_since")
+            if data_since not in (None, ""):
+                from datetime import date as _date, datetime as _datetime
+                if isinstance(data_since, (_datetime, _date)):
+                    pass
+                elif isinstance(data_since, str):
+                    try:
+                        _datetime.fromisoformat(data_since.strip().replace("Z", "+00:00"))
+                    except ValueError:
+                        errors.append(
+                            f"fields[{idx}].data_since must be an ISO date or datetime "
+                            f"(e.g. 2025-12-24), got {data_since!r}."
+                        )
+                else:
+                    errors.append(
+                        f"fields[{idx}].data_since must be an ISO date or datetime, "
+                        f"got {type(data_since).__name__}."
+                    )
 
             retention_days = f.get("retention_days")
             if retention_days is not None:

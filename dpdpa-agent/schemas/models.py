@@ -162,7 +162,7 @@ class Event(BaseModel):
     model_config = {
         "json_schema_extra": {
             "example": {
-                "tenant_id": "blinkit",
+                "tenant_id": "retail_co",
                 "event_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
                 "source_type": "log",
                 "source_system": "order-service",
@@ -302,7 +302,7 @@ class Verdict(BaseModel):
     model_config = {
         "json_schema_extra": {
             "example": {
-                "tenant_id": "blinkit",
+                "tenant_id": "retail_co",
                 "verdict_id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
                 "event_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
                 "rule_id": "EXPOSURE_001",

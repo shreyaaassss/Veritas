@@ -238,10 +238,10 @@ class TestNoCollisions:
 
     def test_generic_order_id_does_not_fire_aadhaar_or_pan(self):
         """
-        Order IDs (Phase 2's 'BLK-XXXXXX' shape) must not false-positive
+        Order IDs (Phase 2's 'ORD-XXXXXX' shape) must not false-positive
         as Aadhaar or PAN — different length/structure entirely.
         """
-        results = analyze_text("BLK-431682")
+        results = analyze_text("ORD-431682")
         assert not any(r.entity_type == "IN_AADHAAR" for r in results)
         assert not any(r.entity_type == "IN_PAN" for r in results)
 
@@ -269,15 +269,15 @@ class TestNoCollisions:
 
     def test_order_id_shape_does_not_fire_person(self):
         """
-        REGRESSION TEST — see analyzer_engine.py's _is_known_id_shape.
-        Presidio's spaCy-backed PERSON recognizer scores 'BLK-431682'
+        REGRESSION TEST — see the PERSON digit filter in analyzer_engine.py.
+        Presidio's spaCy-backed PERSON recognizer scores 'ORD-431682'
         identically (0.85) to a real name like 'Priya Nair' when the
         token is evaluated in isolation (no surrounding sentence
         context). Without the ID-shape filter, every clean order-status
         log line (whose only field is order_id) would be falsely tagged
         contains_pii=True. This must stay suppressed.
         """
-        results = analyze_text("BLK-431682")
+        results = analyze_text("ORD-431682")
         assert not any(r.entity_type == "PERSON" for r in results)
 
     def test_partner_id_shape_does_not_fire_person(self):

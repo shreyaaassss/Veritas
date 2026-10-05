@@ -32,7 +32,7 @@ Use when asked: *"Who actually uses this?"* / *"Is the live feed the main featur
 
 | Component | Status |
 |---|---|
-| Blinkit DB schema / log format | Simulated (realistic Blinkit-flavored generators) |
+| Retail Co DB schema / log format | Simulated (realistic Retail Co-flavored generators) |
 | Network traffic / Kafka | Simulated (in-process asyncio queue, same topology) |
 | PII detection (Presidio + custom recognizers) | **Real logic** |
 | DPDPA rule evaluation (3-check engine) | **Real logic** |

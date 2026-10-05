@@ -6,7 +6,7 @@ validation_status (pattern_match / validated / failed_validation) driven
 by the org's config-declared identifier validators. See validators.py
 and detection/engine.py's _resolve_validation_status.
 
-Uses the real "blinkit" seed org config (org_config/configs/blinkit/),
+Uses the real "retail_co" seed org config (org_config/configs/retail_co/),
 which already declares validator: aadhaar for the "aadhaar" identifier,
 validator: pan for "pan", and validator: none for "phone" — exactly the
 three cases this phase's exit criteria call for.
@@ -26,7 +26,7 @@ from schemas.models import Event, SourceType
 from detection.engine import detect_event
 from detection.models import FAILED_VALIDATION, PATTERN_MATCH, VALIDATED
 
-TENANT_ID = "blinkit"
+TENANT_ID = "retail_co"
 
 # Same synthetic, self-computed (not a real government ID) Verhoeff-valid
 # Aadhaar-shaped value used in test_validators.py.
@@ -69,7 +69,7 @@ class TestFailedValidationAadhaar:
 class TestValidatorNoneStillDetects:
 
     def test_phone_field_with_validator_none_detects_as_pattern_match(self):
-        """Blinkit's 'phone' identifier declares validator: none — must still
+        """Retail Co's 'phone' identifier declares validator: none — must still
         detect fine, tagged pattern_match (Phase 2 must not regress Phase 3)."""
         event = Event(
             tenant_id=TENANT_ID,

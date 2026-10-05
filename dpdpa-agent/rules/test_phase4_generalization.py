@@ -9,15 +9,15 @@ dedicated tests; this file does not duplicate them).
 Two things are worth new coverage here:
 
   1. Check 1 (Exposure) used to hardcode `source_system == "marketing-
-     analytics"` — a Blinkit-specific string. Phase 4 replaced it with a
+     analytics"` — a Retail Co-specific string. Phase 4 replaced it with a
      config-driven probe (_forbids_raw_pii_here). The existing regression
      test (test_marketing_purpose_case_classified_as_exposure_per_design_
      decision_1) only proves the classification OUTCOME is unchanged for
-     Blinkit's own data — it can't prove the hardcode is actually gone,
-     since Blinkit's source_system is still literally "marketing-
+     Retail Co's own data — it can't prove the hardcode is actually gone,
+     since Retail Co's source_system is still literally "marketing-
      analytics". TestCheck1GeneralizesBeyondHardcodedSourceSystemName
      proves the fix generalizes, using a synthetic org whose deidentified-
-     only source_system is deliberately named nothing like Blinkit's.
+     only source_system is deliberately named nothing like Retail Co's.
 
   2. Multi-tenant isolation at the RULE ENGINE layer (not just the
      registry-loader layer, which Phase 1's registry/test_registry.py
@@ -52,7 +52,7 @@ from schemas.models import Event, RuleId, Severity, SourceType
 
 SYNTHETIC_ORG_ID = "phase4_test_org"
 
-# Deliberately named NOTHING like Blinkit's "marketing-analytics" — the
+# Deliberately named NOTHING like Retail Co's "marketing-analytics" — the
 # whole point is to prove Check 1 no longer needs that literal string.
 SYNTHETIC_DEIDENTIFIED_SOURCE_SYSTEM = "clickstream_pipeline"
 SYNTHETIC_ORDINARY_SOURCE_SYSTEM = "crm_service"
@@ -88,7 +88,7 @@ def fresh_registry_and_synthetic_org():
     delete_org_configs(SYNTHETIC_ORG_ID)
     result = upload_org_config(SYNTHETIC_ORG_ID, SYNTHETIC_ORG_CONFIG)
     assert result["status"] == "ok", result
-    load_registry(force_reload=True)
+    load_registry("retail_co", force_reload=True)
     yield
     _reset_cache()
     delete_org_configs(SYNTHETIC_ORG_ID)
@@ -115,13 +115,13 @@ def _email_detected_event(tenant_id: str, source_system: str, field_name: str = 
 
 class TestCheck1GeneralizesBeyondHardcodedSourceSystemName:
 
-    def test_deidentified_scope_fires_exposure_for_a_synthetic_non_blinkit_source_system(self):
+    def test_deidentified_scope_fires_exposure_for_a_synthetic_non_retail_co_source_system(self):
         """
         A source_system named nothing like "marketing-analytics", under
-        an org that isn't blinkit, whose config declares consent_scope=
+        an org that isn't retail_co, whose config declares consent_scope=
         deidentified_or_hashed_only, must still fire EXPOSURE_001 — proof
         that Check 1's rule is now config-driven, not a hardcoded string
-        match against Blinkit's specific source_system name.
+        match against Retail Co's specific source_system name.
         """
         detected = _email_detected_event(SYNTHETIC_ORG_ID, SYNTHETIC_DEIDENTIFIED_SOURCE_SYSTEM)
         verdicts = evaluate_event(detected)
@@ -167,18 +167,18 @@ class TestMultiTenantIsolationInterleaved:
     """
 
     @staticmethod
-    def _blinkit_retention_detected() -> DetectedEvent:
+    def _retail_co_retention_detected() -> DetectedEvent:
         return detect_event(RETENTION_VIOLATION_EVENT)
 
     @staticmethod
     def _edtech_linkage_detected() -> DetectedEvent:
         """edtech_co's linkage_rules declare [student_name, school_name, dob] —
-        a field-name vocabulary completely disjoint from Blinkit's own
+        a field-name vocabulary completely disjoint from Retail Co's own
         linkage rules ([name, delivery_address, phone] and
         [aadhaar, pan, bank_details]). If tenant scoping were ever broken
-        (e.g. always consulting Blinkit's config), this event would fire
+        (e.g. always consulting Retail Co's config), this event would fire
         ZERO linkage verdicts instead of one, because none of its field
-        names match any Blinkit rule."""
+        names match any Retail Co rule."""
         event = Event(
             tenant_id="edtech_co",
             event_id=str(uuid4()),
@@ -191,9 +191,9 @@ class TestMultiTenantIsolationInterleaved:
         return DetectedEvent(event=event, contains_pii=False, matched_entities=[])
 
     @staticmethod
-    def _blinkit_linkage_detected() -> DetectedEvent:
+    def _retail_co_linkage_detected() -> DetectedEvent:
         event = Event(
-            tenant_id="blinkit",
+            tenant_id="retail_co",
             event_id=str(uuid4()),
             source_type=SourceType.API,
             source_system="order-service",
@@ -204,13 +204,13 @@ class TestMultiTenantIsolationInterleaved:
         return DetectedEvent(event=event, contains_pii=False, matched_entities=[])
 
     def test_interleaved_linkage_verdicts_never_cross_contaminate(self):
-        blinkit_detected = self._blinkit_linkage_detected()
+        retail_co_detected = self._retail_co_linkage_detected()
         edtech_detected = self._edtech_linkage_detected()
 
         # Interleave A,B,A,B,A,B — a naive "current org" global would
         # start returning stale/wrong results after the first switch.
         results = []
-        for detected in [blinkit_detected, edtech_detected] * 3:
+        for detected in [retail_co_detected, edtech_detected] * 3:
             results.append((detected.event.tenant_id, evaluate_event(detected)))
 
         for tenant_id, verdicts in results:
@@ -219,7 +219,7 @@ class TestMultiTenantIsolationInterleaved:
             v = linkage_verdicts[0]
             assert v.tenant_id == tenant_id
             fields_involved = set(v.matched_registry_entry["fields_involved"])
-            if tenant_id == "blinkit":
+            if tenant_id == "retail_co":
                 assert fields_involved == {"name", "delivery_address", "phone"}
             else:
                 assert fields_involved == {"student_name", "school_name", "dob"}
@@ -231,16 +231,16 @@ class TestMultiTenantIsolationInterleaved:
         wrong, a module-level "last org" variable) existed, changing call
         order would change the outcome. It must not.
         """
-        blinkit_detected = self._blinkit_linkage_detected()
+        retail_co_detected = self._retail_co_linkage_detected()
         edtech_detected = self._edtech_linkage_detected()
 
-        order_a = [edtech_detected, edtech_detected, blinkit_detected, edtech_detected, blinkit_detected]
+        order_a = [edtech_detected, edtech_detected, retail_co_detected, edtech_detected, retail_co_detected]
         for detected in order_a:
             verdicts = evaluate_event(detected)
             linkage_verdicts = [v for v in verdicts if v.rule_id == RuleId.LINKAGE_001]
             assert len(linkage_verdicts) == 1
             expected_fields = (
-                {"name", "delivery_address", "phone"} if detected.event.tenant_id == "blinkit"
+                {"name", "delivery_address", "phone"} if detected.event.tenant_id == "retail_co"
                 else {"student_name", "school_name", "dob"}
             )
             assert set(linkage_verdicts[0].matched_registry_entry["fields_involved"]) == expected_fields
@@ -253,17 +253,17 @@ class TestMultiTenantIsolationInterleaved:
         under interleaving with the synthetic third org from the class
         above too (three distinct orgs in one process).
         """
-        blinkit_detected = self._blinkit_retention_detected()
+        retail_co_detected = self._retail_co_retention_detected()
         synthetic_exposure_detected = _email_detected_event(SYNTHETIC_ORG_ID, SYNTHETIC_DEIDENTIFIED_SOURCE_SYSTEM)
 
         for _ in range(3):
-            blinkit_verdicts = evaluate_event(blinkit_detected)
+            retail_co_verdicts = evaluate_event(retail_co_detected)
             synthetic_verdicts = evaluate_event(synthetic_exposure_detected)
 
-            retention_verdicts = [v for v in blinkit_verdicts if v.rule_id == RuleId.RETENTION_001]
+            retention_verdicts = [v for v in retail_co_verdicts if v.rule_id == RuleId.RETENTION_001]
             assert len(retention_verdicts) == 1
             rv = retention_verdicts[0]
-            assert rv.tenant_id == "blinkit"
+            assert rv.tenant_id == "retail_co"
             assert rv.matched_registry_entry["source_system"] == "delivery-partner-service"
             assert rv.matched_registry_entry["retention_days"] == 180
             assert rv.matched_registry_entry["declared_purpose"] == "onboarding_kyc"
@@ -274,7 +274,7 @@ class TestMultiTenantIsolationInterleaved:
             assert ev.tenant_id == SYNTHETIC_ORG_ID
             assert ev.source_system == SYNTHETIC_DEIDENTIFIED_SOURCE_SYSTEM
             # Exposure verdicts never carry registry evidence by design —
-            # confirming this ALSO means Blinkit's onboarding_kyc/180-day
+            # confirming this ALSO means Retail Co's onboarding_kyc/180-day
             # data could not possibly have leaked in here even in principle.
             assert ev.matched_registry_entry is None
 

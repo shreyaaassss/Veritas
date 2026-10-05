@@ -56,7 +56,7 @@ revision:
       it structurally shouldn't be" IS exposure, regardless of channel.
 
 PHASE 4 RESOLUTION: option (a), but implemented so the CLASSIFICATION
-OUTCOME for Blinkit's existing seeded case is unchanged (still
+OUTCOME for Retail Co's existing seeded case is unchanged (still
 EXPOSURE_001/HIGH — see test_marketing_purpose_case_classified_as_exposure_
 per_design_decision_1, which still passes unmodified). What actually
 changed is WHERE the signal comes from, per this phase's mandate to
@@ -64,7 +64,7 @@ remove org-specific hardcoding, not what the check decides: the literal
 `== "marketing-analytics"` string comparison is gone. In its place,
 Check 1 now calls _forbids_raw_pii_here(), a read-only, config-driven
 probe via get_registry_entry()/RegistryEntry.forbids_raw_pii() — the same
-mechanism Check 2 already used. For Blinkit's actual seeded data this
+mechanism Check 2 already used. For Retail Co's actual seeded data this
 produces the IDENTICAL answer (its marketing-analytics phone field's
 consent_scope is DEIDENTIFIED_ONLY_SCOPE, so forbids_raw_pii() is True,
 so Check 1 still fires, still EXPOSURE_001), but it now works for ANY
@@ -258,8 +258,8 @@ def _check_1_exposure(detected: DetectedEvent, match: MatchedEntity) -> Optional
         PHASE 4: this used to be a hardcoded `== "marketing-analytics"`
         string; it is now fully config-driven and applies identically to
         any org that declares a deidentified-only source_system, not
-        just Blinkit's literal spelling of one. The classification
-        OUTCOME for Blinkit's existing seeded marketing-analytics case is
+        just Retail Co's literal spelling of one. The classification
+        OUTCOME for Retail Co's existing seeded marketing-analytics case is
         deliberately unchanged (still EXPOSURE_001, still HIGH — see
         Design Decision #1, and rules/test_rule_engine.py's
         test_marketing_purpose_case_classified_as_exposure_per_design_decision_1,

@@ -26,7 +26,7 @@ from schemas.models import RemediationStatus, RuleId, Severity, SourceType, Verd
 from investigation import investigate, parse_reference
 
 
-def _make_explained_verdict(tenant_id: str = "blinkit", rule_id: RuleId = RuleId.EXPOSURE_001) -> ExplainedVerdict:
+def _make_explained_verdict(tenant_id: str = "retail_co", rule_id: RuleId = RuleId.EXPOSURE_001) -> ExplainedVerdict:
     verdict = Verdict(
         tenant_id=tenant_id,
         verdict_id=uuid.uuid4(),
@@ -94,53 +94,53 @@ class TestInvestigateCore:
         # patch the module-level singleton so it points at our tmp store.
         with patch("evidence_store.store.get_store", return_value=store), \
              patch("investigation._call_llm_for_investigation") as mock_llm:
-            result = investigate("blinkit", 999, "what happened")
+            result = investigate("retail_co", 999, "what happened")
         assert result.used_fallback is True
         assert "999" in result.answer
         mock_llm.assert_not_called()
 
     def test_successful_llm_answer_used(self, store):
-        store.append(_make_explained_verdict("blinkit"))
+        store.append(_make_explained_verdict("retail_co"))
         with patch("evidence_store.store.get_store", return_value=store), \
              patch("investigation._call_llm_for_investigation", return_value="This is a HIGH severity exposure of a PAN."):
-            result = investigate("blinkit", 1, "What exactly is the breach here?")
+            result = investigate("retail_co", 1, "What exactly is the breach here?")
         assert result.used_fallback is False
         assert result.answer == "This is a HIGH severity exposure of a PAN."
         assert result.section_cited == "DPDPA 2023 § 8(1) — Security Safeguards"
         assert result.breach_summary["rule_id"] == "EXPOSURE_001"
 
     def test_none_from_llm_falls_back(self, store):
-        store.append(_make_explained_verdict("blinkit"))
+        store.append(_make_explained_verdict("retail_co"))
         with patch("evidence_store.store.get_store", return_value=store), \
              patch("investigation._call_llm_for_investigation", return_value=None):
-            result = investigate("blinkit", 1, "what happened")
+            result = investigate("retail_co", 1, "what happened")
         assert result.used_fallback is True
         assert "already-verified explanation" in result.answer
 
     def test_wrong_statute_citation_falls_back(self, store):
         """The model citing a DIFFERENT section than this violation's own
         grounded citation must be discarded, not shown."""
-        store.append(_make_explained_verdict("blinkit"))
+        store.append(_make_explained_verdict("retail_co"))
         with patch("evidence_store.store.get_store", return_value=store), \
              patch("investigation._call_llm_for_investigation", return_value="This violates § 99 of some other Act."):
-            result = investigate("blinkit", 1, "which rule does this violate?")
+            result = investigate("retail_co", 1, "which rule does this violate?")
         assert result.used_fallback is True
 
     def test_answer_with_no_citation_at_all_is_accepted(self, store):
         """Most questions (remediation, impact, etc.) won't cite a section
         at all — that's fine, only a WRONG citation is rejected."""
-        store.append(_make_explained_verdict("blinkit"))
+        store.append(_make_explained_verdict("retail_co"))
         with patch("evidence_store.store.get_store", return_value=store), \
              patch("investigation._call_llm_for_investigation", return_value="You should rotate credentials and audit access logs."):
-            result = investigate("blinkit", 1, "how do I fix this?")
+            result = investigate("retail_co", 1, "how do I fix this?")
         assert result.used_fallback is False
 
     def test_force_llm_fallback_env_var(self, store, monkeypatch):
         monkeypatch.setenv("FORCE_LLM_FALLBACK", "1")
-        store.append(_make_explained_verdict("blinkit"))
+        store.append(_make_explained_verdict("retail_co"))
         with patch("evidence_store.store.get_store", return_value=store), \
              patch("investigation._call_llm_for_investigation") as mock_llm:
-            result = investigate("blinkit", 1, "what happened")
+            result = investigate("retail_co", 1, "what happened")
         mock_llm.assert_not_called()
         assert result.used_fallback is True
 
@@ -156,11 +156,11 @@ class TestInvestigateCore:
         mock_llm.assert_not_called()
 
     def test_history_is_forwarded_to_the_llm_call(self, store):
-        store.append(_make_explained_verdict("blinkit"))
+        store.append(_make_explained_verdict("retail_co"))
         with patch("evidence_store.store.get_store", return_value=store), \
              patch("investigation._call_llm_for_investigation", return_value="Follow-up answer.") as mock_llm:
             history = [{"role": "user", "content": "@01 what happened"}, {"role": "assistant", "content": "It was exposed."}]
-            investigate("blinkit", 1, "why is that serious?", history=history)
+            investigate("retail_co", 1, "why is that serious?", history=history)
         args, kwargs = mock_llm.call_args
         assert history in args or history in kwargs.values()
 
@@ -197,23 +197,23 @@ class TestInvestigateEndpoint:
         reset_user_store()
 
     def test_text_form_with_reference(self):
-        self._client.post("/v1/blinkit/scan", json={"text": "leaked employee id: ABCDE1234F"})
+        self._client.post("/v1/retail_co/scan", json={"text": "leaked employee id: ABCDE1234F"})
 
         with patch("investigation._call_llm_for_investigation", return_value="It was exposed in a log."):
-            r = self._client.post("/v1/blinkit/investigate", json={"text": "@1 what happened?"})
+            r = self._client.post("/v1/retail_co/investigate", json={"text": "@1 what happened?"})
         assert r.status_code == 200
         assert r.json()["answer"] == "It was exposed in a log."
 
     def test_structured_form(self):
-        self._client.post("/v1/blinkit/scan", json={"text": "leaked employee id: ABCDE1234F"})
+        self._client.post("/v1/retail_co/scan", json={"text": "leaked employee id: ABCDE1234F"})
 
         with patch("investigation._call_llm_for_investigation", return_value="It was exposed."):
-            r = self._client.post("/v1/blinkit/investigate", json={"violation_id": 1, "question": "what happened?"})
+            r = self._client.post("/v1/retail_co/investigate", json={"violation_id": 1, "question": "what happened?"})
         assert r.status_code == 200
         assert r.json()["violation_id"] == 1
 
     def test_missing_reference_returns_400(self):
-        r = self._client.post("/v1/blinkit/investigate", json={"text": "no reference here"})
+        r = self._client.post("/v1/retail_co/investigate", json={"text": "no reference here"})
         assert r.status_code == 400
 
     def test_unknown_org_returns_404(self):

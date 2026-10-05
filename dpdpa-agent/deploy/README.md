@@ -88,7 +88,7 @@ Wait ~30 seconds, then:
 
 ```bash
 curl http://localhost:8000/v1/orgs
-# Expected: {"org_ids": ["blinkit", ...]}
+# Expected: {"org_ids": ["retail_co", ...]}
 ```
 
 Or open `http://<device-ip>:8000` in a browser — the dashboard should load without any manual intervention.

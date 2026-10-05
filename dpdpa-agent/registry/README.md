@@ -2,7 +2,7 @@
 
 **Status: Implemented.**
 
-Ground-truth lookup for what data each Blinkit `source_system` is declared to
+Ground-truth lookup for what data each Retail Co `source_system` is declared to
 collect, for what purpose, under what consent scope, and for how long. Phase 4's
 Rule Engine calls this registry synchronously, per event, to decide whether a
 piece of PII is where it's allowed to be, for the reason it was collected, for

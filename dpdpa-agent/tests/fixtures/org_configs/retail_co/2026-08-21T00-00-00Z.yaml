@@ -1,25 +1,19 @@
-# Veritas Org Config — Blinkit (Retail)
-# ======================================
-# This is the REFERENCE config for the Blinkit retail org.
-# It migrates the hardcoded Blinkit registry from registry/seed_registry.py
-# into the generic Org Config format.
+# Test fixture org config: "retail_co" (a retail org with four source systems)
+# ==========================================================================
+# Used only by the test suite (loaded into a temporary data directory by
+# conftest.py). It is NOT shipped with the product: every real customer
+# uploads their own config during onboarding.
 #
-# EXIT CRITERIA REGRESSION TEST: if the generic config loader can correctly
-# reproduce everything the old hardcoded version did, Phase 0 is proven correct.
-#
-# NOTE: This file is a SEED CONFIG loaded at startup for demo purposes.
-# In production, an org would upload their config via upload_org_config().
-#
-# Source systems mapped here (these are Blinkit's own microservice names,
-# not Veritas internals — another org would use entirely different names):
-#   order-service           -> order_fulfillment data (customers table)
-#   delivery-partner-service -> onboarding_kyc data (delivery_partners table)
-#   support-ticketing        -> customer_support data (support_tickets table)
-#   marketing-analytics      -> analytics/campaign data (marketing_events table)
+# Source systems used here (an org defines its own names):
+#   order-service            -> order fulfilment data
+#   delivery-partner-service -> onboarding KYC data (holds data older than its
+#                               180-day retention window, via data_since below)
+#   support-ticketing        -> customer support data
+#   marketing-analytics      -> analytics data (de-identified / hashed only)
 
-org_id: blinkit
+org_id: retail_co
 
-# Custom identifier types Blinkit cares about (beyond generic phone/email)
+# Custom identifier types the org cares about (beyond generic phone/email)
 identifiers:
   - name: aadhaar
     pattern: indian_aadhaar
@@ -31,7 +25,7 @@ identifiers:
     pattern: indian_phone
     validator: none
 
-# PII fields declared by Blinkit across all their source systems.
+# PII fields declared by the org across all their source systems.
 # These replace the hardcoded 4-table structure from registry/seed_registry.py.
 # Each field is scoped to the source_system it flows through.
 fields:
@@ -79,6 +73,7 @@ fields:
     consent_scope: onboarding_kyc
     retention_days: 180
     source_system: delivery-partner-service
+    data_since: 2025-12-24   # 240 days before the test reference date (2026-08-21)
 
   - field_name: pan
     pii_category: pan
@@ -166,7 +161,7 @@ fields:
     retention_days: 365
     source_system: marketing-analytics
 
-# Linkage rules for Blinkit
+# Linkage rules for the org
 # (Phase 3 will evaluate these — for Phase 0 they are config data only)
 linkage_rules:
   - fields: [name, delivery_address, phone]

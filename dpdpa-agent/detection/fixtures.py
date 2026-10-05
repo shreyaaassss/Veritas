@@ -4,7 +4,7 @@ DPDPA Compliance Agent — Detection Test Fixtures (Phase 0 Generalised)
 Real/realistic sample events used across detection tests.
 
 Phase 0:
-  - tenant_id added to every Event fixture (default: "blinkit")
+  - tenant_id added to every Event fixture (default: "retail_co")
   - source_system values are plain strings ("support-ticketing", "order-service", etc.)
 """
 
@@ -15,7 +15,7 @@ from uuid import uuid4
 
 from schemas.models import Event, SourceType
 
-TENANT_ID = "blinkit"
+TENANT_ID = "retail_co"
 
 EXPOSURE_LOG_EVENT = Event(
     tenant_id=TENANT_ID,
@@ -41,8 +41,8 @@ CLEAN_LOG_EVENT = Event(
     source_type=SourceType.LOG,
     source_system="order-service",
     timestamp=datetime.now(timezone.utc).isoformat(),
-    raw_snippet='[2026-08-21T10:33:01Z] INFO order-service: order BLK-431682 status updated to \'confirmed\'',
-    fields={"order_id": "BLK-431682"},
+    raw_snippet='[2026-08-21T10:33:01Z] INFO order-service: order ORD-431682 status updated to \'confirmed\'',
+    fields={"order_id": "ORD-431682"},
 )
 
 # Raw phone leaking into a marketing-analytics event that should be hashed-only.

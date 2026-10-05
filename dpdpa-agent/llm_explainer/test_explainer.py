@@ -20,7 +20,7 @@ from llm_explainer.explainer import (
 )
 
 
-def _make_verdict(rule_id: RuleId = RuleId.EXPOSURE_001, tenant_id: str = "blinkit") -> Verdict:
+def _make_verdict(rule_id: RuleId = RuleId.EXPOSURE_001, tenant_id: str = "retail_co") -> Verdict:
     return Verdict(
         tenant_id=tenant_id,
         verdict_id=uuid.uuid4(),

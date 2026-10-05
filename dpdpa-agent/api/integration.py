@@ -6,7 +6,7 @@ logic duplication between them:
 
   A1. Stream/Telemetry mode  — POST /v1/{org_id}/events
       Generalizes what the v2 build's ingestion was: before this phase,
-      there was no callable HTTP ingestion endpoint at all — Blinkit-
+      there was no callable HTTP ingestion endpoint at all — Retail Co-
       simulated telemetry was pushed directly into an in-process
       asyncio.Queue by ingestion/log_generator.py and ingestion/
       api_generator.py (see run_pipeline.py), never via an HTTP route a

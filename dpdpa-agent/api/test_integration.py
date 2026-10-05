@@ -3,7 +3,7 @@ Phase 5+6 — Integration API Tests
 ======================================
 Covers the plan's exit criteria for Part A (endpoints work correctly) and
 the cross-tenant portion of Part B/C (dashboard reads never leak across
-orgs when reached via the real HTTP layer, using the real blinkit/
+orgs when reached via the real HTTP layer, using the real retail_co/
 edtech_co seed configs — same convention Phase 4's tests already used).
 
 Uses a temp-file-backed EvidenceStore for the whole module (monkeypatched
@@ -75,13 +75,13 @@ def auth_cookies(tmp_path):
 
 
 @pytest.fixture()
-def blinkit_token():
-    """Issue a registration key and register an agent for blinkit.
-    Returns a valid Bearer token string for use in /v1/blinkit/events calls."""
+def retail_co_token():
+    """Issue a registration key and register an agent for retail_co.
+    Returns a valid Bearer token string for use in /v1/retail_co/events calls."""
     store = get_agent_store()
-    key = store.issue_key("blinkit")
+    key = store.issue_key("retail_co")
     store.consume_key(key)
-    _agent, token = store.create_agent("blinkit", "test-source")
+    _agent, token = store.create_agent("retail_co", "test-source")
     return token
 
 
@@ -105,7 +105,7 @@ class TestOrgValidation:
 
     def test_events_without_token_returns_401(self):
         r = client.post(
-            "/v1/blinkit/events",
+            "/v1/retail_co/events",
             json={"source_type": "log", "source_system": "x", "raw_snippet": "hello"},
         )
         assert r.status_code == 401
@@ -115,23 +115,23 @@ class TestOrgValidation:
         from fastapi.testclient import TestClient
         from dashboard.server import app as _app
         fresh_client = TestClient(_app, cookies={})  # no session cookie
-        r = fresh_client.post("/v1/blinkit/scan", json={"text": "hello"})
+        r = fresh_client.post("/v1/retail_co/scan", json={"text": "hello"})
         assert r.status_code == 401
 
     def test_scan_known_org_accepted(self):
         # client already has auth cookie from isolated_store fixture
-        r = client.post("/v1/blinkit/scan", json={"text": "just a clean log line, nothing sensitive"})
+        r = client.post("/v1/retail_co/scan", json={"text": "just a clean log line, nothing sensitive"})
         assert r.status_code == 200
 
 
 class TestScanInputShapes:
 
     def test_scan_rejects_empty_request(self):
-        r = client.post("/v1/blinkit/scan", json={})
+        r = client.post("/v1/retail_co/scan", json={})
         assert r.status_code == 422  # neither text nor fields given
 
     def test_scan_text_only_detects_and_masks(self):
-        r = client.post("/v1/blinkit/scan", json={"text": "employee record lookup: ABCDE1234F"})
+        r = client.post("/v1/retail_co/scan", json={"text": "employee record lookup: ABCDE1234F"})
         assert r.status_code == 200
         data = r.json()
         assert data["contains_pii"] is True
@@ -143,7 +143,7 @@ class TestScanInputShapes:
 
     def test_scan_fields_only_detects_and_masks(self):
         r = client.post(
-            "/v1/blinkit/scan",
+            "/v1/retail_co/scan",
             json={"fields": {"pan": "ABCDE1234F"}, "source_system": "delivery-partner-service"},
         )
         assert r.status_code == 200
@@ -153,7 +153,7 @@ class TestScanInputShapes:
 
     def test_scan_both_text_and_fields_merges_results(self):
         r = client.post(
-            "/v1/blinkit/scan",
+            "/v1/retail_co/scan",
             json={
                 "text": "order note: customer pan is ABCDE1234F",
                 "fields": {"phone": "9876543210"},
@@ -170,7 +170,7 @@ class TestScanInputShapes:
         """Part A2.4: a scan with no real source_system must never crash
         and must never fabricate a false RETENTION_001 — it degrades to
         the existing PURPOSE_001 unregistered-field path."""
-        r = client.post("/v1/blinkit/scan", json={"fields": {"pan": "ABCDE1234F"}})
+        r = client.post("/v1/retail_co/scan", json={"fields": {"pan": "ABCDE1234F"}})
         assert r.status_code == 200
         data = r.json()
         rule_ids = {v["rule_id"] for v in data["verdicts"]}
@@ -217,7 +217,7 @@ class TestOrgConfigUpload:
     def test_orgs_listing_includes_seed_orgs(self):
         r = client.get("/v1/orgs")
         assert r.status_code == 200
-        assert "blinkit" in r.json()["org_ids"]
+        assert "retail_co" in r.json()["org_ids"]
         assert "edtech_co" in r.json()["org_ids"]
 
 
@@ -234,46 +234,46 @@ class TestCrossTenantDashboardIsolation:
         # deterministically for both orgs, independent of either org's
         # registry/retention aging state (see test file's other notes on
         # why fields-based scans against seed data aren't reliably violating).
-        r_blinkit = client.post("/v1/blinkit/scan", json={"text": "leaked employee id: ABCDE1234F"})
+        r_retail_co = client.post("/v1/retail_co/scan", json={"text": "leaked employee id: ABCDE1234F"})
         r_edtech = client.post("/v1/edtech_co/scan", json={"text": "customer email leaked: student@example.com"})
-        assert r_blinkit.status_code == 200 and r_edtech.status_code == 200
+        assert r_retail_co.status_code == 200 and r_edtech.status_code == 200
 
-        blinkit_verdicts = client.get("/api/blinkit/verdicts").json()["verdicts"]
+        retail_co_verdicts = client.get("/api/retail_co/verdicts").json()["verdicts"]
         edtech_verdicts = client.get("/api/edtech_co/verdicts").json()["verdicts"]
 
-        assert len(blinkit_verdicts) >= 1
+        assert len(retail_co_verdicts) >= 1
         assert len(edtech_verdicts) >= 1
-        assert all(v["tenant_id"] == "blinkit" for v in blinkit_verdicts)
+        assert all(v["tenant_id"] == "retail_co" for v in retail_co_verdicts)
         assert all(v["tenant_id"] == "edtech_co" for v in edtech_verdicts)
 
         # verify-chain for each org must be valid and unaffected by the other.
-        assert client.get("/api/blinkit/verify-chain").json()["valid"] is True
+        assert client.get("/api/retail_co/verify-chain").json()["valid"] is True
         assert client.get("/api/edtech_co/verify-chain").json()["valid"] is True
 
     def test_verdict_detail_not_reachable_across_tenant_boundary(self):
         # Text-only scan -> SourceType.LOG -> Check 1 guarantees EXPOSURE_001
         # deterministically, independent of either org's registry aging state.
-        r = client.post("/v1/blinkit/scan", json={"text": "leaked employee id: ABCDE1234F"})
+        r = client.post("/v1/retail_co/scan", json={"text": "leaked employee id: ABCDE1234F"})
         verdict_id = r.json()["verdicts"][0]["verdict_id"]
 
-        own_org = client.get(f"/api/blinkit/verdicts/{verdict_id}")
+        own_org = client.get(f"/api/retail_co/verdicts/{verdict_id}")
         other_org = client.get(f"/api/edtech_co/verdicts/{verdict_id}")
 
         assert own_org.status_code == 200
-        assert other_org.status_code == 404, "a blinkit verdict_id must not be fetchable under edtech_co's scope"
+        assert other_org.status_code == 404, "a retail_co verdict_id must not be fetchable under edtech_co's scope"
 
     def test_status_update_across_tenant_boundary_rejected(self):
-        r = client.post("/v1/blinkit/scan", json={"text": "leaked employee id: ABCDE1234F"})
+        r = client.post("/v1/retail_co/scan", json={"text": "leaked employee id: ABCDE1234F"})
         verdict_id = r.json()["verdicts"][0]["verdict_id"]
 
         r2 = client.post(f"/api/edtech_co/verdicts/{verdict_id}/status", json={"status": "ACKNOWLEDGED"})
         assert r2.status_code == 400
 
     def test_stats_are_tenant_scoped(self):
-        client.post("/v1/blinkit/scan", json={"text": "leaked employee id: ABCDE1234F"})
-        stats_blinkit = client.get("/api/blinkit/stats").json()
+        client.post("/v1/retail_co/scan", json={"text": "leaked employee id: ABCDE1234F"})
+        stats_retail_co = client.get("/api/retail_co/stats").json()
         stats_edtech = client.get("/api/edtech_co/stats").json()
-        assert stats_blinkit["total"] >= 1
+        assert stats_retail_co["total"] >= 1
         assert stats_edtech["total"] == 0
 
 
@@ -281,10 +281,10 @@ class TestViolationNumberLookup:
     """GET /api/{org_id}/violations/{violation_id} — the "@N" lookup."""
 
     def test_lookup_by_number_returns_the_right_violation_with_explanation(self):
-        r = client.post("/v1/blinkit/scan", json={"text": "leaked employee id: ABCDE1234F"})
+        r = client.post("/v1/retail_co/scan", json={"text": "leaked employee id: ABCDE1234F"})
         verdict_id = r.json()["verdicts"][0]["verdict_id"]
 
-        looked_up = client.get("/api/blinkit/violations/1")
+        looked_up = client.get("/api/retail_co/violations/1")
         assert looked_up.status_code == 200
         body = looked_up.json()
         assert body["verdict_id"] == verdict_id
@@ -293,17 +293,17 @@ class TestViolationNumberLookup:
         assert body["section_cited"]
 
     def test_numbering_is_per_tenant_across_the_real_http_layer(self):
-        client.post("/v1/blinkit/scan", json={"text": "leaked employee id: ABCDE1234F"})
+        client.post("/v1/retail_co/scan", json={"text": "leaked employee id: ABCDE1234F"})
         client.post("/v1/edtech_co/scan", json={"text": "customer email leaked: student@example.com"})
 
-        blinkit_1 = client.get("/api/blinkit/violations/1").json()
+        retail_co_1 = client.get("/api/retail_co/violations/1").json()
         edtech_1 = client.get("/api/edtech_co/violations/1").json()
-        assert blinkit_1["tenant_id"] == "blinkit"
+        assert retail_co_1["tenant_id"] == "retail_co"
         assert edtech_1["tenant_id"] == "edtech_co"
-        assert blinkit_1["verdict_id"] != edtech_1["verdict_id"]
+        assert retail_co_1["verdict_id"] != edtech_1["verdict_id"]
 
     def test_unknown_number_returns_404(self):
-        r = client.get("/api/blinkit/violations/999")
+        r = client.get("/api/retail_co/violations/999")
         assert r.status_code == 404
 
 
@@ -311,17 +311,17 @@ class TestScanAndEventsShareTheSameStore:
     """Part B3: violations from /scan and /events must land in the same,
     correctly-scoped Evidence Store — no divergent storage path."""
 
-    def test_scan_and_events_verdicts_both_appear_in_the_same_org_query(self, blinkit_token):
-        client.post("/v1/blinkit/scan", json={"text": "leaked employee id: ABCDE1234F"})
+    def test_scan_and_events_verdicts_both_appear_in_the_same_org_query(self, retail_co_token):
+        client.post("/v1/retail_co/scan", json={"text": "leaked employee id: ABCDE1234F"})
         client.post(
-            "/v1/blinkit/events",
-            headers={"Authorization": f"Bearer {blinkit_token}"},
+            "/v1/retail_co/events",
+            headers={"Authorization": f"Bearer {retail_co_token}"},
             json={
                 "source_type": "log", "source_system": "support-ticketing",
                 "raw_snippet": "agent note: aadhaar 2345 6789 0124 read aloud to customer",
             },
         )
-        rows = client.get("/api/blinkit/verdicts").json()["verdicts"]
+        rows = client.get("/api/retail_co/verdicts").json()["verdicts"]
         rule_ids = {r["rule_id"] for r in rows}
         assert "EXPOSURE_001" in rule_ids  # from the /events log-sourced call
         assert len(rows) >= 2

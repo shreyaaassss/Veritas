@@ -8,27 +8,28 @@ Public interface:
   get_registry_entry(org_id: str, field_name: str, source_system: str, raise_on_missing: bool = True) -> RegistryEntry
   reload_org_config(org_id: str) -> OrgConfig
   validate_org_config(raw_config: dict) -> list[str]
-  list_registry_entries(org_id: str = "blinkit", source_system: Optional[str] = None) -> list[RegistryEntry]
-  load_registry(org_id: str = "blinkit", force_reload: bool = False) -> RegistryStore
+  list_registry_entries(org_id: str, source_system: Optional[str] = None) -> list[RegistryEntry]
+  load_registry(org_id: str, force_reload: bool = False) -> RegistryStore
 """
 
 from __future__ import annotations
 
 import logging
-from datetime import timedelta
+from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
 from org_config.schema import OrgConfig, OrgField
-from org_config.store import get_org_config
+from org_config.store import get_org_config, get_org_config_version_time
 from org_config.validator import validate_org_config
-from registry.models import DEIDENTIFIED_ONLY_SCOPE, RegistryEntry, RegistryStore
-from registry.seed_registry import SEED_NOW
+from registry.models import RegistryEntry, RegistryStore
 
 logger = logging.getLogger("registry.loader")
 
 # In-memory config and store caches keyed by org_id
 _config_cache: Dict[str, OrgConfig] = {}
 _store_cache: Dict[str, RegistryStore] = {}
+# UTC time the cached config version was uploaded (default retention-clock start)
+_config_time_cache: Dict[str, datetime] = {}
 
 
 class OrgConfigNotFoundError(Exception):
@@ -58,6 +59,7 @@ def load_org_config(org_id: str) -> OrgConfig:
         raise OrgConfigNotFoundError(f"Org config not found for org_id: {org_id!r}")
 
     _config_cache[org_id] = config
+    _config_time_cache[org_id] = get_org_config_version_time(org_id) or datetime.now(timezone.utc)
     return config
 
 
@@ -68,54 +70,20 @@ def reload_org_config(org_id: str) -> OrgConfig:
     """
     _config_cache.pop(org_id, None)
     _store_cache.pop(org_id, None)
+    _config_time_cache.pop(org_id, None)
     return load_org_config(org_id)
 
 
 def _org_field_to_registry_entry(org_id: str, field: OrgField) -> RegistryEntry:
     """
-    Convert an OrgField to a RegistryEntry.
-    Preserves seeded violation metadata for the reference regression config (blinkit).
+    Convert an OrgField to a RegistryEntry. Purely config-driven: nothing here
+    depends on which org or source_system this is.
+
+    The retention clock starts at the field's declared `data_since`, or, if the
+    org did not declare one, at the time the org's current config version was
+    uploaded (the data is treated as newly collected).
     """
-    is_seeded = False
-    violation_note = None
-    created_at = SEED_NOW - timedelta(days=45)
-
-    if org_id == "blinkit":
-        if field.field_name == "aadhaar" and field.source_system == "delivery-partner-service":
-            # Seeded retention violation: 240 days old > 180 retention_days
-            created_at = SEED_NOW - timedelta(days=240)
-            is_seeded = True
-            violation_note = (
-                "Inactive delivery partner's aadhaar record is 240 days old, "
-                "60 days past the 180-day KYC retention window. Should have "
-                "been purged. RETENTION_001 candidate."
-            )
-        elif field.field_name == "phone" and field.source_system == "marketing-analytics":
-            # Seeded invariant-carrier: marketing_events structurally forbids raw PII
-            created_at = SEED_NOW - timedelta(days=30)
-            is_seeded = True
-            violation_note = (
-                f"marketing_events structurally forbids raw PII (consent_scope='{DEIDENTIFIED_ONLY_SCOPE}'). "
-                "If raw phone is observed, flags PURPOSE_001."
-            )
-        elif field.source_system == "order-service":
-            created_at = SEED_NOW - timedelta(days=120)
-        elif field.source_system == "support-ticketing":
-            created_at = SEED_NOW - timedelta(days=10)
-        elif field.source_system == "marketing-analytics":
-            created_at = SEED_NOW - timedelta(days=30)
-
-    # Determine table_name if applicable for backward compatibility
-    table_name = None
-    if org_id == "blinkit":
-        mapping = {
-            "order-service": "customers",
-            "delivery-partner-service": "delivery_partners",
-            "support-ticketing": "support_tickets",
-            "marketing-analytics": "marketing_events",
-        }
-        table_name = mapping.get(field.source_system)
-
+    created_at = field.data_since or _config_time_cache.get(org_id) or datetime.now(timezone.utc)
     return RegistryEntry(
         field_name=field.field_name,
         pii_category=field.pii_category,
@@ -123,10 +91,7 @@ def _org_field_to_registry_entry(org_id: str, field: OrgField) -> RegistryEntry:
         consent_scope=field.consent_scope,
         retention_days=field.retention_days,
         source_system=field.source_system,
-        table_name=table_name,
         created_at=created_at,
-        is_seeded_violation=is_seeded,
-        violation_note=violation_note,
     )
 
 
@@ -160,7 +125,7 @@ def get_registry_entry(
 
 
 def list_registry_entries(
-    org_id: str = "blinkit",
+    org_id: str,
     source_system: Optional[str] = None,
 ) -> List[RegistryEntry]:
     """
@@ -173,7 +138,7 @@ def list_registry_entries(
     return [e for e in entries if e.source_system == source_system]
 
 
-def load_registry(org_id: str = "blinkit", force_reload: bool = False) -> RegistryStore:
+def load_registry(org_id: str, force_reload: bool = False) -> RegistryStore:
     """
     Load (or return cached) RegistryStore for org_id.
     """
@@ -194,3 +159,4 @@ def _reset_cache() -> None:
     """Test helper to reset in-memory caches."""
     _config_cache.clear()
     _store_cache.clear()
+    _config_time_cache.clear()

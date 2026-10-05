@@ -41,9 +41,9 @@ DESIGN DECISIONS (documented per the plan's requirement):
    values are NOT recomputed (that would violate the append-only/tamper-
    evidence guarantee retroactively) — they keep whatever chain they were
    originally written with. In this codebase's actual history, every row
-   written before this phase was blinkit's (Phase 5 is the first time a
-   non-blinkit tenant's verdicts could ever reach this store), so the
-   pre-existing chain is — and remains, unchanged — exactly blinkit's
+   written before this phase was retail_co's (Phase 5 is the first time a
+   non-retail_co tenant's verdicts could ever reach this store), so the
+   pre-existing chain is — and remains, unchanged — exactly retail_co's
    per-tenant chain; no discontinuity is introduced for the common case.
 
 3. STATUS TRANSITIONS:

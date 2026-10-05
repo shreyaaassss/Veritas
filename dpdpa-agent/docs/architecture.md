@@ -6,7 +6,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                     TELEMETRY SOURCES (Blinkit)                     │
+│                     TELEMETRY SOURCES (Retail Co)                     │
 │                                                                     │
 │   order-service  │  delivery-partner-service  │  support-ticketing  │
 │                        marketing-analytics                          │
@@ -18,7 +18,7 @@
 ┌─────────────────────────────────────────────────────────────────────┐
 │                   INGESTION PIPELINE  (Phase 2)                     │
 │                                                                     │
-│  • Log simulator (Python / Faker) — generates realistic Blinkit     │
+│  • Log simulator (Python / Faker) — generates realistic Retail Co     │
 │    telemetry with embedded Indian PII for demo purposes             │
 │  • WebSocket streamer — pushes Event objects to downstream          │
 │  • Produces: Event  (schema: /schemas/event_schema.json)            │

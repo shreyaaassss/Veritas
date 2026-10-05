@@ -56,7 +56,7 @@ Then open **http://localhost:8000** in a browser.
 - The "Live" indicator in the top-right header turns green.
 
 **Point out to judges:**
-> "Events are flowing from two parallel generators — an application log simulator and an API traffic simulator — both modelling real Blinkit system behaviour. Every PII match is detected by Microsoft Presidio with custom Aadhaar and PAN recognizers, evaluated against our compliance registry, and shown here in real time."
+> "Events are flowing from two parallel generators — an application log simulator and an API traffic simulator — both modelling real Retail Co system behaviour. Every PII match is detected by Microsoft Presidio with custom Aadhaar and PAN recognizers, evaluated against our compliance registry, and shown here in real time."
 
 ---
 

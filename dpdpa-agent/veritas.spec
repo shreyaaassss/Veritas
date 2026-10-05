@@ -14,7 +14,7 @@
 # What IS bundled (read-only assets):
 #   - dashboard/index.html
 #   - llm_explainer/statute_snippets.json
-#   - org_config/configs/ (seed configs for blinkit, edtech_co, etc.)
+#   - org_config/configs/ (empty at build time; org configs are created at onboarding)
 #   - spaCy en_core_web_lg model
 #   - All Python packages (FastAPI, uvicorn, Presidio, SQLite, etc.)
 #

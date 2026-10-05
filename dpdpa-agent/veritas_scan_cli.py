@@ -10,9 +10,9 @@ detection or rule-engine logic of its own, so there is exactly one engine
 behind all three of Veritas's integration modes.
 
 Usage:
-    kubectl logs <pod> | python veritas_scan_cli.py --org blinkit
+    kubectl logs <pod> | python veritas_scan_cli.py --org retail_co
     cat some_query_output.txt | python veritas_scan_cli.py --org edtech_co
-    echo 'aadhaar 2345 6789 0124 leaked' | python veritas_scan_cli.py --org blinkit --url http://localhost:8000
+    echo 'aadhaar 2345 6789 0124 leaked' | python veritas_scan_cli.py --org retail_co --url http://localhost:8000
 
 Output contract:
   stdout — ONLY the masked/redacted text (so raw PII never reaches the
