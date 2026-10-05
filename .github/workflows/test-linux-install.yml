@@ -1,0 +1,201 @@
+name: Test Linux .deb Installation
+
+# Builds the .deb from the current commit (not a published release), installs it
+# on a clean Ubuntu runner and exercises the license + service lifecycle.
+
+on:
+  push:
+    tags: ['v*']
+    branches: [main]
+    paths:
+      - 'package/deb/**'
+      - 'package/build-deb.sh'
+      - 'dpdpa-agent/license.py'
+      - 'dpdpa-agent/run_pipeline.py'
+      - 'dpdpa-agent/veritas-linux.spec'
+      - 'tools/fingerprint.py'
+      - 'tools/generate_license.py'
+      - '.github/workflows/test-linux-install.yml'
+  workflow_dispatch:
+
+jobs:
+  test-linux-deb:
+    name: Build, install and smoke-test veritas .deb on Ubuntu 22.04
+    runs-on: ubuntu-22.04   # same base as the release build
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: dpdpa-agent/requirements.txt
+
+      - name: Install build dependencies
+        working-directory: dpdpa-agent
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+          pip install https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl
+
+      - name: Build runtime binary
+        working-directory: dpdpa-agent
+        run: python -m PyInstaller veritas-linux.spec --noconfirm
+
+      - name: Build .deb
+        run: |
+          chmod +x package/build-deb.sh
+          bash package/build-deb.sh dpdpa-agent/dist/veritas-runtime 0.0.0-ci amd64
+          ls -lh dist/*.deb
+
+      - name: Install .deb
+        run: sudo apt-get install -y ./dist/veritas_0.0.0-ci_amd64.deb
+
+      - name: Package layout, user and service unit
+        run: |
+          id veritas
+          test -x /opt/veritas/veritas-runtime
+          test -x /usr/bin/veritas
+          systemctl is-enabled veritas
+          ! systemctl is-active --quiet veritas   # needs a license first
+          veritas version
+
+      - name: Fingerprint — CLI equals runtime, v2 format
+        run: |
+          FP_RT=$(/opt/veritas/veritas-runtime --fingerprint)
+          FP_CLI=$(sudo veritas fingerprint | grep -E '^v2:[0-9a-f]{64}$')
+          echo "runtime: $FP_RT"
+          echo "cli:     $FP_CLI"
+          [[ "$FP_RT" =~ ^v2:[0-9a-f]{64}$ ]] || { echo "runtime fingerprint is not v2 format"; exit 1; }
+          [ "$FP_RT" = "$FP_CLI" ] || { echo "CLI and runtime fingerprints differ"; exit 1; }
+          echo "FP=$FP_RT" >> "$GITHUB_ENV"
+
+      - name: Fingerprint is stable and independent of hostname
+        run: |
+          BEFORE=$(/opt/veritas/veritas-runtime --fingerprint)
+          sudo hostname some-other-hostname
+          AFTER=$(/opt/veritas/veritas-runtime --fingerprint)
+          [ "$BEFORE" = "$AFTER" ] || { echo "fingerprint changed with hostname"; exit 1; }
+
+      - name: Prepare license generator
+        env:
+          VERITAS_PRIVATE_KEY_B64: ${{ secrets.VERITAS_PRIVATE_KEY_B64 }}
+        run: |
+          test -n "$VERITAS_PRIVATE_KEY_B64" || { echo "VERITAS_PRIVATE_KEY_B64 secret is not set"; exit 1; }
+          python3 -m venv /tmp/licvenv
+          /tmp/licvenv/bin/pip install cryptography --quiet
+          echo "$VERITAS_PRIVATE_KEY_B64" | base64 -d > /tmp/ci_private_key.pem
+          chmod 600 /tmp/ci_private_key.pem
+
+      - name: No license — starts once, reports clearly, does not crash-loop
+        run: |
+          wait_failed() { for _ in $(seq 1 60); do systemctl is-failed --quiet veritas && return 0; sleep 3; done; return 1; }
+          sudo systemctl start veritas
+          wait_failed || { echo "service did not stop after missing license"; sudo journalctl -u veritas --no-pager | tail -30; exit 1; }
+          NR=$(systemctl show -p NRestarts --value veritas)
+          echo "NRestarts=$NR"
+          [ "$NR" = "0" ] || { echo "service restarted $NR times without a license"; exit 1; }
+          sudo journalctl -u veritas --no-pager | grep -q "license file not found" \
+            || { echo "missing-license message not found"; sudo journalctl -u veritas --no-pager | tail -30; exit 1; }
+          sudo systemctl reset-failed veritas || true
+
+      - name: Wrong-machine license is rejected and shows this machine's fingerprint
+        run: |
+          /tmp/licvenv/bin/python3 tools/generate_license.py --org ci-test --tier enterprise \
+            --expiry 2027-12-31 --fingerprint "v2:$(printf '0%.0s' {1..64})" \
+            --key /tmp/ci_private_key.pem --out /tmp/wrong.vlic
+          sudo cp /tmp/wrong.vlic /var/lib/veritas/veritas.vlic
+          sudo chown veritas:veritas /var/lib/veritas/veritas.vlic
+          wait_failed() { for _ in $(seq 1 60); do systemctl is-failed --quiet veritas && return 0; sleep 3; done; return 1; }
+          sudo systemctl start veritas
+          wait_failed || { echo "service did not stop for wrong-machine license"; exit 1; }
+          sudo journalctl -u veritas --no-pager | grep -q "not valid for this machine" \
+            || { sudo journalctl -u veritas --no-pager | tail -30; exit 1; }
+          sudo journalctl -u veritas --no-pager | grep -q "$FP" \
+            || { echo "error did not show this machine's fingerprint"; exit 1; }
+          sudo systemctl reset-failed veritas || true
+
+      - name: Old-format (v1) fingerprint license asks for a reissue
+        run: |
+          /tmp/licvenv/bin/python3 tools/generate_license.py --org ci-test --tier enterprise \
+            --expiry 2027-12-31 --fingerprint "$(printf 'a%.0s' {1..64})" \
+            --key /tmp/ci_private_key.pem --out /tmp/old.vlic
+          sudo cp /tmp/old.vlic /var/lib/veritas/veritas.vlic
+          sudo chown veritas:veritas /var/lib/veritas/veritas.vlic
+          wait_failed() { for _ in $(seq 1 60); do systemctl is-failed --quiet veritas && return 0; sleep 3; done; return 1; }
+          sudo systemctl start veritas
+          wait_failed || { echo "service did not stop for old-format license"; exit 1; }
+          sudo journalctl -u veritas --no-pager | grep -q "old machine fingerprint format" \
+            || { sudo journalctl -u veritas --no-pager | tail -30; exit 1; }
+          sudo systemctl reset-failed veritas || true
+
+      - name: Machine-bound license (CLI fingerprint) activates via 'veritas license'
+        run: |
+          /tmp/licvenv/bin/python3 tools/generate_license.py --org ci-test --tier enterprise \
+            --expiry 2027-12-31 --fingerprint "$FP" \
+            --key /tmp/ci_private_key.pem --out /tmp/bound.vlic
+          sudo veritas license /tmp/bound.vlic
+
+      - name: Wait for the server (spaCy takes ~60s on CI)
+        run: |
+          for i in $(seq 1 36); do
+            RESP=$(curl -sk https://localhost:8000/health 2>/dev/null || echo "")
+            if echo "$RESP" | grep -q '"status":"ok"'; then echo "UP: $RESP"; exit 0; fi
+            echo "  attempt $i/36 ($((i*5))s)"; sleep 5
+          done
+          sudo journalctl -u veritas --no-pager | tail -60
+          exit 1
+
+      - name: Endpoints
+        run: |
+          curl -sk https://localhost:8000/health | python3 -c "import sys,json; assert json.load(sys.stdin)['status']=='ok'"
+          test "$(curl -sk -o /dev/null -w '%{http_code}' https://localhost:8000/setup)" = "200"
+          test "$(curl -sk -o /dev/null -w '%{http_code}' https://localhost:8000/api/auth/me)" = "401"
+          curl -sk https://localhost:8000/ready | python3 -m json.tool || true
+
+      - name: Acceptance check command
+        run: sudo veritas check
+
+      - name: Restart keeps working
+        run: |
+          sudo veritas restart
+          for i in $(seq 1 36); do
+            curl -sk https://localhost:8000/health | grep -q '"status":"ok"' && exit 0
+            sleep 5
+          done
+          sudo journalctl -u veritas --no-pager | tail -40
+          exit 1
+
+      - name: Crash recovery (SIGKILL)
+        run: |
+          OLD=$(systemctl show -p MainPID --value veritas)
+          sudo kill -9 "$OLD"
+          for i in $(seq 1 36); do
+            NEW=$(systemctl show -p MainPID --value veritas)
+            if [ "$NEW" != "0" ] && [ "$NEW" != "$OLD" ] && curl -sk https://localhost:8000/health | grep -q '"status":"ok"'; then
+              echo "recovered: pid $OLD -> $NEW"; exit 0
+            fi
+            sleep 5
+          done
+          sudo journalctl -u veritas --no-pager | tail -40
+          exit 1
+
+      - name: Uninstall
+        run: |
+          sudo apt-get remove -y veritas
+          ! systemctl is-active --quiet veritas
+          sudo apt-get purge -y veritas
+          ! id veritas 2>/dev/null
+          test ! -d /var/lib/veritas
+
+      - name: Collect logs on failure
+        if: failure()
+        run: |
+          systemctl status veritas --no-pager || true
+          sudo journalctl -u veritas --no-pager | tail -150 || true
+
+      - name: Remove signing key
+        if: always()
+        run: rm -f /tmp/ci_private_key.pem

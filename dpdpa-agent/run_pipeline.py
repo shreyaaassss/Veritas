@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import sys
 import threading
 import time
 from pathlib import Path
@@ -45,6 +46,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger("pipeline")
 
+# Exit status used when the license is missing/invalid (see veritas.service).
+LICENSE_EXIT_CODE = 78
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(
@@ -54,7 +58,32 @@ def main() -> None:
         "--port", type=int, default=8000,
         help="Dashboard port (default: 8000)",
     )
+    parser.add_argument(
+        "--fingerprint", action="store_true",
+        help="Print this machine's license fingerprint and exit "
+             "(send it to Veritas to receive a machine-bound license).",
+    )
+    parser.add_argument(
+        "--check", action="store_true",
+        help="Run the production acceptance checks, print the report and exit.",
+    )
     args = parser.parse_args()
+
+    # ---- One-shot commands (no server start, no license required) ----
+    if args.fingerprint:
+        from license import FingerprintError, current_fingerprint
+        try:
+            print(current_fingerprint())
+        except FingerprintError as e:
+            print(f"ERROR: {e}", file=sys.stderr)
+            raise SystemExit(1)
+        return
+
+    if args.check:
+        from production_check import print_report, run_checks
+        report = run_checks()
+        print_report(report)
+        raise SystemExit(0 if (report["all_passed"] or report["has_warnings"]) else 1)
 
     # ---- License check ----
     from license import LicenseError, validate_license
@@ -67,7 +96,9 @@ def main() -> None:
     except LicenseError as e:
         border = "=" * 60
         print(f"\n{border}\nLICENSE ERROR\n{border}\n{e}\n{border}\n")
-        raise SystemExit(1)
+        # 78 (EX_CONFIG): the systemd unit lists it in RestartPreventExitStatus,
+        # so a missing/invalid license is reported once instead of crash-looping.
+        raise SystemExit(LICENSE_EXIT_CODE)
 
     # ---- First-run: copy seed org configs out of the PyInstaller bundle ----
     from runtime_paths import bundle_root, data_root, is_bundled

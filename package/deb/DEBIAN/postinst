@@ -32,10 +32,16 @@ systemctl enable veritas
 echo ""
 echo "Veritas DPDPA Compliance Platform installed successfully!"
 echo ""
-echo "  1. sudo veritas fingerprint   → send to Veritas for your license"
+echo "  1. Send this machine's fingerprint to Veritas to get your license:"
+FP=$(/opt/veritas/veritas-runtime --fingerprint 2>/dev/null) || FP=""
+if [ -n "$FP" ]; then
+    echo "       $FP"
+else
+    echo "       (run: sudo veritas fingerprint)"
+fi
 echo "  2. sudo veritas license /path/to/veritas.vlic"
 echo "  3. sudo veritas start"
-echo "  4. Open https://localhost:8000/setup"
+echo "  4. Open https://<this-host>:8000/setup (self-signed certificate)"
 echo ""
-echo "CLI: veritas {start|stop|restart|status|logs|fingerprint|license|check}"
+echo "CLI: veritas {start|stop|restart|status|logs|fingerprint|license|check|version}"
 echo ""

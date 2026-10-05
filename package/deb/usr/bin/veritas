@@ -2,63 +2,32 @@
 # Veritas CLI — manage the Veritas compliance service
 RUNTIME=/opt/veritas/veritas-runtime
 DATA_DIR=/var/lib/veritas
+VERSION=$(dpkg-query -W -f='${Version}' veritas 2>/dev/null || echo unknown)
+URL="https://$(hostname -f 2>/dev/null || hostname):8000"
 
 case "$1" in
-  start)    systemctl start veritas && echo "Veritas started. Open http://localhost:8000" ;;
+  start)    systemctl start veritas && echo "Veritas started. Open $URL/setup (self-signed certificate; allow the browser warning)." ;;
   stop)     systemctl stop veritas ;;
   restart)  systemctl restart veritas ;;
   status)   systemctl status veritas ;;
   logs)     journalctl -u veritas -f ;;
-  check)    sudo -u veritas VERITAS_DATA_DIR=$DATA_DIR $RUNTIME --check 2>&1 || python3 -c "
-import sys; sys.path.insert(0,'$RUNTIME'); from production_check import run_checks,print_report; r=run_checks(); print_report(r)" ;;
+  check)    runuser -u veritas -- env VERITAS_DATA_DIR="$DATA_DIR" "$RUNTIME" --check ;;
 
   fingerprint)
-    python3 - <<'PYEOF'
-import hashlib, platform, socket, subprocess, uuid, sys
-
-def _disk_serial():
-    system = platform.system()
-    if system == "Linux":
-        for dev in ("/dev/sda", "/dev/nvme0n1", "/dev/vda", "/dev/xvda"):
-            try:
-                out = subprocess.check_output(
-                    ["lsblk", "-dno", "SERIAL", dev],
-                    stderr=subprocess.DEVNULL, timeout=5, text=True,
-                ).strip()
-                if out:
-                    return out
-            except Exception:
-                pass
-        return "NO_SERIAL"
-    elif system == "Darwin":
-        try:
-            out = subprocess.check_output(
-                ["system_profiler", "SPHardwareDataType"], text=True, timeout=10,
-            )
-            for line in out.splitlines():
-                if "Serial Number" in line:
-                    return line.split(":")[-1].strip()
-        except Exception:
-            pass
-    return "NO_SERIAL"
-
-mac    = hex(uuid.getnode())
-host   = socket.gethostname()
-system = platform.system()
-serial = _disk_serial()
-raw    = f"{serial}:{mac}:{host}:{system}"
-fp     = hashlib.sha256(raw.encode()).hexdigest()
-
-print("Veritas Machine Fingerprint")
-print("=" * 44)
-print("Send this fingerprint to your Veritas contact")
-print("to receive your license file (veritas.vlic):")
-print()
-print(fp)
-print()
-print(f"System:   {system} {platform.release()}")
-print(f"Hostname: {host}")
-PYEOF
+    # The runtime is the single source of truth for the fingerprint, so this
+    # always matches what the service checks the license against.
+    if ! FP=$("$RUNTIME" --fingerprint 2>&1); then
+      echo "ERROR: could not determine this machine's fingerprint:" >&2
+      echo "$FP" >&2
+      exit 1
+    fi
+    echo "Veritas Machine Fingerprint"
+    echo "==========================================================================="
+    echo "Send this fingerprint to your Veritas contact to receive your license"
+    echo "file (veritas.vlic):"
+    echo
+    echo "$FP"
+    echo
     ;;
 
   license)
@@ -76,13 +45,33 @@ PYEOF
     chmod 640 "$LICENSE_FILE"
     systemctl restart veritas
     echo "License installed. Veritas is restarting..."
-    sleep 2
-    systemctl is-active veritas && echo "  Status: running" && echo "  Open: http://localhost:8000/setup"
+    # The runtime checks the license first and exits (code 78) if it is invalid.
+    # A valid start takes up to a minute while the language model loads.
+    STATE=starting
+    for _ in $(seq 1 90); do
+      sleep 1
+      if systemctl is-failed --quiet veritas; then STATE=failed; break; fi
+      if curl -sk "https://localhost:8000/health" 2>/dev/null | grep -q '"status":"ok"'; then STATE=up; break; fi
+    done
+    case "$STATE" in
+      up)
+        echo "  Status: running"
+        echo "  Open:   $URL/setup (self-signed certificate; allow the browser warning)"
+        ;;
+      failed)
+        echo "  Status: NOT running. Last log lines:" >&2
+        journalctl -u veritas -n 15 --no-pager >&2
+        exit 1
+        ;;
+      *)
+        echo "  Status: still starting. Check with: veritas status / veritas logs"
+        ;;
+    esac
     ;;
 
-  version)  echo "Veritas 1.0.0" ;;
+  version)  echo "Veritas $VERSION" ;;
   *)
-    echo "Veritas DPDPA Compliance Platform v1.0.0"
+    echo "Veritas DPDPA Compliance Platform v$VERSION"
     echo ""
     echo "Usage: veritas <command>"
     echo ""
@@ -101,6 +90,6 @@ PYEOF
     echo "  1. sudo veritas fingerprint   → send output to your Veritas contact"
     echo "  2. sudo veritas license /path/to/veritas.vlic"
     echo "  3. sudo veritas start"
-    echo "  4. Open http://localhost:8000/setup"
+    echo "  4. Open $URL/setup"
     ;;
 esac

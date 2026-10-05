@@ -381,8 +381,10 @@ The agent appears in the Veritas dashboard under **Agents** within seconds.
 
 ### How Licensing Works
 
-1. Veritas computes a **machine fingerprint** — SHA-256 of disk serial + MAC address + hostname
-2. You send the fingerprint to Veritas
+1. Veritas computes a **machine fingerprint**.
+   - **Linux:** `v2:` followed by a SHA-256 of the machine's `/etc/machine-id` (falling back to the disk serial if there is none). It does not depend on hostname, IP or network cards, so renaming the server or changing networking does not affect the license.
+   - **macOS / Windows:** SHA-256 of disk serial + MAC address + hostname (to be moved to the same scheme).
+2. You send the fingerprint (`sudo veritas fingerprint`) to Veritas
 3. Veritas signs a `.vlic` file with an RSA-2048 private key (never leaves Veritas)
 4. The binary validates the signature and fingerprint on every startup
 
@@ -396,7 +398,7 @@ The agent appears in the Veritas dashboard under **Agents** within seconds.
 
 ### Transferring a License (New Machine)
 
-The fingerprint changes if you replace hardware or migrate to a new VM. Contact your Veritas representative with the new machine's fingerprint to receive a replacement license.
+On Linux the fingerprint changes if the OS is reinstalled (a new `machine-id` is generated) or the server is migrated to a new VM. Machines **cloned from a template or image share the same `machine-id`**: regenerate it on each clone (`sudo rm /etc/machine-id && sudo systemd-machine-id-setup`) before requesting a license. Contact your Veritas representative with the new machine's fingerprint to receive a replacement license.
 
 ---
 
@@ -434,10 +436,14 @@ The fingerprint changes if you replace hardware or migrate to a new VM. Contact 
 
 ### "License not found" at startup
 
-Run `sudo veritas fingerprint`, send to your Veritas contact, install the `.vlic`:
+If the license is missing or invalid the service stops after printing one clear message and does **not** retry (see `sudo veritas logs`). Run `sudo veritas fingerprint`, send it to your Veritas contact, install the `.vlic`:
 ```bash
 sudo veritas license /path/to/veritas.vlic
 ```
+
+### "License uses the old machine fingerprint format"
+
+The license was issued before the Linux fingerprint changed to `v2:`. Send the fingerprint shown in the message (or from `sudo veritas fingerprint`) to your Veritas contact for a reissued license.
 
 ### "This license was issued for a different server"
 

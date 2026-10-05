@@ -87,7 +87,59 @@ func hostname() string {
 	return h
 }
 
+// machineIDPaths are the Linux machine-id locations, in priority order.
+var machineIDPaths = []string{"/etc/machine-id", "/var/lib/dbus/machine-id"}
+
+// readLinuxMachineID returns the systemd/dbus machine-id (lowercase hex) or "".
+func readLinuxMachineID() string {
+	for _, path := range machineIDPaths {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		id := strings.ToLower(strings.TrimSpace(string(data)))
+		if id == "" {
+			continue
+		}
+		valid := true
+		for _, c := range id {
+			if !strings.ContainsRune("0123456789abcdef", c) {
+				valid = false
+				break
+			}
+		}
+		if valid {
+			return id
+		}
+	}
+	return ""
+}
+
+// linuxFingerprintV2 mirrors dpdpa-agent/license.py _fingerprint_v2_linux and
+// tools/fingerprint.py: "v2:" + sha256("veritas-fp-v2|linux|<kind>|<value>").
+// It is anchored on the machine-id, falling back to the disk serial. MAC and
+// hostname are not used. Returns "" if no stable identity exists.
+func linuxFingerprintV2(machineID, serial string) string {
+	kind, value := "machine-id", machineID
+	if machineID == "" {
+		if serial == "" || serial == "NO_SERIAL" {
+			return ""
+		}
+		kind, value = "disk-serial", serial
+	}
+	raw := fmt.Sprintf("veritas-fp-v2|linux|%s|%s", kind, value)
+	sum := sha256.Sum256([]byte(raw))
+	return fmt.Sprintf("v2:%x", sum)
+}
+
 func machineFingerprint() string {
+	if runtime.GOOS == "linux" {
+		// An empty result never equals a license fingerprint, so a machine with
+		// no stable identity cannot satisfy a machine-bound license.
+		return linuxFingerprintV2(readLinuxMachineID(), diskSerial())
+	}
+
+	// Legacy version-1 fingerprint (macOS/Windows; to be migrated).
 	serial := diskSerial()
 	mac := macAddress()
 	host := hostname()

@@ -11,6 +11,9 @@ WorkingDirectory=/opt/veritas
 ExecStart=/opt/veritas/veritas-runtime
 Restart=on-failure
 RestartSec=5
+# 78 = missing/invalid license (run_pipeline.LICENSE_EXIT_CODE). Report it once
+# and stay stopped instead of crash-looping until the license is fixed.
+RestartPreventExitStatus=78
 TimeoutStopSec=30
 
 # Data and secrets

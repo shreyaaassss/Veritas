@@ -8,12 +8,18 @@ Usage:
     python tools/fingerprint.py
     # → prints a 64-character hex fingerprint
 
-Collects: disk serial number + MAC address + hostname (platform-specific).
-This is stable across reboots but changes if the machine is replaced.
+Linux (fingerprint version 2, "v2:" + 64 hex chars):
+  Anchored on /etc/machine-id, falling back to the primary disk serial. MAC
+  address and hostname are NOT used (they change with docker, wifi, VPNs and
+  renames). Must stay identical to dpdpa-agent/license.py, which the product
+  uses to validate licenses; dpdpa-agent/test_license_fingerprint.py checks it.
 
-Platform support:
+Windows / macOS (legacy version 1, 64 hex chars):
+  disk serial + MAC address + hostname + OS. To be migrated later.
+
+Platform support for the disk serial:
   Windows  — wmic diskdrive get serialnumber
-  Linux    — lsblk -dno SERIAL /dev/sda
+  Linux    — lsblk -dno SERIAL on sda / nvme0n1 / vda / xvda
   macOS    — system_profiler SPHardwareDataType (Serial Number field)
 
 Compiled forms:
@@ -83,30 +89,63 @@ def get_disk_serial_macos() -> str:
         return "NO_SERIAL"
 
 
+MACHINE_ID_PATHS = ("/etc/machine-id", "/var/lib/dbus/machine-id")
+
+
+def linux_machine_id() -> str:
+    """systemd/dbus machine-id (32 hex chars) or '' if unavailable."""
+    for path in MACHINE_ID_PATHS:
+        try:
+            with open(path, "r", encoding="ascii") as f:
+                value = f.read().strip().lower()
+        except (OSError, UnicodeDecodeError):
+            continue
+        if value and all(c in "0123456789abcdef" for c in value):
+            return value
+    return ""
+
+
 def machine_fingerprint() -> str:
     """
-    Compute a stable machine fingerprint from hardware identifiers.
-    Returns a 64-character hex string (SHA-256).
+    Compute the machine fingerprint for this platform.
+    Linux returns "v2:<64 hex>". Other platforms return the legacy 64-hex value.
+    Raises RuntimeError if no stable machine identity can be determined (Linux).
     """
-    mac      = hex(uuid.getnode())
-    hostname = socket.gethostname()
-    system   = platform.system()
+    system = platform.system()
 
+    if system == "Linux":
+        machine_id = linux_machine_id()
+        if machine_id:
+            kind, value = "machine-id", machine_id
+        else:
+            serial = get_disk_serial_linux()
+            if serial == "NO_SERIAL":
+                raise RuntimeError(
+                    "Cannot determine a stable machine identity: /etc/machine-id "
+                    "is missing and no disk serial is available."
+                )
+            kind, value = "disk-serial", serial
+        raw = f"veritas-fp-v2|linux|{kind}|{value}"
+        return "v2:" + hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+    mac  = hex(uuid.getnode())
+    host = socket.gethostname()
     if system == "Windows":
         disk_serial = get_disk_serial_windows()
-    elif system == "Linux":
-        disk_serial = get_disk_serial_linux()
     elif system == "Darwin":
         disk_serial = get_disk_serial_macos()
     else:
         disk_serial = "NO_SERIAL"
-
-    raw = f"{disk_serial}:{mac}:{hostname}:{system}"
+    raw = f"{disk_serial}:{mac}:{host}:{system}"
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
 def main() -> None:
-    fp = machine_fingerprint()
+    try:
+        fp = machine_fingerprint()
+    except RuntimeError as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        sys.exit(1)
     print(f"Veritas Machine Fingerprint")
     print(f"===========================")
     print(f"Send this to support@veritas.io with your order:")

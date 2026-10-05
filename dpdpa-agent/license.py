@@ -77,7 +77,7 @@ class LicenseInfo:
 
 
 # ---------------------------------------------------------------------------
-# Machine fingerprint (matches tools/fingerprint.py)
+# Machine fingerprint (must match tools/fingerprint.py)
 # ---------------------------------------------------------------------------
 
 def _disk_serial() -> str:
@@ -126,14 +126,104 @@ def _disk_serial() -> str:
     return "NO_SERIAL"
 
 
-def current_fingerprint() -> str:
-    """Compute this machine's fingerprint. Must match tools/fingerprint.py."""
+class FingerprintError(Exception):
+    """Raised when no stable machine identity can be determined."""
+
+
+# Linux machine-id locations, in priority order. Overridable in tests.
+_MACHINE_ID_PATHS = ("/etc/machine-id", "/var/lib/dbus/machine-id")
+
+FINGERPRINT_V2_PREFIX = "v2:"
+
+
+def _linux_machine_id() -> str:
+    """Return the systemd/dbus machine-id (32 hex chars) or '' if unavailable."""
+    for path in _MACHINE_ID_PATHS:
+        try:
+            value = Path(path).read_text(encoding="ascii").strip().lower()
+        except (OSError, UnicodeDecodeError):
+            continue
+        if value and all(c in "0123456789abcdef" for c in value):
+            return value
+    return ""
+
+
+def _fingerprint_v2_linux() -> str:
+    """
+    Linux fingerprint, version 2.
+
+    Anchored on /etc/machine-id (stable across reboots, network changes and
+    renames; set once at OS install). If that is unavailable, falls back to the
+    primary disk serial. The anchor kind is part of the hash so the two can
+    never collide. MAC address and hostname are deliberately NOT used: both
+    change with docker bridges, wifi toggling, VPNs and server renames.
+
+    Format: "v2:" + sha256("veritas-fp-v2|linux|<kind>|<value>") hex.
+    """
+    machine_id = _linux_machine_id()
+    if machine_id:
+        kind, value = "machine-id", machine_id
+    else:
+        serial = _disk_serial()
+        if serial == "NO_SERIAL":
+            raise FingerprintError(
+                "Cannot determine a stable machine identity: /etc/machine-id is "
+                "missing and no disk serial is available."
+            )
+        kind, value = "disk-serial", serial
+    raw = f"veritas-fp-v2|linux|{kind}|{value}"
+    return FINGERPRINT_V2_PREFIX + hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _fingerprint_v1() -> str:
+    """Legacy fingerprint (disk serial + MAC + hostname + OS), still used on macOS/Windows."""
     mac      = hex(uuid.getnode())
     hostname = socket.gethostname()
     system   = platform.system()
     serial   = _disk_serial()
     raw      = f"{serial}:{mac}:{hostname}:{system}"
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def current_fingerprint() -> str:
+    """
+    Compute this machine's fingerprint. Must match tools/fingerprint.py.
+    Raises FingerprintError if no stable machine identity exists.
+    """
+    if platform.system() == "Linux":
+        return _fingerprint_v2_linux()
+    return _fingerprint_v1()
+
+
+def check_license_fingerprint(license_fingerprint: str) -> None:
+    """
+    Raise LicenseError unless license_fingerprint identifies this machine.
+    """
+    try:
+        this_machine = current_fingerprint()
+    except FingerprintError as e:
+        raise LicenseError(
+            f"Veritas cannot verify this machine-bound license.\n{e}\n"
+            "Contact support@veritas.io for an unbound license."
+        )
+
+    if license_fingerprint == this_machine:
+        return
+
+    if platform.system() == "Linux" and not license_fingerprint.startswith(FINGERPRINT_V2_PREFIX):
+        raise LicenseError(
+            "Veritas license uses the old machine fingerprint format, which is no "
+            "longer accepted on Linux.\n"
+            f"This machine's fingerprint is: {this_machine}\n"
+            "Send it to support@veritas.io to receive a reissued license."
+        )
+
+    raise LicenseError(
+        "Veritas license is not valid for this machine.\n"
+        "This license was issued for a different server.\n"
+        f"This machine's fingerprint is: {this_machine}\n"
+        "Contact support@veritas.io to transfer your license."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -159,9 +249,10 @@ def validate_license(path: Path = _LICENSE_PATH) -> LicenseInfo:
     # 1. File must exist
     if not path.exists():
         raise LicenseError(
-            "Veritas license file (veritas.vlic) not found.\n"
-            "Place your veritas.vlic file in the dpdpa-agent/ directory.\n"
-            "Contact support@veritas.io to obtain a license."
+            f"Veritas license file not found at {path}.\n"
+            "Install your license with: sudo veritas license /path/to/veritas.vlic\n"
+            "To obtain one, run 'sudo veritas fingerprint' and send the result to "
+            "support@veritas.io."
         )
 
     raw = path.read_text(encoding="utf-8").strip()
@@ -244,13 +335,7 @@ def validate_license(path: Path = _LICENSE_PATH) -> LicenseInfo:
     machine_bound = bool(license_fingerprint)
 
     if license_fingerprint:
-        this_machine = current_fingerprint()
-        if this_machine != license_fingerprint:
-            raise LicenseError(
-                "Veritas license is not valid for this machine.\n"
-                "This license was issued for a different server.\n"
-                "Contact support@veritas.io to transfer your license."
-            )
+        check_license_fingerprint(license_fingerprint)
 
     return LicenseInfo(
         org=payload.get("org", "unknown"),
