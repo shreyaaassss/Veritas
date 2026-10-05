@@ -1,0 +1,14 @@
+# Normalise line endings so diffs show real changes only.
+* text=auto eol=lf
+
+# Windows-only scripts keep CRLF.
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+*.iss text eol=crlf
+
+# Binary files.
+*.png binary
+*.jpg binary
+*.ico binary
+*.pem -text
+*.vlic -text
