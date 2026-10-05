@@ -1,6 +1,14 @@
 # Implementation Order
 
-Status: agreed order to confirm. Nothing below is built yet except Step 0's cleanup (already done in the working tree, not committed).
+Status (2026-10-06):
+
+| Milestone | State |
+|---|---|
+| 1. Linux works | **Done.** Released as v1.0.16; v1.0.17 adds the agent `source_type` fix. Linux install test passes in CI. A real Ubuntu machine ran the dashboard. Remaining from that test: restart and crash-recovery checks reported back by the tester |
+| 2. License portal | Not started. Needs the new Supabase key |
+| 3. Architecture changes | Not started. Waits for the simulation's load numbers |
+| **4. Enterprise agent and telemetry alignment** | **Planned (below). Starts next.** Brings the agent and deployments in line with the product spec "Enterprise Telemetry, Agent & Compliance Flow" |
+| Simulation | A teammate builds it from `veritas-demo/SIMULATION_PLAN.md` |
 
 Goal of the first milestone: **a Linux `.deb` that installs, activates with a license, and runs reliably**, verified by an automated install test. Everything else comes after.
 
@@ -37,6 +45,96 @@ These change runtime behaviour, so they come after the install path is proven an
 | 12 | **Offline hardening:** bundle fonts and jsPDF locally; re-check license expiry while running. | Required for air-gapped customers; independent of 11. |
 | 13 | **Metrics:** queue depth, events/s, detection latency, agent last-seen. | Most useful once the queue exists. |
 | 14 | **Structure and docs:** split `server.py` into routers and `index.html` into modules; rewrite the technical audit and `architecture.md`. | Pure refactor and docs; do last so it doesn't block anything. |
+
+## Milestone 4: Enterprise agent and telemetry alignment (next)
+
+Source: the product spec "Enterprise Telemetry, Agent & Compliance Flow" (agent is a thin telemetry bridge, all compliance logic stays in Core, Kubernetes via DaemonSet, plain servers as OS services, sanitization optional and later).
+
+### Where we stand against that spec (assessed 2026-10-06)
+
+| Spec area | State |
+|---|---|
+| Thin agent, intelligence in Core | Aligned |
+| Blank dashboard, then create org, policy, key, agent | Aligned in code (no bundled orgs). The empty-dashboard screen itself still needs a visual check |
+| One-time-key registration | Aligned |
+| Core pipeline (ingest, PII, four rules, violations, evidence, dashboard, cases, audit) | Aligned |
+| Modes A and C (Veritas does not store raw logs; customer's own logging is untouched) | Effectively in place. Core stores verdicts and metadata only, not raw text |
+| Security and reliability basics (TLS, token, revoke, heartbeat, retry, bounded buffer) | Mostly aligned. Token saved as plain JSON; buffer in memory only; no Core ingest queue yet |
+| Plain Linux/Windows/Docker agent | Partly. The Linux `.deb` very likely cannot save its identity or read logs; no log-rotation handling |
+| Kubernetes DaemonSet | **Not aligned.** Shipped manifests are broken (see Phase B) |
+| Mode B (sanitize and forward downstream) | Not built |
+
+Findings behind the "not aligned" rows come from reading the manifests and agent code; **nothing has been run on a cluster**. Phase B starts by reproducing them.
+
+### Phase A: Agent reliability and the Linux server path (do first; spec priorities 2, 3, 5)
+
+| # | Task | Notes |
+|---|---|---|
+| A1 | Fix the agent `.deb`: writable state location (identity file), read access to application logs, correct post-install text (`veritas_address`, not `server_url`), identity file mode 0600 | `ProtectSystem=strict` makes `/opt/veritas-agent` read-only, so `.veritas_state.json` cannot be written, and the one-time key is consumed anyway. Log files are usually `root:adm 0640` |
+| A2 | Log rotation: detect rotation/truncation and reopen the file | Today the agent holds the old file open and silently misses new lines |
+| A3 | Do not let one failing event block the queue: bounded retries for non-auth errors, then drop and count | Today any non-401/403 error (including a persistent 422) retries the same event forever |
+| A4 | Heartbeat carries basic health: sources being read, queue depth, lines dropped, agent version. Show it in the dashboard Agents tab | Spec: "report basic health/status" |
+| A5 | Agent Docker image and `.deb` report their real version | Part of the version-reporting backlog item |
+| A6 | CI test for the agent: install the agent `.deb` on a runner next to a started server, register with a key, tail a file, append PII lines, rotate the file, assert violations in the ledger | Same safety net as the server install test |
+| A7 | Release v1.0.18 and retest on the Ubuntu machine | Gate for Phase A |
+
+**Acceptance:** on a clean Ubuntu machine the agent `.deb` registers, survives a restart and a log rotation, and violations appear in the dashboard; the CI agent test is green.
+
+### Phase B: Kubernetes agent (spec priority 4)
+
+Start by reproducing the defects on a local `kind` cluster, then fix them.
+
+| # | Task | Notes |
+|---|---|---|
+| B1 | **Reusable enrollment keys** on the server (maximum uses, expiry, org-scoped, revocable) plus the dashboard control to issue one | A DaemonSet registers one agent per node; today one key is shared by every node and the first node uses it up |
+| B2 | **Wildcard log paths** in sources (for example `/var/log/containers/order-*.log`) and parsing of the container runtime's line format | Pod log file names change on every redeploy; stdout logs are the main source on containerd clusters, which have no Docker socket |
+| B3 | **`source_system` naming rules** for node logs (map namespace/pod/container name patterns to a `source_system` in the agent config) | Needed so the org policy applies to the right system. Decision pending, see below |
+| B4 | Rewrite the manifests: state at its own mount path (not over `/app`), config and key in a Secret, key delivered through an environment variable or init step (today the `${VERITAS_REGISTRATION_KEY}` placeholder is never substituted), one agent per node | Shipped `agent-deployment.yaml` and `agent-daemonset.yaml` mount state over `/app`, hiding `agent.py` |
+| B5 | Publish the agent image to a registry (GHCR) in the release workflow | Today only a local `veritas-agent:latest` exists |
+| B6 | CI test on `kind` with 2 nodes: DaemonSet registers both agents with one reusable key; a pod writing PII to stdout produces a violation mapped to the right `source_system` | Proves the spec's main Kubernetes claim |
+| B7 | Rewrite `veritas-agent/k8s/README.md` to match | |
+
+**Acceptance:** one command deploys the DaemonSet; both nodes appear ACTIVE; stdout PII from a test pod shows up as a violation under the expected source system; the `kind` CI test is green.
+
+### Phase C: Complete the customer flow (spec priorities 1, 6)
+
+| # | Task | Notes |
+|---|---|---|
+| C1 | Add `data_since` to the Add Organization form | Existing systems with old data cannot be described through the UI today |
+| C2 | User and role management screen (create users, assign role and organizations) | Today only the API; a customer admin should not need curl |
+| C3 | Visual check of the blank first-run dashboard and fix anything half-empty | Spec priority 1 |
+| C4 | Version reporting in `/health` and agent registration | Backlog item |
+| C5 | Ingest queue and worker pool (Milestone 3, step 11), once the simulation baseline exists | Spec section 13: only when measured traffic needs it |
+| C6 | Optional on-disk spool in the agent for long outages and agent restarts | Spec: bounded local buffering; today it is memory-only (1000 lines) |
+| C7 | Full end-to-end check: file log, agent, Core, violation, evidence, dashboard, on Linux and in Kubernetes | Spec priority 6; the simulation covers most of this |
+
+### Phase D: Sanitization and downstream forwarding, Mode B (spec priority 7, deliberately last)
+
+1. Write a short design first: output actions `raw`, `sanitized`, `compliance-metadata-only`; per-organization setting; connectors (syslog, HTTP, object storage) and where redaction runs (Core).
+2. Build only after Phases A to C are stable. Not a prerequisite for the Agent.
+
+### Phase E: Housekeeping
+
+- Remove Raspberry Pi wording from docs and install scripts (spec: enterprise software, not an appliance requirement).
+- Update `PROJECT_OVERVIEW.md` and `INSTALL.md` to reflect the agent changes.
+- Store the enterprise telemetry spec in the repo (suggested: `docs/ENTERPRISE_TELEMETRY_SPEC.md`) so the plan has a stable reference.
+
+### Decisions needed before Phase B
+
+| Decision | Recommendation |
+|---|---|
+| How a node log line gets its `source_system` | Mapping rules in the agent config, for example "namespace `shop`, pod `order-*` becomes `order-service`", with a clear warning for unmapped logs |
+| Reusable enrollment keys | Yes: maximum uses plus expiry, shown once, revocable from the dashboard |
+| Agent buffer in the first release | Keep in memory for Phase A; add the disk spool in Phase C (C6) |
+| Agent token storage | File mode 0600 on servers; Kubernetes Secret plus a writable state volume in the cluster |
+
+### Order and dependencies
+
+1. Phase A, then release v1.0.18 and the Ubuntu retest.
+2. Phase B (needs A2's rotation and A3's queue behavior; B1 touches the server).
+3. Phase C in parallel with B where it does not touch the same files (C1 to C4 are independent).
+4. Phase D after A to C are stable.
+5. The simulation and Milestones 2 and 3 run alongside; the simulation's Mode B should use the v1.0.18 agent once it exists.
 
 ## In parallel from now (teammate)
 
