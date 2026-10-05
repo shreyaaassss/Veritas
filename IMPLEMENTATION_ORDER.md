@@ -58,3 +58,6 @@ Simulation: Phase 0 baseline, then Mode A driver and ground-truth checker, then 
 | Reissue of old licenses | Test licenses from before v2 are invalid on Linux by design. No customer licenses exist, so nothing to migrate. |
 | Portal: revocation, renewal/reissue, license id, multi-user login, tier limits | Deferred by decision; see `LICENSE_PORTAL_REVIEW.md`. |
 | Go launcher gofmt | `license.go` and `main_linux.go` already fail `gofmt -l` (comment formatting). Cosmetic. |
+| Version reporting | `/health` and agent registration report version `1.0.0` regardless of the release (found while testing v1.0.17 from source). The runtime does not know its own version; embed a VERSION file at build time (release workflow) and read it. |
+| User management screen | No dashboard screen for creating users or assigning roles/orgs; only the API. Needed before a customer admin can onboard analysts without curl. |
+| macOS install test trigger | `test-macos-install.yml` runs at tag push before release assets exist, so it fails every release and passes on re-run. Make it wait for the release or trigger after it. |
