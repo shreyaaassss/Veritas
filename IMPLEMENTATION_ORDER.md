@@ -47,3 +47,14 @@ Simulation: Phase 0 baseline, then Mode A driver and ground-truth checker, then 
 1. OK to commit the cleanup (step 0) and how you want it split (one commit, or cleanup / fixtures / docs).
 2. The new Supabase URL and service key when you are ready (step 6). Don't paste them here: put them in the portal's `.env.local` and Vercel, and I'll work from the variable names.
 3. Confirm Milestone 1 as the first thing to build.
+
+## Backlog: changes to make later
+
+| Item | Notes |
+|---|---|
+| Support email | No support mailbox exists yet. The product says `support@veritas.io` (license errors in `license.py`, `license.go`, `tools/fingerprint.py`) and the `.deb` control file says `support@veritas.app`. Create the real address, then replace all of them with one value (ideally one constant). |
+| CI signing key | CI tests sign licenses with the production private key stored in the `VERITAS_PRIVATE_KEY_B64` secret. Move to a separate test keypair and a test build that embeds its public key. |
+| macOS and Windows fingerprint | Still the old scheme (disk serial + MAC + hostname). Move to `IOPlatformUUID` / `MachineGuid` anchors, same `v2:` format, once the Linux path is proven. |
+| Reissue of old licenses | Test licenses from before v2 are invalid on Linux by design. No customer licenses exist, so nothing to migrate. |
+| Portal: revocation, renewal/reissue, license id, multi-user login, tier limits | Deferred by decision; see `LICENSE_PORTAL_REVIEW.md`. |
+| Go launcher gofmt | `license.go` and `main_linux.go` already fail `gofmt -l` (comment formatting). Cosmetic. |
