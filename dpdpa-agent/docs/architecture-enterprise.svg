@@ -1,0 +1,230 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1700 1040" width="1700" height="1040" font-family="Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#374151"/>
+    </marker>
+    <marker id="arrO" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#c2740c"/>
+    </marker>
+    <style>
+      .t  { font-size: 14px; fill: #1f2937; }
+      .tb { font-size: 15px; font-weight: 700; fill: #111827; }
+      .ts { font-size: 12px; fill: #4b5563; }
+      .zone { fill: #fafafa; stroke: #9ca3af; stroke-width: 1.5; }
+      .zt { font-size: 15px; font-weight: 700; fill: #374151; letter-spacing: 1px; }
+      .cur { fill: #e8f1fb; stroke: #2b6cb0; stroke-width: 1.8; }
+      .new { fill: #fff4e5; stroke: #dd8a1b; stroke-width: 1.8; stroke-dasharray: 7 4; }
+      .opt { fill: #f3f4f6; stroke: #6b7280; stroke-width: 1.5; stroke-dasharray: 7 4; }
+      .db  { fill: #e6f4ea; stroke: #2f855a; stroke-width: 1.8; }
+      .flow { stroke: #374151; stroke-width: 2; fill: none; marker-end: url(#arr); }
+      .flowO { stroke: #c2740c; stroke-width: 2; fill: none; stroke-dasharray: 6 4; marker-end: url(#arrO); }
+      .flowG { stroke: #6b7280; stroke-width: 1.8; fill: none; stroke-dasharray: 6 4; marker-end: url(#arr); }
+      .num { fill: #1f2937; }
+      .numt { font-size: 13px; font-weight: 700; fill: #ffffff; text-anchor: middle; }
+    </style>
+  </defs>
+
+  <rect width="1700" height="1040" fill="#ffffff"/>
+
+  <text x="30" y="40" class="tb" style="font-size:24px">Veritas — Enterprise Deployment &amp; Simulation Architecture</text>
+  <text x="30" y="66" class="ts" style="font-size:14px">Everything stays inside the customer network. Agents only make outbound calls. The left zone is what veritas-demo simulates.</text>
+
+  <!-- ============ PRODUCTION ZONE ============ -->
+  <rect x="30" y="100" width="540" height="680" rx="10" class="zone"/>
+  <text x="50" y="128" class="zt">PRODUCTION ZONE</text>
+  <text x="50" y="148" class="ts">Simulated by veritas-demo/ (docker compose) — continuous telemetry</text>
+
+  <!-- services -->
+  <rect x="55" y="170" width="200" height="62" rx="8" class="cur"/>
+  <text x="70" y="195" class="tb">order-service</text>
+  <text x="70" y="214" class="ts">orders + occasional PII debug log</text>
+  <rect x="55" y="248" width="200" height="62" rx="8" class="cur"/>
+  <text x="70" y="273" class="tb">delivery-service</text>
+  <text x="70" y="292" class="ts">stale partner DP-4471 (retention)</text>
+  <rect x="55" y="326" width="200" height="62" rx="8" class="cur"/>
+  <text x="70" y="351" class="tb">marketing-service</text>
+  <text x="70" y="370" class="ts">raw phone in payloads (purpose)</text>
+  <rect x="55" y="404" width="200" height="62" rx="8" class="cur"/>
+  <text x="70" y="429" class="tb">support-service</text>
+  <text x="70" y="448" class="ts">agent notes with customer PII</text>
+
+  <!-- shared volume -->
+  <rect x="320" y="220" width="220" height="200" rx="8" class="db"/>
+  <text x="335" y="248" class="tb">Shared log volume</text>
+  <text x="335" y="270" class="ts">/var/log/app/*.log</text>
+  <text x="335" y="290" class="ts">~90% clean traffic</text>
+  <text x="335" y="308" class="ts">~10–20% violations</text>
+  <text x="335" y="326" class="ts">(env-configurable mix)</text>
+  <text x="335" y="356" class="ts">mounted read-only by</text>
+  <text x="335" y="374" class="ts">the Veritas Agent</text>
+
+  <path d="M255,201 L320,260" class="flow"/>
+  <path d="M255,279 L320,290" class="flow"/>
+  <path d="M255,357 L320,330" class="flow"/>
+  <path d="M255,435 L320,380" class="flow"/>
+
+  <!-- agent -->
+  <rect x="320" y="455" width="220" height="130" rx="8" class="cur"/>
+  <text x="335" y="482" class="tb">Veritas Agent</text>
+  <text x="335" y="503" class="ts">file tail + Docker log tail</text>
+  <text x="335" y="521" class="ts">bounded queue (1000), retry 1s→30s</text>
+  <text x="335" y="539" class="ts">registration key → agent ID + token</text>
+  <text x="335" y="557" class="ts">heartbeat loop, 401/403 = revoked</text>
+  <path d="M430,420 L430,455" class="flow"/>
+
+  <!-- real env hosts -->
+  <rect x="55" y="620" width="485" height="130" rx="8" class="opt"/>
+  <text x="70" y="647" class="tb">Real environment equivalents</text>
+  <text x="70" y="670" class="ts">• App hosts (VM / bare metal): veritas-agent .deb under systemd</text>
+  <text x="70" y="690" class="ts">• Kubernetes: agent DaemonSet + Secret + ConfigMap (veritas-agent/k8s)</text>
+  <text x="70" y="710" class="ts">• Docker hosts: agent container tailing named containers</text>
+  <text x="70" y="730" class="ts">One agent per host/node, each with its own revocable identity.</text>
+
+  <!-- ============ PROXY ============ -->
+  <rect x="610" y="100" width="150" height="680" rx="10" class="zone"/>
+  <text x="635" y="128" class="zt">EDGE</text>
+  <rect x="625" y="440" width="120" height="110" rx="8" class="opt"/>
+  <text x="640" y="468" class="tb">Proxy and TLS</text>
+  <text x="640" y="488" class="ts">TLS, only :443</text>
+  <text x="640" y="506" class="ts">firewall rules</text>
+  <text x="640" y="524" class="ts">→ server :8000</text>
+
+  <path d="M540,520 L625,495" class="flow"/>
+  <path d="M745,495 L775,495 L775,305 L840,305" class="flow"/>
+  <text x="548" y="480" class="ts">HTTPS</text>
+
+  <!-- ============ SERVER ZONE ============ -->
+  <rect x="800" y="100" width="870" height="680" rx="10" class="zone"/>
+  <text x="820" y="128" class="zt">COMPLIANCE ZONE — VERITAS SERVER (1 VM, systemd)</text>
+
+  <!-- launcher -->
+  <rect x="825" y="145" width="820" height="58" rx="8" class="cur"/>
+  <text x="840" y="170" class="tb">veritas-launcher (Go)</text>
+  <text x="840" y="190" class="ts">validates veritas.vlic (RSA-PSS + machine-id fingerprint) → starts runtime → systemd restart on failure</text>
+
+  <!-- runtime outer -->
+  <rect x="825" y="215" width="820" height="545" rx="8" fill="#ffffff" stroke="#2b6cb0" stroke-width="1.5"/>
+  <text x="840" y="238" class="zt" style="font-size:13px">veritas-runtime (Python / FastAPI)</text>
+
+  <!-- pipeline row -->
+  <rect x="840" y="255" width="190" height="100" rx="8" class="cur"/>
+  <text x="855" y="280" class="tb">Ingest API</text>
+  <text x="855" y="300" class="ts">POST /v1/{org}/events</text>
+  <text x="855" y="318" class="ts">agent token auth</text>
+  <text x="855" y="336" class="ts">schema validation</text>
+
+  <rect x="1065" y="255" width="150" height="100" rx="8" class="new"/>
+  <text x="1080" y="280" class="tb">Ingest queue</text>
+  <text x="1080" y="300" class="ts">NEW: bounded</text>
+  <text x="1080" y="318" class="ts">returns 202 fast</text>
+  <text x="1080" y="336" class="ts">backpressure</text>
+
+  <rect x="1250" y="255" width="170" height="100" rx="8" class="cur"/>
+  <text x="1265" y="280" class="tb">PII detection</text>
+  <text x="1265" y="300" class="ts">Presidio + spaCy +</text>
+  <text x="1265" y="318" class="ts">Aadhaar/PAN/phone</text>
+  <text x="1265" y="336" class="ts">(worker pool, NEW)</text>
+
+  <rect x="1455" y="255" width="175" height="100" rx="8" class="cur"/>
+  <text x="1470" y="280" class="tb">Rules engine</text>
+  <text x="1470" y="300" class="ts">EXPOSURE / PURPOSE /</text>
+  <text x="1470" y="318" class="ts">RETENTION / LINKAGE</text>
+  <text x="1470" y="336" class="ts">from org policy YAML</text>
+
+  <path d="M1030,305 L1065,305" class="flow"/>
+  <path d="M1215,305 L1250,305" class="flowO"/>
+  <path d="M1420,305 L1455,305" class="flow"/>
+
+  <!-- second row -->
+  <rect x="1455" y="400" width="175" height="80" rx="8" class="cur"/>
+  <text x="1470" y="425" class="tb">Explain</text>
+  <text x="1470" y="445" class="ts">verdict + statute text</text>
+  <text x="1470" y="463" class="ts">(template; LLM optional)</text>
+  <path d="M1542,355 L1542,400" class="flow"/>
+
+  <rect x="1250" y="400" width="170" height="80" rx="8" class="db"/>
+  <text x="1265" y="425" class="tb">Evidence store</text>
+  <text x="1265" y="445" class="ts">append-only, SHA-256</text>
+  <text x="1265" y="463" class="ts">hash chain, per org</text>
+  <path d="M1455,440 L1420,440" class="flow"/>
+
+  <rect x="1455" y="525" width="175" height="70" rx="8" class="cur"/>
+  <text x="1470" y="550" class="tb">Live feed</text>
+  <text x="1470" y="570" class="ts">WebSocket room per org</text>
+  <path d="M1542,480 L1542,525" class="flow"/>
+
+  <!-- control plane -->
+  <rect x="840" y="400" width="190" height="195" rx="8" class="cur"/>
+  <text x="855" y="425" class="tb">Control plane</text>
+  <text x="855" y="447" class="ts">agent registration</text>
+  <text x="855" y="465" class="ts">one-time keys, revoke</text>
+  <text x="855" y="483" class="ts">heartbeat / last-seen</text>
+  <text x="855" y="501" class="ts">users, login, sessions</text>
+  <text x="855" y="519" class="ts">RBAC: admin / auditor /</text>
+  <text x="855" y="537" class="ts">viewer, audit log</text>
+  <text x="855" y="555" class="ts">TLS cert auto-generated</text>
+  <text x="855" y="573" class="ts">license status endpoint</text>
+  
+  <!-- REST -->
+  <rect x="1065" y="525" width="355" height="70" rx="8" class="cur"/>
+  <text x="1080" y="550" class="tb">Dashboard REST + WebSocket API</text>
+  <text x="1080" y="570" class="ts">verdicts, cases, comments, export, verify-chain, backup</text>
+  <path d="M1335,480 L1335,525" class="flow"/>
+  <path d="M1455,560 L1420,560" class="flow"/>
+
+  <!-- storage strip -->
+  <rect x="840" y="640" width="790" height="95" rx="8" class="db"/>
+  <text x="855" y="665" class="tb">Local disk — /var/lib/veritas</text>
+  <text x="855" y="688" class="ts">evidence.db (SQLite, WAL mode, single writer = queue worker) · agents.db · users.db · audit.db</text>
+  <text x="855" y="708" class="ts">org_config/{org}/*.yaml (versioned) · TLS cert/key · veritas.vlic · backups/</text>
+  <path d="M1335,595 L1335,640" class="flow"/>
+
+  <!-- ============ BOTTOM ROW ============ -->
+  <rect x="30" y="820" width="300" height="110" rx="8" class="opt"/>
+  <text x="45" y="848" class="tb">License portal</text>
+  <text x="45" y="870" class="ts">Next.js + Supabase (vendor side)</text>
+  <text x="45" y="888" class="ts">enter customer fingerprint → .vlic</text>
+  <text x="45" y="906" class="ts">delivered as a file, works offline</text>
+  <path d="M180,820 L180,800 L788,800 L788,174 L825,174" class="flowG"/>
+  <text x="200" y="795" class="ts">veritas.vlic (file)</text>
+
+  <rect x="850" y="820" width="230" height="110" rx="8" class="opt"/>
+  <text x="865" y="848" class="tb">Backup target</text>
+  <text x="865" y="870" class="ts">nightly backup + chain verify</text>
+  <text x="865" y="888" class="ts">NAS / object store in the LAN</text>
+  <path d="M965,735 L965,820" class="flowG"/>
+
+  <rect x="1110" y="820" width="230" height="110" rx="8" class="opt"/>
+  <text x="1125" y="848" class="tb">LLM (optional)</text>
+  <text x="1125" y="870" class="ts">cloud API or local Ollama</text>
+  <text x="1125" y="888" class="ts">sends rule + field + statute,</text>
+  <text x="1125" y="906" class="ts">never raw PII</text>
+  <path d="M1225,735 L1225,820" class="flowG"/>
+
+  <rect x="1380" y="820" width="265" height="110" rx="8" class="cur"/>
+  <text x="1395" y="848" class="tb">Admin / Auditor / Viewer</text>
+  <text x="1395" y="870" class="ts">browser: login, live feed, cases,</text>
+  <text x="1395" y="888" class="ts">PDF + evidence export</text>
+  <text x="1395" y="906" class="ts">HTTPS + WSS via the reverse proxy</text>
+  <path d="M1645,875 L1657,875 L1657,617 L1380,617 L1380,595" class="flow"/>
+
+  <!-- ============ NUMBERED FLOW ============ -->
+  <g>
+    <circle cx="288" cy="236" r="12" class="num"/><text x="288" y="241" class="numt">1</text>
+    <circle cx="410" cy="440" r="12" class="num"/><text x="410" y="445" class="numt">2</text>
+    <circle cx="582" cy="507" r="12" class="num"/><text x="582" y="512" class="numt">3</text>
+    <circle cx="1048" cy="283" r="12" class="num"/><text x="1048" y="288" class="numt">4</text>
+    <circle cx="1233" cy="283" r="12" class="num"/><text x="1233" y="288" class="numt">5</text>
+    <circle cx="1438" cy="283" r="12" class="num"/><text x="1438" y="288" class="numt">6</text>
+    <circle cx="1435" cy="422" r="12" class="num"/><text x="1435" y="427" class="numt">7</text>
+    <circle cx="1657" cy="740" r="12" class="num"/><text x="1657" y="745" class="numt">8</text>
+  </g>
+
+  <!-- ============ LEGEND ============ -->
+  <rect x="30" y="960" width="1615" height="62" rx="8" fill="#ffffff" stroke="#d1d5db"/>
+  <rect x="48" y="975" width="26" height="14" class="cur"/><text x="82" y="987" class="ts">exists today</text>
+  <rect x="190" y="975" width="26" height="14" class="new"/><text x="224" y="987" class="ts">recommended change</text>
+  <rect x="380" y="975" width="26" height="14" class="opt"/><text x="414" y="987" class="ts">real-environment / optional</text>
+  <rect x="610" y="975" width="26" height="14" class="db"/><text x="644" y="987" class="ts">storage</text>
+  <text x="48" y="1011" class="ts">Flow: 1 services write logs · 2 agent tails · 3 HTTPS POST (bearer token) · 4 enqueue · 5 detect PII · 6 evaluate rules · 7 store evidence + live feed · 8 humans review in the dashboard</text>
+</svg>
