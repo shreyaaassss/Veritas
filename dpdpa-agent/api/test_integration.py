@@ -325,3 +325,30 @@ class TestScanAndEventsShareTheSameStore:
         rule_ids = {r["rule_id"] for r in rows}
         assert "EXPOSURE_001" in rule_ids  # from the /events log-sourced call
         assert len(rows) >= 2
+
+
+class TestAgentPayloadCompatibility:
+    """The agent forwards log lines; the server must accept what it sends."""
+
+    @pytest.mark.parametrize("source_type", ["log", "LOG", "Log"])
+    def test_events_accepts_log_source_type_in_any_case(self, retail_co_token, source_type):
+        r = client.post(
+            "/v1/retail_co/events",
+            headers={"Authorization": f"Bearer {retail_co_token}"},
+            json={
+                "source_type": source_type, "source_system": "support-ticketing",
+                "raw_snippet": "agent note: aadhaar 2345 6789 0124 read aloud to customer",
+                "fields": {},
+            },
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["contains_pii"] is True
+
+    def test_events_rejects_unknown_source_type(self, retail_co_token):
+        r = client.post(
+            "/v1/retail_co/events",
+            headers={"Authorization": f"Bearer {retail_co_token}"},
+            json={"source_type": "carrier-pigeon", "source_system": "x", "raw_snippet": "y"},
+        )
+        assert r.status_code == 422
+

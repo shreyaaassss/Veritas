@@ -59,7 +59,7 @@ from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, Body, Depends, HTTPException
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from agent_store.models import Agent
 from api.agent_auth import verify_agent_token
@@ -229,6 +229,12 @@ class IngestEventRequest(BaseModel):
     timestamp: Optional[datetime] = None
     raw_snippet: str = Field(..., min_length=1, max_length=100_000)
     fields: Dict[str, str] = Field(default_factory=dict)
+
+    @field_validator("source_type", mode="before")
+    @classmethod
+    def _source_type_case_insensitive(cls, v):
+        """Accept "LOG"/"Log"/"log": the agent has historically sent upper case."""
+        return v.strip().lower() if isinstance(v, str) else v
 
     @model_validator(mode="after")
     def _validate_fields_size(self) -> "IngestEventRequest":

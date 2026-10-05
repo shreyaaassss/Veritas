@@ -327,7 +327,7 @@ def forward_event(
     url     = base_url.rstrip("/") + state["event_endpoint"]
     headers = _build_headers(state)
     payload = {
-        "source_type":   "LOG",
+        "source_type":   "log",
         "source_system": source_system,
         "raw_snippet":   raw_snippet,
         "fields":        {},
