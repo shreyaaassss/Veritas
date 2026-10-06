@@ -59,7 +59,7 @@ jobs:
           test -x /opt/veritas/veritas-runtime
           test -x /usr/bin/veritas
           systemctl is-enabled veritas
-          ! systemctl is-active --quiet veritas   # needs a license first
+          if systemctl is-active --quiet veritas; then echo "service is running before it has a license"; exit 1; fi
           veritas version
 
       - name: Fingerprint — CLI equals runtime, v2 format
@@ -185,9 +185,9 @@ jobs:
       - name: Uninstall
         run: |
           sudo apt-get remove -y veritas
-          ! systemctl is-active --quiet veritas
+          if systemctl is-active --quiet veritas; then echo "service still running after remove"; exit 1; fi
           sudo apt-get purge -y veritas
-          ! id veritas 2>/dev/null
+          if id veritas >/dev/null 2>&1; then echo "user still exists after purge"; exit 1; fi
           test ! -d /var/lib/veritas
 
       - name: Collect logs on failure

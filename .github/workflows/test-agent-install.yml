@@ -1,0 +1,218 @@
+name: Test Agent .deb Installation
+
+# Builds the agent .deb from the current commit, installs it on a clean Ubuntu runner
+# next to a Veritas server (run from source, with a real self-signed certificate),
+# and checks the whole path: registration, log reading with the service's real
+# systemd restrictions, health reporting, rotation, bad events, restart and outage.
+
+on:
+  push:
+    tags: ['v*']
+    branches: [main]
+    paths:
+      - 'veritas-agent/**'
+      - 'package/agent-deb/**'
+      - 'package/build-agent-deb.sh'
+      - 'dpdpa-agent/api/agents.py'
+      - 'dpdpa-agent/api/agent_auth.py'
+      - 'dpdpa-agent/agent_store/**'
+      - '.github/scripts/agent_e2e.py'
+      - '.github/scripts/agent_ci_lib.sh'
+      - '.github/workflows/test-agent-install.yml'
+  workflow_dispatch:
+
+jobs:
+  test-agent-deb:
+    name: Install and exercise the agent .deb on Ubuntu 22.04
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    env:
+      VERITAS_URL: https://localhost:8000
+      VERITAS_ORG: ci_org
+      VERITAS_ADMIN_USER: ci_admin
+      VERITAS_ADMIN_PASSWORD: CiAdmin#12345
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: dpdpa-agent/requirements.txt
+
+      # ── The Veritas server, run from source ──────────────────────────────
+      - name: Install server dependencies
+        working-directory: dpdpa-agent
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl
+
+      - name: Create an any-machine test license
+        env:
+          VERITAS_PRIVATE_KEY_B64: ${{ secrets.VERITAS_PRIVATE_KEY_B64 }}
+        run: |
+          test -n "$VERITAS_PRIVATE_KEY_B64" || { echo "VERITAS_PRIVATE_KEY_B64 secret is not set"; exit 1; }
+          mkdir -p /tmp/vdata
+          echo "$VERITAS_PRIVATE_KEY_B64" | base64 -d > /tmp/ci_private_key.pem
+          chmod 600 /tmp/ci_private_key.pem
+          python tools/generate_license.py --org ci-agent-test --tier enterprise \
+            --expiry 2027-12-31 --key /tmp/ci_private_key.pem --out /tmp/vdata/veritas.vlic
+          rm -f /tmp/ci_private_key.pem
+
+      - name: Start the server and create the test organization
+        run: |
+          source .github/scripts/agent_ci_lib.sh
+          start_server
+          wait_server
+          $E2E setup
+
+      # ── The agent package ────────────────────────────────────────────────
+      - name: Build and install the agent .deb
+        run: |
+          chmod +x package/build-agent-deb.sh
+          bash package/build-agent-deb.sh 0.0.0-ci all
+          sudo apt-get install -y ./dist/veritas-agent_0.0.0-ci_all.deb
+
+      - name: Package layout
+        run: |
+          id veritas-agent
+          test "$(veritas-agent version)" = "Veritas Agent 0.0.0-ci"
+          test "$(cat /opt/veritas-agent/VERSION)" = "0.0.0-ci"
+          systemctl is-enabled veritas-agent
+          if systemctl is-active --quiet veritas-agent; then echo "agent is running before it was configured"; exit 1; fi
+          systemctl cat veritas-agent | grep -q "StateDirectory=veritas-agent"
+          systemctl cat veritas-agent | grep -q "SupplementaryGroups=adm"
+          systemctl cat veritas-agent | grep -q "RestartPreventExitStatus=78"
+          test "$(stat -c '%U %a' /etc/veritas-agent/config.yaml)" = "veritas-agent 640"
+
+      # ── A bad key stops the service once, with a clear reason ────────────
+      - name: Invalid key stops the service once and does not loop
+        run: |
+          source .github/scripts/agent_ci_lib.sh
+          write_agent_config "not-a-real-key"
+          sudo systemctl start veritas-agent
+          wait_service_failed
+          test "$(systemctl show -p ExecMainStatus --value veritas-agent)" = "78"
+          test "$(systemctl show -p NRestarts --value veritas-agent)" = "0"
+          agent_log_has "Registration rejected" || { echo "no clear rejection reason in the log"; exit 1; }
+          if sudo test -e /var/lib/veritas-agent/.veritas_state.json; then echo "an identity was saved although registration was rejected"; exit 1; fi
+          sudo systemctl reset-failed veritas-agent || true
+
+      # ── Real registration and log reading ────────────────────────────────
+      - name: Register with a real key and read logs under the service restrictions
+        run: |
+          source .github/scripts/agent_ci_lib.sh
+          sudo mkdir -p "$LOGDIR"
+          sudo touch "$LOGDIR/app.log" "$LOGDIR/secret.log"
+          sudo chown root:adm "$LOGDIR/app.log";  sudo chmod 640 "$LOGDIR/app.log"     # readable through group adm
+          sudo chown root:root "$LOGDIR/secret.log"; sudo chmod 600 "$LOGDIR/secret.log" # not readable by the agent
+          KEY=$($E2E issue-key)
+          write_agent_config "$KEY"
+          sudo systemctl start veritas-agent
+          $E2E wait-agent --label ci-agent --version 0.0.0-ci \
+            --source "app.log=reading" \
+            --source "secret.log=error:Permission denied" \
+            --source "later.log=waiting" --timeout 150
+          # identity saved in the state directory, owner-only
+          test "$(sudo stat -c '%U %a' /var/lib/veritas-agent/.veritas_state.json)" = "veritas-agent 600"
+          # the one-time key never appears in the logs
+          if agent_log_has "$KEY"; then echo "the registration key appears in the agent log"; exit 1; fi
+          set_baseline
+
+      # ── Telemetry end to end ─────────────────────────────────────────────
+      - name: Log lines become violations; clean lines do not
+        run: |
+          source .github/scripts/agent_ci_lib.sh
+          append_log app.log "DEBUG customer verified with Aadhaar 2345 6789 0124"
+          append_log app.log "INFO order ORD-583927 status updated to packed"
+          append_log app.log "DEBUG receipt sent to phone 9876543210"
+          expect_new_violations 2
+
+      - name: Rotation by rename loses nothing and repeats nothing
+        run: |
+          source .github/scripts/agent_ci_lib.sh
+          append_log app.log "DEBUG last line before rotation, phone 9123456780"
+          sudo mv "$LOGDIR/app.log" "$LOGDIR/app.log.1"
+          printf '%s\n' "DEBUG first line after rotation, phone 9234567801" | sudo tee "$LOGDIR/app.log" >/dev/null
+          sudo chmod 644 "$LOGDIR/app.log"
+          expect_new_violations 4
+
+      - name: Truncation in place (copytruncate) is followed
+        run: |
+          source .github/scripts/agent_ci_lib.sh
+          sudo truncate -s 0 "$LOGDIR/app.log"
+          append_log app.log "DEBUG after copytruncate, phone 9345678012"
+          expect_new_violations 5
+
+      - name: An oversized line is dropped and the line behind it still arrives
+        run: |
+          source .github/scripts/agent_ci_lib.sh
+          python -c "print('x' * 150000)" | sudo tee -a "$LOGDIR/app.log" >/dev/null
+          append_log app.log "DEBUG after the oversized line, phone 9456780123"
+          expect_new_violations 6
+          $E2E counter --label ci-agent --name dropped_rejected --min 1 --timeout 90
+
+      - name: A file that appears later is read from its start
+        run: |
+          source .github/scripts/agent_ci_lib.sh
+          printf '%s\n' "DEBUG from a late file, phone 9567801234" | sudo tee "$LOGDIR/later.log" >/dev/null
+          sudo chmod 644 "$LOGDIR/later.log"
+          expect_new_violations 7
+          $E2E wait-agent --label ci-agent --source "later.log=reading" --timeout 60
+
+      # ── Restart and outage ───────────────────────────────────────────────
+      - name: Restart keeps the identity (no second registration)
+        run: |
+          source .github/scripts/agent_ci_lib.sh
+          BEFORE=$(agent_ids)
+          sudo systemctl restart veritas-agent
+          $E2E wait-agent --label ci-agent --version 0.0.0-ci --timeout 90
+          AFTER=$(agent_ids)
+          echo "before: $BEFORE"; echo "after:  $AFTER"
+          [ "$BEFORE" = "$AFTER" ] || { echo "the agent registered again after a restart"; exit 1; }
+          agent_log_has "Using existing identity" || { echo "the agent did not reuse its saved identity"; exit 1; }
+          append_log app.log "DEBUG after restart, phone 9678012345"
+          expect_new_violations 8
+
+      - name: A server outage is buffered and delivered afterwards
+        run: |
+          source .github/scripts/agent_ci_lib.sh
+          stop_server
+          append_log app.log "DEBUG during outage 1, phone 9789012345"
+          append_log app.log "DEBUG during outage 2, phone 9890123456"
+          append_log app.log "DEBUG during outage 3, phone 9901234567"
+          sleep 8
+          start_server
+          wait_server
+          expect_new_violations 11 240
+          $E2E counter --label ci-agent --name retries --min 1 --timeout 60
+          systemctl is-active --quiet veritas-agent
+
+      - name: Evidence chain is intact
+        run: |
+          source .github/scripts/agent_ci_lib.sh
+          $E2E verify-chain
+
+      # ── Removal ──────────────────────────────────────────────────────────
+      - name: Uninstall and purge
+        run: |
+          sudo apt-get remove -y veritas-agent
+          if systemctl is-active --quiet veritas-agent; then echo "agent still running after remove"; exit 1; fi
+          sudo apt-get purge -y veritas-agent
+          if id veritas-agent >/dev/null 2>&1; then echo "user still exists after purge"; exit 1; fi
+          sudo test ! -e /var/lib/veritas-agent
+          sudo test ! -e /etc/veritas-agent
+
+      - name: Collect logs on failure
+        if: failure()
+        run: |
+          echo "=== agent status ==="; systemctl status veritas-agent --no-pager || true
+          echo "=== agent journal ==="; sudo journalctl -u veritas-agent --no-pager | tail -150 || true
+          echo "=== server log ==="; tail -80 /tmp/server.log || true
+          echo "=== agents ==="; python .github/scripts/agent_e2e.py agents || true
+
+      - name: Remove secrets
+        if: always()
+        run: rm -f /tmp/ci_private_key.pem /tmp/vdata/veritas.vlic
