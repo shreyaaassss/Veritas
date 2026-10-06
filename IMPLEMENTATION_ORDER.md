@@ -98,17 +98,25 @@ Start by reproducing the defects on a local `kind` cluster, then fix them.
 
 **Acceptance:** one command deploys the DaemonSet; both nodes appear ACTIVE; stdout PII from a test pod shows up as a violation under the expected source system; the `kind` CI test is green.
 
-### Phase C: Complete the customer flow (spec priorities 1, 6)
+### Phase C: Complete the customer flow (revised 2026-10-06 after Phase B)
+
+The first version of this phase mixed polish with items that need measurements or carry privacy cost. It was reshaped as follows.
 
 | # | Task | Notes |
 |---|---|---|
-| C1 | Add `data_since` to the Add Organization form | Existing systems with old data cannot be described through the UI today |
-| C2 | User and role management screen (create users, assign role and organizations) | Today only the API; a customer admin should not need curl |
-| C3 | Visual check of the blank first-run dashboard and fix anything half-empty | Spec priority 1 |
-| C4 | Version reporting in `/health` and agent registration | Backlog item |
-| C5 | Ingest queue and worker pool (Milestone 3, step 11), once the simulation baseline exists | Spec section 13: only when measured traffic needs it |
-| C6 | Optional on-disk spool in the agent for long outages and agent restarts | Spec: bounded local buffering; today it is memory-only (1000 lines) |
-| C7 | Full end-to-end check: file log, agent, Core, violation, evidence, dashboard, on Linux and in Kubernetes | Spec priority 6; the simulation covers most of this |
+| C1 | **Route-access test.** A test that lists every route and fails if a non-public route can be reached without authentication, or an organization route without organization access; an explicit, reviewed list of public routes. Fix whatever it finds. | The agent-management leak found in A4 shows the pattern can recur. A test stops it for every future route too. |
+| C2 | **Passwords and the user management screen.** Change your own password; an administrator resets a user's password; a minimum password policy; the screen: create user, role, disable, grant or revoke organization access; audit-log entries for each. | The backend can already create users, change roles and grant organizations, but **there is no route to change or reset a password at all**. A customer cannot go live without it. |
+| C3 | **`data_since` in the Add Organization form and the Policy tab.** | Systems that already hold old data cannot be described through the UI today, so retention is measured wrongly. |
+| C4 | **Version reporting and compatibility.** Real versions in `/health` and agent registration; the dashboard shows the server version and flags agents older than the supported minimum. | Builds on A5. Cheap, and it helps support. |
+| C5 | **First-run experience.** Look at the blank dashboard after a fresh install and fix anything half-empty (needs the browser extension connected). | Spec priority 1. Never looked at yet. |
+| C6 | **Browser smoke tests in CI.** Sign in, create an organization, issue a key, see an agent, see a violation, change a case status. | Nothing tests the dashboard in a browser today. Replaces the vague "full end-to-end check": the log-to-violation path is already covered by the Linux, agent and Kubernetes CI tests. |
+| C7 | **Operations basics.** Scheduled backups with chain verification; license-expiry warning in the dashboard and a re-check while running; documented way to install the company's own TLS certificate. | From the technical audit. A customer notices these soon after go-live. |
+
+**Moved out of Phase C**
+- **Ingest queue and worker pool:** stays in Milestone 3 (step 11), gated on the simulation's load baseline (spec section 13: only when measured traffic needs it).
+- **On-disk spool in the agent: deferred, with conditions.** Today the agent never writes log content to disk, only its identity. A spool would put raw log lines, which can contain Aadhaar or phone numbers, on every application server. If a customer needs it: opt-in, owner-only permissions, a size cap and encryption at rest. Until then keep the in-memory buffer (1,000 lines) and make its size configurable.
+
+**Acceptance:** the route-access test is green and part of CI; a customer administrator can onboard users, change passwords and describe existing data without curl; the dashboard is covered by a browser smoke test.
 
 ### Phase D: Sanitization and downstream forwarding, Mode B (spec priority 7, deliberately last)
 
