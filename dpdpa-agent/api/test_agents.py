@@ -739,3 +739,54 @@ def test_agent_store_migrates_keys_created_before_reusable_keys(tmp_path):
     with pytest.raises(ValueError, match="already been used"):
         store.consume_key("openkey")
     store.close()
+
+
+# ---------------------------------------------------------------------------
+# Version reporting and compatibility
+# ---------------------------------------------------------------------------
+
+class TestVersions:
+    def test_registration_tells_the_agent_the_server_and_minimum_versions(self, monkeypatch):
+        import veritas_version
+        monkeypatch.setenv("VERITAS_VERSION", "7.7.7")
+        veritas_version.get_version.cache_clear()
+        try:
+            key = client.post("/agents/issue-key", json={"org_id": "retail_co"}).json()["key"]
+            data = client.post("/agent/register", json={"registration_key": key, "source_label": "v"}).json()
+            assert data["server_version"] == "7.7.7"
+            assert data["min_agent_version"] == veritas_version.MIN_AGENT_VERSION
+        finally:
+            veritas_version.get_version.cache_clear()
+
+    def test_heartbeat_says_whether_the_agent_is_outdated(self):
+        agent_id, token = _register_agent()
+        hdr = {"Authorization": f"Bearer {token}"}
+        old = client.post("/agent/heartbeat", headers=hdr,
+                          json={"agent_id": agent_id, "health": {"agent_version": "1.0.10"}}).json()
+        assert old["agent_outdated"] is True and old["min_agent_version"]
+        no_health = client.post("/agent/heartbeat", headers=hdr, json={"agent_id": agent_id}).json()
+        assert no_health["agent_outdated"] is True          # pre-1.0.18 agents send no health report
+        current = client.post("/agent/heartbeat", headers=hdr,
+                              json={"agent_id": agent_id, "health": {"agent_version": "99.0.0"}}).json()
+        assert current["agent_outdated"] is False
+
+    def test_agent_list_flags_outdated_agents(self):
+        agent_id, token = _register_agent()
+        client.post("/agent/heartbeat", headers={"Authorization": f"Bearer {token}"},
+                    json={"agent_id": agent_id, "health": {"agent_version": "1.0.1"}})
+        row = [a for a in client.get("/agents").json()["agents"] if a["agent_id"] == agent_id][0]
+        assert row["agent_version"] == "1.0.1" and row["outdated"] is True
+        client.post("/agent/heartbeat", headers={"Authorization": f"Bearer {token}"},
+                    json={"agent_id": agent_id, "health": {"agent_version": "1.0.19"}})
+        row = [a for a in client.get("/agents").json()["agents"] if a["agent_id"] == agent_id][0]
+        assert row["outdated"] is False
+
+    def test_system_health_reports_the_release_version(self, monkeypatch):
+        import veritas_version
+        monkeypatch.setenv("VERITAS_VERSION", "7.7.7")
+        veritas_version.get_version.cache_clear()
+        try:
+            runtime = client.get("/api/system/health").json()["checks"]["runtime"]
+            assert runtime["version"] == "7.7.7" and runtime["min_agent_version"]
+        finally:
+            veritas_version.get_version.cache_clear()

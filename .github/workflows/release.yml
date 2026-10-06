@@ -46,6 +46,7 @@ jobs:
       - name: Build PyInstaller binary
         working-directory: dpdpa-agent
         run: |
+          echo "${GITHUB_REF_NAME#v}" > VERSION     # the server reports this release version
           python -m PyInstaller veritas-linux.spec --noconfirm
 
       - name: Build .deb package
@@ -89,6 +90,7 @@ jobs:
       - name: Build PyInstaller binary
         working-directory: dpdpa-agent
         run: |
+          echo "${GITHUB_REF_NAME#v}" > VERSION     # the server reports this release version
           python -m PyInstaller veritas-mac.spec --noconfirm
 
       - name: Build .pkg installer
@@ -131,7 +133,10 @@ jobs:
 
       - name: Build PyInstaller runtime
         working-directory: dpdpa-agent
-        run: python -m PyInstaller veritas.spec --noconfirm
+        shell: bash
+        run: |
+          echo "${GITHUB_REF_NAME#v}" > VERSION     # the server reports this release version
+          python -m PyInstaller veritas.spec --noconfirm
 
       - name: Set up Go
         uses: actions/setup-go@v5

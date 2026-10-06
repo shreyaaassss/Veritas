@@ -455,9 +455,9 @@ def bootstrap(config: Dict[str, Any], state: Dict[str, Any]) -> Dict[str, Any]:
                 sys.exit(EXIT_CONFIG)
 
             logger.info(
-                "Registered as %s | org: %s | endpoint: %s | TLS: %s",
+                "Registered as %s | org: %s | endpoint: %s | TLS: %s | server %s",
                 state["agent_id"], state["org_id"], state["event_endpoint"],
-                "HTTPS" if is_https else "HTTP",
+                "HTTPS" if is_https else "HTTP", data.get("server_version") or "?",
             )
             return state
 
@@ -550,6 +550,29 @@ def get_agent_version() -> str:
     except OSError:
         text = ""
     return (text or "dev")[:64]
+
+
+_VERSION_WARNED = False
+
+
+def note_server_versions(data: Dict[str, Any]) -> None:
+    """
+    Log, once, what the server says about this agent's version: the server's release and
+    whether this agent is older than the oldest version it supports. Never raises.
+    """
+    global _VERSION_WARNED
+    try:
+        server_version = str(data.get("server_version") or "")
+        minimum = str(data.get("min_agent_version") or "")
+        if data.get("agent_outdated") is True and not _VERSION_WARNED:
+            _VERSION_WARNED = True
+            logger.warning(
+                "This agent (%s) is older than %s, the oldest version Veritas server %s fully "
+                "supports. Upgrade the agent: some features may not work.",
+                get_agent_version(), minimum or "the minimum", server_version or "?",
+            )
+    except Exception:
+        pass
 
 
 class SourceBoard:
@@ -1299,6 +1322,10 @@ def heartbeat_loop(
             )
             if resp.ok:
                 logger.debug("Heartbeat sent OK")
+                try:
+                    note_server_versions(resp.json())
+                except Exception:
+                    pass   # an answer without JSON (an older server) is fine
             else:
                 logger.warning("Heartbeat returned %s", resp.status_code)
         except Exception as e:

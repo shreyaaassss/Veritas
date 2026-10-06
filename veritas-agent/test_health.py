@@ -158,3 +158,45 @@ class TestHeartbeat:
         assert kw["json"]["agent_id"] == "A1"
         assert kw["json"]["health"]["agent_version"] == "1.0.18"
         assert kw["headers"]["Authorization"] == "Bearer t"
+
+
+class TestServerVersionNotice:
+    def test_outdated_agent_is_warned_once(self, monkeypatch, caplog):
+        monkeypatch.setattr(agent, "_VERSION_WARNED", False)
+        monkeypatch.setenv("VERITAS_AGENT_VERSION", "1.0.10")
+        reply = {"ok": True, "server_version": "1.0.19", "min_agent_version": "1.0.18", "agent_outdated": True}
+        with caplog.at_level("WARNING"):
+            agent.note_server_versions(reply)
+            agent.note_server_versions(reply)
+        warnings = [r for r in caplog.records if "older than 1.0.18" in r.getMessage()]
+        assert len(warnings) == 1
+        assert "1.0.10" in warnings[0].getMessage() and "1.0.19" in warnings[0].getMessage()
+
+    def test_current_agent_is_not_warned(self, monkeypatch, caplog):
+        monkeypatch.setattr(agent, "_VERSION_WARNED", False)
+        with caplog.at_level("WARNING"):
+            agent.note_server_versions({"ok": True, "server_version": "1.0.19",
+                                        "min_agent_version": "1.0.18", "agent_outdated": False})
+            agent.note_server_versions({"ok": True})          # an older server says nothing
+            agent.note_server_versions({"agent_outdated": "yes"})   # not a real boolean
+        assert not [r for r in caplog.records if "older than" in r.getMessage()]
+
+    def test_garbage_answers_never_raise(self):
+        for junk in (None, [], "x", {"agent_outdated": object()}):
+            agent.note_server_versions(junk)  # type: ignore[arg-type]
+
+    def test_heartbeat_passes_the_answer_to_the_notice(self, monkeypatch):
+        seen = []
+        monkeypatch.setattr(agent, "note_server_versions", lambda d: seen.append(d))
+
+        class Resp:
+            ok = True
+            status_code = 200
+            def json(self): return {"agent_outdated": True}
+
+        monkeypatch.setattr(agent.requests, "post", lambda url, **kw: Resp())
+        monkeypatch.setattr(agent.time, "sleep", lambda s: (_ for _ in ()).throw(TestHeartbeat._Stop()))
+        with pytest.raises(TestHeartbeat._Stop):
+            agent.heartbeat_loop({"veritas_address": "https://v:8000"}, {"agent_id": "A1", "auth_token": "t"}, 30,
+                                 queue.Queue())
+        assert seen == [{"agent_outdated": True}]

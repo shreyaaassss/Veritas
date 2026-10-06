@@ -1544,6 +1544,7 @@
       </div>
 
       <div class="topbar-actions">
+        <div id="serverVersion" style="display:none;font-size:11px;color:var(--text-muted);padding:0 4px 6px;" title="Veritas server release"></div>
         <div class="license-badge" id="licenseBadge" style="display:none;">
           <span class="license-dot"></span>
           <span id="licenseBadgeText">Licensed</span>
@@ -3449,12 +3450,16 @@ function renderAgentsTable(agents) {
   tbody.innerHTML = agents.map(a => {
     const hb      = agentHeartbeatCell(a);
     const health  = agentHealthSummary(a);
-    if (a.status === 'ACTIVE' && (hb.stale || health.attention)) needAttention += 1;
+    if (a.status === 'ACTIVE' && (hb.stale || health.attention || a.outdated)) needAttention += 1;
     const created = new Date(a.created_at).toLocaleDateString();
     const canRevoke = a.status === 'ACTIVE';
-    const version = a.agent_version
+    const outdatedTip = a.agent_version
+      ? 'Older than the oldest agent version this server fully supports. Upgrade the agent.'
+      : 'This agent does not report a version, so it predates version reporting. Upgrade it.';
+    const version = (a.agent_version
       ? `<span class="mono" style="font-size:0.8rem;">${escapeHtml(a.agent_version)}</span>`
-      : '<span style="color:var(--text-subtle)">—</span>';
+      : '<span style="color:var(--text-subtle)">—</span>')
+      + (a.outdated ? ` <span class="badge MEDIUM" title="${outdatedTip}">Outdated</span>` : '');
     return `<tr>
       <td class="mono" style="font-size:0.8rem;">${escapeHtml(a.agent_id)}</td>
       <td><span class="badge system">${escapeHtml(a.source_label || 'unlabelled')}</span></td>
@@ -3914,6 +3919,21 @@ async function submitChangePassword() {
   showToast('Password changed. Other sessions were signed out.', 'success');
 }
 
+// ---- Server version (sidebar) ----
+async function showServerVersion() {
+  try {
+    const r = await fetch('/api/system/health', { credentials: 'include' });
+    if (!r.ok) return;
+    const rt = ((await r.json()).checks || {}).runtime || {};
+    const el = document.getElementById('serverVersion');
+    if (el && rt.version) {
+      el.textContent = 'Veritas ' + (/^\d/.test(rt.version) ? 'v' : '') + rt.version;
+      if (rt.min_agent_version) el.title = `Veritas server release. Agents older than ${rt.min_agent_version} are flagged as outdated.`;
+      el.style.display = 'block';
+    }
+  } catch (e) { /* version label stays hidden */ }
+}
+
 // ---- License Badge ----
 async function checkLicense() {
   try {
@@ -4072,6 +4092,7 @@ async function triggerBackup() {
     return;
   }
   await checkLicense();
+  showServerVersion();
   await populateOrgSelector();
   connectWS();
   refreshStats();

@@ -68,6 +68,8 @@ logger = logging.getLogger("dashboard.server")
 # body is read. Prevents unbounded memory use from oversized Agent payloads.
 # ---------------------------------------------------------------------------
 
+from veritas_version import MIN_AGENT_VERSION, get_version
+
 _API_VERSION = "1.0.0"
 _MAX_BODY_BYTES = 256 * 1024  # 256 KB
 
@@ -628,7 +630,7 @@ async def health():
     Liveness probe — returns 200 if the server process is running.
     Does NOT check dependencies. Used by: load balancers, systemd, Docker.
     """
-    return {"status": "ok", "service": "veritas", "version": _API_VERSION}
+    return {"status": "ok", "service": "veritas", "version": _API_VERSION}   # API version, not the release
 
 
 @app.get("/ready")
@@ -765,7 +767,8 @@ async def system_health(_user: User = Depends(get_current_user)):
         "status": "ok",
         "python": sys.version.split()[0],
         "platform": _platform.system(),
-        "version": "1.0.0",
+        "version": get_version(),
+        "min_agent_version": MIN_AGENT_VERSION,
     }
 
     overall = all(
@@ -780,7 +783,7 @@ async def system_health(_user: User = Depends(get_current_user)):
         # Everyone else sees the status of each check and the figures the panel shows.
         keep = {
             "evidence_store": (), "agent_store": ("agents",), "license": ("days_remaining",),
-            "tls": (), "disk": ("free_pct",), "runtime": ("version",),
+            "tls": (), "disk": ("free_pct",), "runtime": ("version", "min_agent_version"),
         }
         checks = {
             name: {"status": v.get("status"), **{k: v[k] for k in keep[name] if k in v}}

@@ -28,6 +28,7 @@ from config_loader import OrgConfigNotFoundError, load_org_config
 from rate_limit import issue_key_rate_limit, record_register_failure, register_rate_limit
 from user_store.models import User, UserRole
 from user_store.store import get_user_store
+from veritas_version import MIN_AGENT_VERSION, get_version, is_agent_outdated
 
 logger = logging.getLogger("api.agents")
 
@@ -77,6 +78,7 @@ def _agent_to_dict(agent: Agent) -> dict:
         "last_heartbeat_at": agent.last_heartbeat_at.isoformat() if agent.last_heartbeat_at else None,
         "events_received": agent.events_received,
         "agent_version": agent.agent_version,
+        "outdated": is_agent_outdated(agent.agent_version),
         "health": agent.health,
         "health_updated_at": agent.health_updated_at.isoformat() if agent.health_updated_at else None,
     }
@@ -121,7 +123,8 @@ class RegisterAgentResponse(BaseModel):
     auth_token:     str
     org_id:         str
     event_endpoint: str
-    server_version: str = "1.0.0"   # Phase 22 — agent can detect version mismatches
+    server_version: str = ""          # lets the agent notice a version mismatch
+    min_agent_version: str = ""
 
 
 class SourceHealth(BaseModel):
@@ -366,6 +369,8 @@ async def register_agent(
         auth_token=plaintext_token,
         org_id=agent.org_id,
         event_endpoint=f"/v1/{agent.org_id}/events",
+        server_version=get_version(),
+        min_agent_version=MIN_AGENT_VERSION,
     )
 
 
@@ -404,4 +409,11 @@ async def agent_heartbeat(
         agent.agent_id,
         health=req.health.model_dump() if req.health is not None else None,
     )
-    return {"ok": True, "agent_id": agent.agent_id}
+    reported = req.health.agent_version if req.health is not None else ""
+    return {
+        "ok": True,
+        "agent_id": agent.agent_id,
+        "server_version": get_version(),
+        "min_agent_version": MIN_AGENT_VERSION,
+        "agent_outdated": is_agent_outdated(reported),
+    }

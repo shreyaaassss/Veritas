@@ -51,3 +51,6 @@ dpdpa-agent/org_config/configs/other_corp/
 dpdpa-agent/org_config/configs/api_test_org/
 dpdpa-agent/org_config/configs/edtech_co_test/
 dpdpa-agent/org_config/configs/phase4_test_org/
+
+# written by the release build
+dpdpa-agent/VERSION

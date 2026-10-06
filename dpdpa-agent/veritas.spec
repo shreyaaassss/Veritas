@@ -1,3 +1,4 @@
+import os
 # -*- mode: python ; coding: utf-8 -*-
 #
 # Veritas Runtime — PyInstaller Spec File
@@ -75,6 +76,7 @@ a = Analysis(
         ('dashboard/static',                   'dashboard/static'),
         ('llm_explainer/statute_snippets.json','llm_explainer'),
         ('org_config/configs',                 'org_config/configs'),
+        *([('VERSION', '.')] if os.path.exists('VERSION') else []),   # written by the release build
 
         # Package data files
         *spacy_datas,
