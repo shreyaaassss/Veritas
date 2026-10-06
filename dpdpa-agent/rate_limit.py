@@ -210,3 +210,40 @@ def issue_key_rate_limit(request: Request) -> None:
 def clear_login_limit(ip: str) -> None:
     """Call after successful login to reset the IP's failure counter."""
     _limiter.reset("login", ip)
+
+
+# ---------------------------------------------------------------------------
+# Per-account login lockout
+# ---------------------------------------------------------------------------
+# Login is also limited per IP address, which a guess spread over many addresses avoids.
+# This limits failures per account name: 5 wrong attempts lock that name for 15 minutes.
+# It applies to any name typed, existing or not, so it reveals nothing about which accounts exist.
+
+ACCOUNT_MAX_FAILURES = 5
+ACCOUNT_WINDOW_SECONDS = 900
+
+
+def _account_key(username: str) -> str:
+    return (username or "").strip().lower()[:64]
+
+
+def account_lock_check(username: str) -> None:
+    """Raise HTTP 429 if this account name is locked after too many failed logins."""
+    _limiter.peek("acct_fail", _account_key(username),
+                  max_requests=ACCOUNT_MAX_FAILURES, window_seconds=ACCOUNT_WINDOW_SECONDS)
+
+
+def account_failure(username: str) -> bool:
+    """Record a failed login for this name. Returns True if this failure locked it."""
+    key = _account_key(username)
+    _limiter.record("acct_fail", key)
+    try:
+        _limiter.peek("acct_fail", key, max_requests=ACCOUNT_MAX_FAILURES,
+                      window_seconds=ACCOUNT_WINDOW_SECONDS)
+    except HTTPException:
+        return True
+    return False
+
+
+def account_success(username: str) -> None:
+    _limiter.reset("acct_fail", _account_key(username))

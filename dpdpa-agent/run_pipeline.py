@@ -75,6 +75,11 @@ def main() -> None:
         help="Print the one-time setup code needed to create the first administrator and exit.",
     )
     parser.add_argument(
+        "--reset-password", metavar="USERNAME",
+        help="Set a temporary password for a user and exit (for a lost administrator password). "
+             "Run on the server; the user must choose a new password at next sign-in.",
+    )
+    parser.add_argument(
         "--install-cert", nargs=2, metavar=("CERT.pem", "KEY.pem"),
         help="Install a company-issued TLS certificate and its private key and exit "
              "(restart the service afterwards).",
@@ -107,6 +112,32 @@ def main() -> None:
                   "when it starts.", file=sys.stderr)
             raise SystemExit(1)
         print(code)
+        return
+
+    if args.reset_password:
+        from api.auth import _hash_password
+        from api.passwords import generate_temporary_password
+        from user_store.store import get_user_store
+        store = get_user_store()
+        target = store.get_by_username(args.reset_password.strip())
+        if not target:
+            print(f"ERROR: there is no user named {args.reset_password!r}.", file=sys.stderr)
+            raise SystemExit(1)
+        temp = generate_temporary_password()
+        store.set_password(target.user_id, _hash_password(temp), must_change=True)
+        try:
+            from audit_log.store import get_audit_store
+            get_audit_store().log("PASSWORD_RESET", actor_name="system (command line)",
+                                  resource=f"user:{target.user_id}", detail={"username": target.username})
+        except Exception:
+            pass
+        print(f"Temporary password for {target.username}: {temp}")
+        print("It works once: the user must choose a new password at the next sign-in, and all of "
+              "their current sessions have ended.")
+        if not target.is_active:
+            print(f"NOTE: the account is disabled. Another administrator can enable it on the Users page.",
+                  file=sys.stderr)
+        print("If the account was locked after failed sign-ins, the lock ends by itself within 15 minutes.")
         return
 
     if args.install_cert:

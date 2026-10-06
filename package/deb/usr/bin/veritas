@@ -86,6 +86,15 @@ case "$1" in
     esac
     ;;
 
+  reset-password)
+    # Lost administrator password: set a temporary one (the user must choose their own at sign-in).
+    if [ -z "$2" ]; then
+      echo "Usage: veritas reset-password <username>"
+      exit 1
+    fi
+    runuser -u veritas -- env VERITAS_DATA_DIR="$DATA_DIR" "$RUNTIME" --reset-password "$2"
+    ;;
+
   install-cert)
     # Replace the self-signed certificate with one issued by your company (or a public CA).
     if [ -z "$2" ] || [ -z "$3" ]; then
@@ -118,6 +127,7 @@ case "$1" in
     echo "  fingerprint   Print machine fingerprint (send to Veritas for license)"
     echo "  setup-code    Print the one-time code the setup page asks for"
     echo "  license <f>   Install license file and restart"
+    echo "  reset-password <user>   Set a temporary password (lost administrator password)"
     echo "  install-cert <cert> <key>   Install a company TLS certificate and restart"
     echo "  version       Print version"
     echo ""

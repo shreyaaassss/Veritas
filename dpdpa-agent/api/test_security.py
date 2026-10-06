@@ -235,8 +235,8 @@ class TestRateLimiting:
         pw_hash = CryptContext(schemes=["bcrypt"], deprecated="auto").hash("GoodPass1!")
         get_user_store().create_user("rl_user", "rl@test.io", pw_hash, UserRole.VIEWER)
 
-        # Accumulate 5 failures (half the limit)
-        for _ in range(5):
+        # Accumulate 4 failures (one short of the per-account lockout at 5)
+        for _ in range(4):
             anon_client.post("/api/auth/login", data={"username": "rl_user", "password": "wrong"})
 
         # Successful login clears the counter

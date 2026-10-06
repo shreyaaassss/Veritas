@@ -252,3 +252,101 @@ class TestAudit:
         text = str(rows)
         assert "PASSWORD_RESET" in text and "PASSWORD_CHANGED" in text
         assert temp not in text and "Bob-Chose#This99" not in text
+
+
+# ── per-account lockout ────────────────────────────────────────────────────
+class TestAccountLockout:
+    def attempt(self, name, pw, ip):
+        return new_client().post("/api/auth/login", data={"username": name, "password": pw},
+                                 headers={"x-forwarded-for": ip})
+
+    def test_five_wrong_passwords_lock_the_account_even_from_other_addresses(self):
+        make_user("alice")
+        codes = [self.attempt("alice", "wrong-wrong-1", f"10.0.0.{i}").status_code for i in range(5)]
+        assert codes == [401] * 5
+        # the right password, from a fresh address, is now refused too
+        r = self.attempt("alice", ADMIN_PW, "10.9.9.9")
+        assert r.status_code == 429 and "Retry-After" in r.headers
+
+    def test_other_accounts_are_not_affected(self):
+        make_user("alice"); make_user("bob")
+        for i in range(5):
+            self.attempt("alice", "wrong-wrong-1", f"10.0.1.{i}")
+        assert self.attempt("bob", ADMIN_PW, "10.0.2.1").status_code == 200
+
+    def test_a_success_resets_the_counter(self):
+        make_user("alice")
+        for i in range(4):
+            self.attempt("alice", "wrong-wrong-1", f"10.0.3.{i}")
+        assert self.attempt("alice", ADMIN_PW, "10.0.3.50").status_code == 200
+        for i in range(4):
+            assert self.attempt("alice", "wrong-wrong-1", f"10.0.3.{60 + i}").status_code == 401
+        assert self.attempt("alice", ADMIN_PW, "10.0.3.99").status_code == 200
+
+    def test_unknown_names_lock_the_same_way_so_nothing_is_revealed(self):
+        codes = [self.attempt("nobody-here", "x" * 12, f"10.0.4.{i}").status_code for i in range(6)]
+        assert codes == [401] * 5 + [429]
+
+    def test_lock_is_case_insensitive(self):
+        make_user("alice")
+        for i in range(5):
+            self.attempt("ALICE" if i % 2 else "alice", "wrong-wrong-1", f"10.0.5.{i}")
+        assert self.attempt("Alice", ADMIN_PW, "10.0.5.99").status_code == 429
+
+    def test_the_lock_is_audited(self):
+        from audit_log.store import get_audit_store
+        make_user("alice")
+        for i in range(5):
+            self.attempt("alice", "wrong-wrong-1", f"10.0.6.{i}")
+        assert "ACCOUNT_LOCKED" in str(get_audit_store().query(limit=50))
+
+    def test_the_lock_ends_after_the_window(self, monkeypatch):
+        import rate_limit
+        make_user("alice")
+        for i in range(5):
+            self.attempt("alice", "wrong-wrong-1", f"10.0.7.{i}")
+        assert self.attempt("alice", ADMIN_PW, "10.0.7.99").status_code == 429
+        real = rate_limit.time.monotonic
+        monkeypatch.setattr(rate_limit.time, "monotonic", lambda: real() + rate_limit.ACCOUNT_WINDOW_SECONDS + 5)
+        assert self.attempt("alice", ADMIN_PW, "10.0.7.100").status_code == 200
+
+
+# ── offline password reset (lost administrator password) ───────────────────
+class TestCommandLineReset:
+    def run(self, monkeypatch, capsys, *args):
+        import run_pipeline
+        monkeypatch.setattr("sys.argv", ["veritas", *args])
+        try:
+            run_pipeline.main()
+            code = 0
+        except SystemExit as e:
+            code = e.code
+        out = capsys.readouterr()
+        return code, out.out, out.err
+
+    def test_reset_gives_a_working_temporary_password_that_must_be_changed(self, monkeypatch, capsys):
+        make_user("boss", UserRole.SUPER_ADMIN)
+        old = login("boss")
+        code, out, _ = self.run(monkeypatch, capsys, "--reset-password", "boss")
+        assert code == 0
+        temp = out.split("Temporary password for boss: ")[1].split()[0]
+        assert old.get("/api/auth/me").status_code == 401          # existing sessions ended
+        assert new_client().post("/api/auth/login", data={"username": "boss", "password": ADMIN_PW}).status_code == 401
+        c = login("boss", temp)
+        assert c.get("/api/auth/me").json()["must_change_password"] is True
+        assert c.get("/api/auth/users").status_code == 403           # nothing else works until changed
+        assert c.post("/api/auth/change-password",
+                      json={"current_password": temp, "new_password": "Fresh-Start#4812"}).status_code == 200
+        assert c.get("/api/auth/users").status_code == 200
+
+    def test_unknown_user_is_an_error(self, monkeypatch, capsys):
+        code, _, err = self.run(monkeypatch, capsys, "--reset-password", "ghost")
+        assert code == 1 and "no user named" in err
+
+    def test_reset_is_audited_without_the_password(self, monkeypatch, capsys):
+        from audit_log.store import get_audit_store
+        make_user("boss", UserRole.SUPER_ADMIN)
+        _, out, _ = self.run(monkeypatch, capsys, "--reset-password", "boss")
+        temp = out.split("Temporary password for boss: ")[1].split()[0]
+        text = str(get_audit_store().query(limit=50))
+        assert "PASSWORD_RESET" in text and "command line" in text and temp not in text

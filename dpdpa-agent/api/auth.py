@@ -32,7 +32,8 @@ from api.auth_deps import (
     get_current_user,
     require_roles,
 )
-from rate_limit import login_rate_limit, setup_rate_limit, clear_login_limit
+from rate_limit import (account_failure, account_lock_check, account_success, clear_login_limit,
+                        login_rate_limit, setup_rate_limit)
 from user_store.models import User, UserRole
 from user_store.store import get_user_store
 
@@ -140,16 +141,25 @@ async def login(
     if not username or not password:
         raise _AUTH_FAIL
 
+    # A name with too many recent failures is locked, even for the right password.
+    account_lock_check(username)
+
+    def fail() -> HTTPException:
+        if account_failure(username):
+            logger.warning("Account name %r locked for 15 minutes after repeated failed logins", username.strip()[:64])
+            _audit("ACCOUNT_LOCKED", actor=None, resource=f"username:{username.strip()[:64]}", result="FAILURE")
+        return _AUTH_FAIL
+
     store = get_user_store()
     user  = store.get_by_username(username.strip())
 
     if not user:
         # Constant-time: run hash to avoid timing attack revealing valid usernames
         _verify_password(password, "$2b$12$dummy.hash.to.prevent.timing.attacks.abc")
-        raise _AUTH_FAIL
+        raise fail()
 
     if not user.is_active:
-        raise _AUTH_FAIL  # Generic — do not reveal account exists but is disabled
+        raise fail()  # Generic — do not reveal account exists but is disabled
 
     if not _verify_password(password, user.password_hash):
         try:
@@ -157,7 +167,9 @@ async def login(
             get_audit_store().log(AuditAction.LOGIN_FAILED, actor_name=username.strip(), result="FAILURE")
         except Exception:
             pass
-        raise _AUTH_FAIL
+        raise fail()
+
+    account_success(username)
 
     # Issue session cookie
     token = create_access_token(user)

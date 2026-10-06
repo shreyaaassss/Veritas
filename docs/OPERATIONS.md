@@ -59,3 +59,17 @@ If a license expires while Veritas is running, the service **keeps running and k
 ## Users and passwords
 
 Administrators manage accounts under **Users** (SUPER ADMIN only): add users, change roles, give access to organizations, disable accounts, reset passwords. Passwords need at least 10 characters, must not be a common password and must not contain the username or email name. A reset gives a temporary password shown once; the user must choose their own at the next sign-in. Changing or resetting a password signs that account out everywhere else. At least one active SUPER ADMIN must always remain.
+
+### Lost administrator password
+
+If no administrator can sign in, on the server run:
+
+```bash
+sudo veritas reset-password <username>
+```
+
+It prints a temporary password. That user must choose a new one at the next sign-in; their other sessions end. The reset is written to the audit log (`PASSWORD_RESET`, by "system (command line)").
+
+### Failed sign-ins
+
+Five wrong passwords for the same account name lock that name for 15 minutes, whatever address they come from (and the same applies to names that do not exist, so nothing is revealed about which accounts exist). The lock is recorded as `ACCOUNT_LOCKED` in the audit log and ends by itself. Sign-in is also limited per address (10 attempts per 5 minutes).
