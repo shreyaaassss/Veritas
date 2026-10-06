@@ -56,10 +56,13 @@ Config file (agent-config.yaml):
 from __future__ import annotations
 
 import argparse
+import fnmatch
+import glob
 import json
 import logging
 import os
 import queue
+import re
 import sys
 import threading
 import time
@@ -173,14 +176,121 @@ def _fetch_server_cert(base_url: str, dest: Path, verify: Union[bool, str]) -> b
 # Config loading
 # ---------------------------------------------------------------------------
 
+_ENV_REF = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
+
+
+def expand_env(value: Any, missing: Optional[List[str]] = None) -> Any:
+    """
+    Replace ${NAME} with the environment variable NAME in every string of the config
+    (recursively). Unset variables are collected in `missing` instead of being left as
+    literal text: a registration key of "${VERITAS_REGISTRATION_KEY}" must never be sent
+    to the server as if it were a key.
+    """
+    if missing is None:
+        missing = []
+    if isinstance(value, str):
+        def sub(m: "re.Match[str]") -> str:
+            name = m.group(1)
+            if name in os.environ:
+                return os.environ[name]
+            missing.append(name)
+            return m.group(0)
+        return _ENV_REF.sub(sub, value)
+    if isinstance(value, list):
+        return [expand_env(v, missing) for v in value]
+    if isinstance(value, dict):
+        return {k: expand_env(v, missing) for k, v in value.items()}
+    return value
+
+
+K8S_MATCH_KEYS = ("namespace", "pod", "container")
+K8S_DEFAULT_PATH = "/var/log/containers/*.log"
+LOG_FORMATS = ("raw", "cri", "docker", "auto")
+MAX_FILES_DEFAULT = 500
+
+
+def validate_sources(sources: Any) -> List[str]:
+    """Return a list of problems with the sources section (empty list = fine)."""
+    problems: List[str] = []
+    if sources is None:
+        return problems
+    if not isinstance(sources, list):
+        return ["'sources' must be a list"]
+    for i, src in enumerate(sources):
+        where = f"sources[{i}]"
+        if not isinstance(src, dict):
+            problems.append(f"{where} must be a mapping")
+            continue
+        kind = str(src.get("type", "")).lower()
+        if kind not in ("file", "docker", "kubernetes_logs"):
+            problems.append(f"{where}: unknown type {src.get('type')!r} (use file, docker or kubernetes_logs)")
+            continue
+        fmt = src.get("format")
+        if fmt is not None and str(fmt).lower() not in LOG_FORMATS:
+            problems.append(f"{where}: format must be one of {', '.join(LOG_FORMATS)}")
+        max_files = src.get("max_files")
+        if max_files is not None and (not isinstance(max_files, int) or isinstance(max_files, bool) or max_files < 1):
+            problems.append(f"{where}: max_files must be a positive integer")
+        if kind == "file" and not src.get("path"):
+            problems.append(f"{where}: file source needs a path")
+        if kind == "file" and not src.get("source_system"):
+            problems.append(f"{where}: file source needs a source_system")
+        if kind == "docker" and not src.get("container"):
+            problems.append(f"{where}: docker source needs a container")
+        if kind == "kubernetes_logs":
+            if src.get("unmapped", "drop") != "drop":
+                problems.append(f"{where}: unmapped must be 'drop' (the only supported mode)")
+            rules = src.get("rules")
+            if not isinstance(rules, list) or not rules:
+                problems.append(f"{where}: kubernetes_logs needs at least one rule (a mapping from "
+                                f"namespace/pod/container to a source_system)")
+                continue
+            for j, rule in enumerate(rules):
+                rwhere = f"{where}.rules[{j}]"
+                if not isinstance(rule, dict):
+                    problems.append(f"{rwhere} must be a mapping")
+                    continue
+                match = rule.get("match")
+                if not isinstance(match, dict) or not match:
+                    problems.append(f"{rwhere}: 'match' must list at least one of {', '.join(K8S_MATCH_KEYS)}")
+                else:
+                    bad = [k for k in match if k not in K8S_MATCH_KEYS]
+                    if bad:
+                        problems.append(f"{rwhere}: unknown match key(s) {bad}; allowed: {', '.join(K8S_MATCH_KEYS)}")
+                    if any(not isinstance(v, str) or not v for v in match.values()):
+                        problems.append(f"{rwhere}: match values must be non-empty text patterns")
+                target = rule.get("source_system")
+                if not isinstance(target, str) or not target.strip():
+                    problems.append(f"{rwhere}: source_system is required")
+                else:
+                    try:
+                        target.format(namespace="n", pod="p", container="c")
+                    except (KeyError, IndexError, ValueError):
+                        problems.append(f"{rwhere}: source_system may only use {{namespace}}, {{pod}} and {{container}}")
+    return problems
+
+
 def load_config(path: Path) -> Dict[str, Any]:
     if not path.exists():
         logger.error("Config file not found: %s", path)
         sys.exit(EXIT_CONFIG)
     with open(path, encoding="utf-8") as f:
         cfg = yaml.safe_load(f) or {}
+
+    missing: List[str] = []
+    cfg = expand_env(cfg, missing)
+    if missing:
+        logger.error("Config refers to environment variable(s) that are not set: %s",
+                     ", ".join(sorted(set(missing))))
+        sys.exit(EXIT_CONFIG)
+
     if not cfg.get("veritas_address"):
         logger.error("Config missing required field: veritas_address")
+        sys.exit(EXIT_CONFIG)
+    problems = validate_sources(cfg.get("sources"))
+    if problems:
+        for problem in problems:
+            logger.error("Config problem: %s", problem)
         sys.exit(EXIT_CONFIG)
     return cfg
 
@@ -668,12 +778,14 @@ class FileFollower:
     - While the file is briefly missing during rotation the old handle is kept.
     """
 
-    def __init__(self, path: Union[str, Path]) -> None:
+    def __init__(self, path: Union[str, Path], read_from_start: bool = False) -> None:
         self.path = Path(path)
         self._fh = None
         self._ident = None
         self._pending = b""
-        self._seek_end_on_first_open = self.path.exists()
+        # A file that already exists when the agent starts is read from its end (history is
+        # not replayed). read_from_start is for files found later: all of it is new.
+        self._seek_end_on_first_open = self.path.exists() and not read_from_start
 
     @staticmethod
     def _identity(st: os.stat_result):
@@ -809,6 +921,276 @@ def tail_file(
         time.sleep(poll_interval)
 
     follower.close()
+
+
+# ---------------------------------------------------------------------------
+# Container logs on a node (Kubernetes DaemonSet) and wildcard file sources
+# ---------------------------------------------------------------------------
+
+# Two line formats are written by container runtimes:
+#   CRI (containerd, CRI-O):  2026-10-05T10:00:00.123456789Z stdout F the message
+#                             flag F = a full line, P = a partial piece to be joined
+#   Docker json-file:         {"log":"the message\n","stream":"stdout","time":"..."}
+_CRI_LINE = re.compile(r"^(\S+) (stdout|stderr) ([FP]) ?(.*)$")
+MAX_JOINED_LINE = 64 * 1024     # stop joining partial pieces beyond this size
+
+
+def parse_container_line(line: str, fmt: str = "auto") -> Optional[tuple]:
+    """
+    Return (message, is_partial) for one raw log line, or None if the line has no message.
+    fmt: raw | cri | docker | auto (decide per line).
+    """
+    if fmt == "raw":
+        return line, False
+
+    if fmt in ("docker", "auto") and line.startswith("{"):
+        try:
+            obj = json.loads(line)
+        except ValueError:
+            obj = None
+        if isinstance(obj, dict) and isinstance(obj.get("log"), str):
+            text = obj["log"]
+            partial = not text.endswith("\n")
+            return text.rstrip("\r\n"), partial
+        if fmt == "docker":
+            return line, False
+
+    if fmt in ("cri", "auto"):
+        m = _CRI_LINE.match(line)
+        if m:
+            return m.group(4), m.group(3) == "P"
+        if fmt == "cri":
+            return line, False
+
+    return line, False
+
+
+class LineJoiner:
+    """Joins the P (partial) pieces of one container log file into whole lines."""
+
+    def __init__(self, fmt: str = "auto") -> None:
+        self.fmt = fmt
+        self._buffer: List[str] = []
+        self._size = 0
+
+    def feed(self, raw_line: str) -> Optional[str]:
+        """Feed one raw line; returns a complete message when one is ready, else None."""
+        parsed = parse_container_line(raw_line, self.fmt)
+        if parsed is None:
+            return None
+        text, partial = parsed
+        self._buffer.append(text)
+        self._size += len(text)
+        if partial and self._size < MAX_JOINED_LINE:
+            return None
+        message = "".join(self._buffer).strip()
+        self._buffer, self._size = [], 0
+        return message or None
+
+
+# <pod>_<namespace>_<container>-<64 hex container id>.log, as named by the kubelet
+_K8S_LOG_NAME = re.compile(
+    r"^(?P<pod>[a-z0-9][-a-z0-9.]*)_(?P<namespace>[a-z0-9-]+)_(?P<container>.+)-(?P<cid>[0-9a-f]{64})\.log$"
+)
+
+
+def parse_k8s_log_name(filename: str) -> Optional[Dict[str, str]]:
+    """{'pod','namespace','container'} from a /var/log/containers file name, or None."""
+    m = _K8S_LOG_NAME.match(filename)
+    return {k: m.group(k) for k in K8S_MATCH_KEYS} if m else None
+
+
+class RuleResolver:
+    """
+    Maps a node log file to a source_system using the configured rules. Every key in a
+    rule's `match` (namespace, pod, container) must match its pattern (shell-style
+    wildcards); the first rule that matches wins. source_system may use {namespace},
+    {pod} and {container}. Files that match no rule return None and are ignored.
+    """
+
+    def __init__(self, rules: List[Dict[str, Any]]) -> None:
+        self.rules = rules
+
+    def resolve(self, path: Union[str, Path]) -> Optional[str]:
+        meta = parse_k8s_log_name(Path(path).name)
+        if meta is None:
+            return None
+        for rule in self.rules:
+            if all(fnmatch.fnmatchcase(meta[key], pattern) for key, pattern in rule["match"].items()):
+                return rule["source_system"].format(**meta)
+        return None
+
+    def describe(self, path: Union[str, Path]) -> str:
+        meta = parse_k8s_log_name(Path(path).name)
+        return f"{meta['namespace']}/{meta['pod']}" if meta else Path(path).name
+
+
+def has_wildcard(path: str) -> bool:
+    return any(ch in path for ch in "*?[")
+
+
+class GlobTailer:
+    """
+    Follows every file matching a wildcard pattern (for example /var/log/containers/*.log),
+    picking up files that appear later and letting go of files that disappear. Testable
+    without threads: poll() returns [(message, source_system), ...].
+
+    - Files that exist when the tailer starts are read from their end; files that appear
+      afterwards (new pods) are read from their start.
+    - resolver(path) returns the source_system for a file, or None to ignore it.
+    - fmt selects the log line format (raw, cri, docker, auto).
+    """
+
+    def __init__(
+        self,
+        pattern: str,
+        resolver,
+        fmt: str = "raw",
+        max_files: int = MAX_FILES_DEFAULT,
+        rescan_seconds: float = 5.0,
+        describe=None,
+        clock=time.monotonic,
+    ) -> None:
+        self.pattern = pattern
+        self.resolver = resolver
+        self.fmt = fmt
+        self.max_files = max_files
+        self.rescan_seconds = rescan_seconds
+        self._describe = describe or (lambda p: Path(p).name)
+        self._clock = clock
+        self._tracked: Dict[str, Dict[str, Any]] = {}
+        self._ignored: set = set()
+        self._over_limit: set = set()
+        self._first_scan = True
+        self._next_scan = 0.0
+
+    # -- bookkeeping exposed to the health report --------------------------
+    @property
+    def files_followed(self) -> int:
+        return len(self._tracked)
+
+    @property
+    def files_ignored(self) -> int:
+        return len(self._ignored)
+
+    @property
+    def files_over_limit(self) -> int:
+        return len(self._over_limit)
+
+    def ignored_names(self, limit: int = 10) -> List[str]:
+        return sorted(self._describe(p) for p in self._ignored)[:limit]
+
+    def _scan(self) -> None:
+        found = set(glob.glob(self.pattern))
+        for path in sorted(found):
+            if path in self._tracked or path in self._ignored or path in self._over_limit:
+                continue
+            system = self.resolver(path)
+            if system is None:
+                self._ignored.add(path)
+                continue
+            if len(self._tracked) >= self.max_files:
+                self._over_limit.add(path)
+                continue
+            self._tracked[path] = {
+                "follower": FileFollower(path, read_from_start=not self._first_scan),
+                "joiner": LineJoiner(self.fmt),
+                "system": system,
+                "gone_polls": 0,
+            }
+        # Forget ignored / over-limit files that no longer exist so the counts stay true.
+        self._ignored &= found
+        self._over_limit &= found
+        self._first_scan = False
+
+    def poll(self) -> List[tuple]:
+        now = self._clock()
+        if now >= self._next_scan:
+            self._scan()
+            self._next_scan = now + self.rescan_seconds
+
+        out: List[tuple] = []
+        for path in list(self._tracked):
+            item = self._tracked[path]
+            try:
+                raw_lines = item["follower"].poll()
+            except OSError:
+                # e.g. permission denied or a file vanishing mid-read; try again next poll
+                item["follower"].close()
+                continue
+            for raw in raw_lines:
+                message = item["joiner"].feed(raw)
+                if message:
+                    out.append((message, item["system"]))
+            if not os.path.exists(path):
+                # The file is gone (pod deleted). Give it one more poll to drain, then let go.
+                item["gone_polls"] += 1
+                if item["gone_polls"] >= 2:
+                    item["follower"].close()
+                    del self._tracked[path]
+            else:
+                item["gone_polls"] = 0
+        return out
+
+    def close(self) -> None:
+        for item in self._tracked.values():
+            item["follower"].close()
+        self._tracked.clear()
+
+
+def tail_glob(
+    pattern: str,
+    kind: str,
+    resolver,
+    event_queue: queue.Queue,
+    fmt: str = "raw",
+    max_files: int = MAX_FILES_DEFAULT,
+    poll_interval: float = 0.5,
+    stop_event: Optional[threading.Event] = None,
+    rescan_seconds: float = 5.0,
+    describe=None,
+) -> None:
+    """Thread target for wildcard file sources and Kubernetes node logs."""
+    logger.info("Following files matching %s (type: %s, format: %s)", pattern, kind, fmt)
+    tailer = GlobTailer(pattern, resolver, fmt=fmt, max_files=max_files,
+                        rescan_seconds=rescan_seconds, describe=describe)
+    SOURCES.update(kind, pattern, source_system="(per file)" if kind == "kubernetes_logs" else "",
+                   state="waiting", detail="no matching files yet")
+    last_ignored: tuple = ()
+
+    while not (stop_event is not None and stop_event.is_set()):
+        try:
+            for message, system in tailer.poll():
+                _enqueue(event_queue, message, system)
+                SOURCES.update(kind, pattern, last_line_at=_now_iso())
+
+            detail = f"{tailer.files_followed} file(s) followed"
+            if tailer.files_ignored:
+                detail += f", {tailer.files_ignored} ignored (no rule matches)"
+            if tailer.files_over_limit:
+                detail += f", {tailer.files_over_limit} skipped (over the {max_files}-file limit)"
+            SOURCES.update(kind, pattern,
+                           state="reading" if tailer.files_followed else "waiting",
+                           detail=detail[:200])
+
+            ignored_now = tuple(tailer.ignored_names())
+            if ignored_now and ignored_now != last_ignored:
+                last_ignored = ignored_now
+                log_limited(f"ignored-{pattern}", logging.WARNING,
+                            "Ignoring logs of %d file(s) that match no rule, for example: %s. Add a "
+                            "rule for them if they should be monitored.",
+                            tailer.files_ignored, ", ".join(ignored_now[:5]), interval=300)
+            if tailer.files_over_limit:
+                log_limited(f"over-limit-{pattern}", logging.WARNING,
+                            "%d file(s) are not followed because the limit of %d files was reached "
+                            "(raise max_files if needed).", tailer.files_over_limit, max_files, interval=300)
+        except Exception as e:  # never let one bad file end the thread
+            SOURCES.update(kind, pattern, state="error", detail=str(e)[:200])
+            log_limited(f"glob-error-{pattern}", logging.ERROR, "Error following %s: %s", pattern, e)
+            time.sleep(max(poll_interval, 5))
+        time.sleep(poll_interval)
+
+    tailer.close()
 
 
 # ---------------------------------------------------------------------------
@@ -954,12 +1336,38 @@ def main() -> None:
         src_type   = source.get("type", "").lower()
         src_system = source.get("source_system", "unknown")
 
-        if src_type == "file":
+        if src_type == "file" and has_wildcard(str(source["path"])):
+            fmt = str(source.get("format", "raw")).lower()
+            t = threading.Thread(
+                target=tail_glob,
+                args=(str(source["path"]), "file", (lambda path, _s=src_system: _s), event_queue),
+                kwargs={"fmt": fmt, "max_files": int(source.get("max_files", MAX_FILES_DEFAULT))},
+                daemon=True,
+                name=f"tail-glob-{src_system}",
+            )
+            t.start()
+
+        elif src_type == "file":
             t = threading.Thread(
                 target=tail_file,
                 args=(source["path"], src_system, event_queue),
                 daemon=True,
                 name=f"tail-file-{src_system}",
+            )
+            t.start()
+
+        elif src_type == "kubernetes_logs":
+            resolver = RuleResolver(source["rules"])
+            t = threading.Thread(
+                target=tail_glob,
+                args=(str(source.get("path", K8S_DEFAULT_PATH)), "kubernetes_logs", resolver.resolve, event_queue),
+                kwargs={
+                    "fmt": str(source.get("format", "auto")).lower(),
+                    "max_files": int(source.get("max_files", MAX_FILES_DEFAULT)),
+                    "describe": resolver.describe,
+                },
+                daemon=True,
+                name="tail-kubernetes-logs",
             )
             t.start()
 

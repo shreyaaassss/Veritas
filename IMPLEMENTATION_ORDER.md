@@ -88,9 +88,9 @@ Start by reproducing the defects on a local `kind` cluster, then fix them.
 
 | # | Task | Notes |
 |---|---|---|
-| B1 | **Reusable enrollment keys** on the server (maximum uses, expiry, org-scoped, revocable) plus the dashboard control to issue one | A DaemonSet registers one agent per node; today one key is shared by every node and the first node uses it up |
-| B2 | **Wildcard log paths** in sources (for example `/var/log/containers/order-*.log`) and parsing of the container runtime's line format | Pod log file names change on every redeploy; stdout logs are the main source on containerd clusters, which have no Docker socket |
-| B3 | **`source_system` naming rules** for node logs (map namespace/pod/container name patterns to a `source_system` in the agent config) | Needed so the org policy applies to the right system. Decision pending, see below |
+| B1 | **Done (2026-10-06, not yet released).** **Reusable enrollment keys** on the server (maximum uses, expiry, org-scoped, revocable) plus the dashboard control to issue one | A DaemonSet registers one agent per node; today one key is shared by every node and the first node uses it up |
+| B2 | **Done (2026-10-06, not yet released).** **Wildcard log paths** in sources (for example `/var/log/containers/order-*.log`) and parsing of the container runtime's line format | Pod log file names change on every redeploy; stdout logs are the main source on containerd clusters, which have no Docker socket |
+| B3 | **Done (2026-10-06, not yet released).** **`source_system` naming rules** for node logs (map namespace/pod/container name patterns to a `source_system` in the agent config) | Needed so the org policy applies to the right system. Decision pending, see below |
 | B4 | Rewrite the manifests: state at its own mount path (not over `/app`), config and key in a Secret, key delivered through an environment variable or init step (today the `${VERITAS_REGISTRATION_KEY}` placeholder is never substituted), one agent per node | Shipped `agent-deployment.yaml` and `agent-daemonset.yaml` mount state over `/app`, hiding `agent.py` |
 | B5 | Publish the agent image to a registry (GHCR) in the release workflow | Today only a local `veritas-agent:latest` exists |
 | B6 | CI test on `kind` with 2 nodes: DaemonSet registers both agents with one reusable key; a pod writing PII to stdout produces a violation mapped to the right `source_system` | Proves the spec's main Kubernetes claim |
