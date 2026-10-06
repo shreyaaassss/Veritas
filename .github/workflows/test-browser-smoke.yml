@@ -1,0 +1,84 @@
+name: Test Dashboard in a Browser
+
+# Starts a Veritas server with NO users and drives the real dashboard in headless Chromium
+# the way a new customer does: setup with the setup code, sign in, first-run screen, create
+# an organization, issue an agent key, see a violation, acknowledge and resolve it, verify the
+# hash chain, manage users (including the forced password change). Any uncaught JavaScript
+# error fails the run. Screenshots of each stage are attached to the run.
+
+on:
+  push:
+    tags: ['v*']
+    branches: [main]
+    paths:
+      - 'dpdpa-agent/**'
+      - '.github/scripts/browser_smoke.py'
+      - '.github/scripts/agent_ci_lib.sh'
+      - '.github/workflows/test-browser-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  browser:
+    name: Dashboard smoke test (Chromium)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    env:
+      VERITAS_URL: https://localhost:8000
+      VERITAS_SETUP_CODE: ci-setup-code     # the value start_server sets
+      SMOKE_SHOTS: smoke-shots
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: dpdpa-agent/requirements.txt
+
+      - name: Install server dependencies and the browser
+        working-directory: dpdpa-agent
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl
+          pip install playwright
+          python -m playwright install --with-deps chromium
+
+      - name: Create an any-machine test license
+        env:
+          VERITAS_PRIVATE_KEY_B64: ${{ secrets.VERITAS_PRIVATE_KEY_B64 }}
+        run: |
+          test -n "$VERITAS_PRIVATE_KEY_B64" || { echo "VERITAS_PRIVATE_KEY_B64 secret is not set"; exit 1; }
+          mkdir -p /tmp/vdata
+          echo "$VERITAS_PRIVATE_KEY_B64" | base64 -d > /tmp/ci_private_key.pem
+          chmod 600 /tmp/ci_private_key.pem
+          python tools/generate_license.py --org ci-browser-test --tier enterprise \
+            --expiry 2027-12-31 --key /tmp/ci_private_key.pem --out /tmp/vdata/veritas.vlic
+          rm -f /tmp/ci_private_key.pem
+
+      - name: Start the server (no users yet)
+        run: |
+          source .github/scripts/agent_ci_lib.sh
+          start_server
+          wait_server
+
+      - name: Drive the dashboard
+        run: python .github/scripts/browser_smoke.py
+
+      - name: Attach screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-screenshots
+          path: smoke-shots
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Server log on failure
+        if: failure()
+        run: tail -100 /tmp/server.log || true
+
+      - name: Remove secrets
+        if: always()
+        run: rm -f /tmp/ci_private_key.pem /tmp/vdata/veritas.vlic

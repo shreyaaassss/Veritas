@@ -1527,7 +1527,7 @@
 
     <div class="sidebar-footer">
       <div class="env-badge">
-        <span>v3.0.0-generic</span>
+        <span id="serverVersion" title="Veritas server release">Veritas</span>
         <div class="dot" title="Integrity store connected"></div>
       </div>
     </div>
@@ -1544,7 +1544,6 @@
       </div>
 
       <div class="topbar-actions">
-        <div id="serverVersion" style="display:none;font-size:11px;color:var(--text-muted);padding:0 4px 6px;" title="Veritas server release"></div>
         <div class="license-badge" id="licenseBadge" style="display:none;">
           <span class="license-dot"></span>
           <span id="licenseBadgeText">Licensed</span>
@@ -2342,6 +2341,7 @@ async function populateOrgSelector() {
     const r = await fetch('/api/auth/my-orgs', { credentials: 'include' });
     const data = await r.json();
     const orgIds = data.org_ids || [];
+    _noOrgsRegistered = orgIds.length === 0;
     if (orgIds.length === 0) {
       showWelcomeOverlay();
       sel.innerHTML = '<option value="">No orgs registered</option>';
@@ -2893,6 +2893,8 @@ async function openEditPolicyModal() {
 function closeAddOrgModal() {
   document.getElementById('addOrgOverlay').classList.remove('open');
   document.getElementById('addOrgModal').classList.remove('open');
+  // Closed without creating the first organization: back to the welcome screen.
+  if (_noOrgsRegistered) showWelcomeOverlay();
 }
 
 function addFieldRow(p) {
@@ -3055,6 +3057,7 @@ async function submitNewOrg() {
     const data = await r.json();
 
     if (r.ok && data.status === 'ok') {
+      _noOrgsRegistered = false;     // the first organization exists now
       closeAddOrgModal();
       dismissWelcomeOverlay();
       const editing = document.getElementById('newOrgId').readOnly;
@@ -3347,13 +3350,26 @@ async function downloadAuditPDF() {
 }
 
 // ---- First-Boot Onboarding ----
+let _noOrgsRegistered = false;
+
 function showWelcomeOverlay() {
+  if (currentUserRole && currentUserRole !== 'SUPER_ADMIN') {
+    // Only a super admin can set up the first organization; anyone else just waits for access.
+    const card = document.querySelector('#welcomeOverlay .welcome-card');
+    card.innerHTML = `
+      <div class="welcome-logo">VERITAS</div>
+      <h2>No organization is assigned to your account yet.</h2>
+      <p>Ask your Veritas administrator to give your account access to an organization, then sign in again.</p>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="signOut()">Sign Out</button>`;
+  }
   document.getElementById('welcomeOverlay').classList.add('visible');
 }
 function dismissWelcomeOverlay() {
   document.getElementById('welcomeOverlay').classList.remove('visible');
 }
 function startOnboarding() {
+  // The welcome screen sits above the form, so step aside while the form is open.
+  dismissWelcomeOverlay();
   openAddOrgModal();
 }
 
@@ -3929,9 +3945,8 @@ async function showServerVersion() {
     if (el && rt.version) {
       el.textContent = 'Veritas ' + (/^\d/.test(rt.version) ? 'v' : '') + rt.version;
       if (rt.min_agent_version) el.title = `Veritas server release. Agents older than ${rt.min_agent_version} are flagged as outdated.`;
-      el.style.display = 'block';
     }
-  } catch (e) { /* version label stays hidden */ }
+  } catch (e) { /* the label stays "Veritas" */ }
 }
 
 // ---- License Badge ----
