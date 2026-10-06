@@ -58,7 +58,9 @@ def data(tmp_path, monkeypatch):
 class TestBackup:
     def test_a_backup_of_a_live_database_restores_to_the_same_data(self, data, tmp_path_factory):
         path = backup.create_backup()
-        assert path.exists() and (path.stat().st_mode & 0o077) == 0, "backup must be owner-only"
+        assert path.exists()
+        if sys.platform != "win32":      # Windows has no POSIX permission bits
+            assert (path.stat().st_mode & 0o077) == 0, "backup must be owner-only"
         ok, errors = backup.verify_backup(path)
         assert ok, errors
         target = tmp_path_factory.mktemp("restore")
@@ -227,7 +229,8 @@ class TestInstallCertificate:
         assert 85 <= info["days_remaining"] <= 90
         assert tls.cert_path().read_bytes() == crt.read_bytes()
         assert tls.key_path().read_bytes() == key.read_bytes()
-        assert (tls.key_path().stat().st_mode & 0o077) == 0, "private key must be owner-only"
+        if sys.platform != "win32":
+            assert (tls.key_path().stat().st_mode & 0o077) == 0, "private key must be owner-only"
         assert 85 <= tls.cert_days_remaining() <= 90
 
     def test_previous_certificate_is_kept(self, certdir):
@@ -280,7 +283,8 @@ class TestInstallCertificate:
         tls.install_certificate(chain, leaf_k)
         assert tls.cert_path().read_bytes().count(b"BEGIN CERTIFICATE") == 2
 
-    def test_server_uses_the_installed_files(self, certdir):
+    def test_server_uses_the_installed_files(self, certdir, monkeypatch):
+        monkeypatch.setenv("VERITAS_TLS", "auto")      # CI runs with TLS switched off
         crt, key = _make_pair(certdir)
         tls.install_certificate(crt, key)
         params = tls.get_ssl_params()
