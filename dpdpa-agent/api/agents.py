@@ -23,7 +23,7 @@ from pydantic import BaseModel, Field, field_validator
 from agent_store.models import Agent, AgentStatus
 from agent_store.store import get_agent_store
 from api.agent_auth import verify_agent_token
-from api.auth_deps import get_current_user, require_roles
+from api.auth_deps import can_access_org as _can_access_org, get_current_user, require_roles
 from config_loader import OrgConfigNotFoundError, load_org_config
 from rate_limit import issue_key_rate_limit, record_register_failure, register_rate_limit
 from user_store.models import User, UserRole
@@ -50,13 +50,6 @@ def _require_org(org_id: str) -> None:
                 f"Register one first via POST /v1/orgs/{org_id}/config."
             ),
         )
-
-
-def _can_access_org(user: User, org_id: str) -> bool:
-    """SUPER_ADMIN reaches every org; everyone else only orgs they were granted."""
-    if user.role == UserRole.SUPER_ADMIN:
-        return True
-    return get_user_store().has_org_access(user.user_id, org_id)
 
 
 def _require_org_access(user: User, org_id: str) -> None:

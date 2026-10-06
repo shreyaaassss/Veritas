@@ -2319,9 +2319,17 @@ function connectWS() {
     } catch(e) {}
   };
 
-  ws.onclose = () => {
+  ws.onclose = (evt) => {
     wsConnected = false;
     document.getElementById('wsDot').className = 'ws-dot';
+    if (evt && evt.code === 4001) {            // session expired or invalid: sign in again
+      window.location.href = '/login';
+      return;
+    }
+    if (evt && evt.code === 4003) {            // refused: no access to this organisation, or account disabled
+      document.getElementById('wsLabel').textContent = 'No access to this organisation';
+      return;                                  // retrying cannot help
+    }
     document.getElementById('wsLabel').textContent = 'Disconnected — reconnecting…';
     wsReconnectTimer = setTimeout(connectWS, 3000);
   };

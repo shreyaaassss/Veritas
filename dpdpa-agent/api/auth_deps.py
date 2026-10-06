@@ -132,17 +132,12 @@ def cookie_kwargs() -> dict:
 # FastAPI dependencies
 # ---------------------------------------------------------------------------
 
-async def get_current_user(request: Request) -> User:
+def user_from_token(token: Optional[str]) -> User:
     """
-    FastAPI dependency: extract and validate JWT from cookie.
-    Returns the authenticated User or raises HTTP 401.
-
-    Usage:
-        @router.get("/protected")
-        async def handler(user: User = Depends(get_current_user)):
-            ...
+    Resolve a session token to an active user. Raises HTTPException (401 for a missing,
+    invalid or unknown session; 403 for a disabled account). Shared by the HTTP dependency
+    and the WebSocket handshake so both enforce exactly the same rules.
     """
-    token = request.cookies.get(_COOKIE_NAME)
     if not token:
         raise HTTPException(
             status_code=401,
@@ -169,6 +164,26 @@ async def get_current_user(request: Request) -> User:
         raise HTTPException(status_code=403, detail="User account is disabled.")
 
     return user
+
+
+def can_access_org(user: User, org_id: str) -> bool:
+    """SUPER_ADMIN reaches every organization; everyone else only organizations they were granted."""
+    if user.role == UserRole.SUPER_ADMIN:
+        return True
+    return get_user_store().has_org_access(user.user_id, org_id)
+
+
+async def get_current_user(request: Request) -> User:
+    """
+    FastAPI dependency: extract and validate JWT from cookie.
+    Returns the authenticated User or raises HTTP 401.
+
+    Usage:
+        @router.get("/protected")
+        async def handler(user: User = Depends(get_current_user)):
+            ...
+    """
+    return user_from_token(request.cookies.get(_COOKIE_NAME))
 
 
 def org_access(*roles: UserRole):

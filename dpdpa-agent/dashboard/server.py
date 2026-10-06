@@ -153,7 +153,7 @@ app = FastAPI(
     ),
     docs_url=None,     # Disable auto-generated Swagger UI in production
     redoc_url=None,    # Disable ReDoc in production
-    openapi_url="/api/openapi.json",  # Still available for integrations
+    openapi_url=None,  # served by openapi_schema() below so that it requires a login
 )
 
 app.add_middleware(_SecurityHeaders)
@@ -239,13 +239,22 @@ async def serve_dashboard(request: Request):
 async def websocket_endpoint(ws: WebSocket, org_id: str):
     """
     Live feed for exactly ONE org's verdicts.
-    Auth: validates JWT cookie on the WebSocket upgrade handshake.
-    Closes with 4001 if not authenticated.
+    Auth: validates the session cookie on the WebSocket upgrade handshake and that the
+    user may access this organization. Closes with 4001 if not authenticated and 4003
+    if the account is disabled or has no access to the organization.
     """
-    from api.auth_deps import decode_access_token, _COOKIE_NAME
-    token = ws.cookies.get(_COOKIE_NAME)
-    if not token or not decode_access_token(token):
-        await ws.close(code=4001, reason="Authentication required")
+    from fastapi import HTTPException
+    from api.auth_deps import _COOKIE_NAME, can_access_org, user_from_token
+    try:
+        # Same rules as the HTTP API: a valid session of an active account...
+        ws_user = user_from_token(ws.cookies.get(_COOKIE_NAME))
+    except HTTPException as exc:
+        await ws.close(code=4001 if exc.status_code == 401 else 4003, reason="Authentication required")
+        return
+    # ...that belongs to THIS organization. Without this any logged-in user could watch
+    # another organization's live violations.
+    if not can_access_org(ws_user, org_id):
+        await ws.close(code=4003, reason="No access to this organisation")
         return
 
     await ws.accept()
@@ -598,28 +607,16 @@ async def verify_backup_endpoint(
 @app.get("/api/version")
 async def api_version():
     """
-    Phase 22 — Returns the current API version and surface summary.
-    Public endpoint — no auth required.
+    Public endpoint: the API version only. The list of endpoints is in the API schema,
+    which requires a login (GET /api/openapi.json).
     """
-    return {
-        "api_version":  _API_VERSION,
-        "service":      "veritas",
-        "description":  "Veritas DPDPA Compliance Platform API",
-        "endpoints": {
-            "auth":      "/api/auth/*",
-            "orgs":      "/v1/orgs/*",
-            "events":    "/v1/{org_id}/events",
-            "scan":      "/v1/{org_id}/scan",
-            "investigate": "/v1/{org_id}/investigate",
-            "agents":    "/agents/*",
-            "agent_bootstrap": "/agent/*",
-            "evidence":  "/api/{org_id}/verdicts/*",
-            "audit_log": "/api/audit/logs",
-            "system":    "/api/system/health",
-            "health":    "/health",
-            "ready":     "/ready",
-        },
-    }
+    return {"api_version": _API_VERSION, "service": "veritas"}
+
+
+@app.get("/api/openapi.json", include_in_schema=False)
+async def openapi_schema(_user: User = Depends(get_current_user)):
+    """The full API schema, for integrations. Requires a login."""
+    return app.openapi()
 
 
 @app.get("/health")
@@ -634,48 +631,43 @@ async def health():
 @app.get("/ready")
 async def ready():
     """
-    Readiness probe — returns 200 if the server is ready to serve requests.
-    Checks: evidence store, agent store, license.
-    Returns 503 if any critical dependency is unavailable.
+    Readiness probe: 200 if the server can serve requests, 503 if a critical dependency is
+    unavailable. Public (load balancers, Kubernetes), so it reports only ok/error per check;
+    the reasons are logged on the server and shown, to logged-in users, by /api/system/health.
+    Checks: evidence store, agent store, license (a license problem does not make the
+    server not ready: it has already started).
     """
     checks: dict = {}
     ok = True
 
-    # Evidence store
     try:
         from evidence_store.store import get_store
         get_store().count("__healthcheck__")
         checks["evidence_store"] = "ok"
     except Exception as e:
-        checks["evidence_store"] = f"error: {e}"
+        logger.warning("Readiness: evidence store check failed: %s", e)
+        checks["evidence_store"] = "error"
         ok = False
 
-    # Agent store
     try:
         from agent_store.store import get_agent_store
-        get_agent_store().count_users() if hasattr(get_agent_store(), 'count_users') else None
+        _ = get_agent_store().list_agents()
         checks["agent_store"] = "ok"
-    except Exception:
-        try:
-            from agent_store.store import get_agent_store
-            _ = get_agent_store().list_agents()
-            checks["agent_store"] = "ok"
-        except Exception as e:
-            checks["agent_store"] = f"error: {e}"
-            ok = False
+    except Exception as e:
+        logger.warning("Readiness: agent store check failed: %s", e)
+        checks["agent_store"] = "error"
+        ok = False
 
-    # License
     try:
         from license import validate_license
         validate_license()
         checks["license"] = "valid"
     except Exception as e:
-        checks["license"] = f"error: {e}"
-        # License failure is non-fatal for readiness (server already started)
+        logger.warning("Readiness: license check failed: %s", e)
+        checks["license"] = "invalid"
 
-    status_code = 200 if ok else 503
     from fastapi.responses import JSONResponse
-    return JSONResponse({"ready": ok, "checks": checks}, status_code=status_code)
+    return JSONResponse({"ready": ok, "checks": checks}, status_code=200 if ok else 503)
 
 
 @app.get("/api/system/health")
@@ -697,10 +689,11 @@ async def system_health(_user: User = Depends(get_current_user)):
     except Exception as e:
         checks["evidence_store"] = {"status": "error", "detail": str(e)}
 
-    # Agent store
+    # Agent store (the count covers only organizations this user can access)
     try:
         from agent_store.store import get_agent_store
-        agent_count = len(get_agent_store().list_agents())
+        from api.auth_deps import can_access_org
+        agent_count = sum(1 for a in get_agent_store().list_agents() if can_access_org(_user, a.org_id))
         checks["agent_store"] = {"status": "ok", "agents": agent_count}
     except Exception as e:
         checks["agent_store"] = {"status": "error", "detail": str(e)}
@@ -777,6 +770,19 @@ async def system_health(_user: User = Depends(get_current_user)):
         for v in checks.values()
         if isinstance(v, dict)
     )
+
+    if _user.role != UserRole.SUPER_ADMIN:
+        # Server-level detail (error text with file paths, certificate fingerprint, secret
+        # file names, AI provider, Python and platform) is for the server administrator.
+        # Everyone else sees the status of each check and the figures the panel shows.
+        keep = {
+            "evidence_store": (), "agent_store": ("agents",), "license": ("days_remaining",),
+            "tls": (), "disk": ("free_pct",), "runtime": ("version",),
+        }
+        checks = {
+            name: {"status": v.get("status"), **{k: v[k] for k in keep[name] if k in v}}
+            for name, v in checks.items() if name in keep
+        }
     return {"healthy": overall, "checks": checks}
 
 
@@ -786,8 +792,11 @@ async def system_health(_user: User = Depends(get_current_user)):
 # ---------------------------------------------------------------------------
 
 @app.get("/api/license")
-async def get_license_info():
-    """Returns license metadata for the dashboard badge. Never exposes the key itself."""
+async def get_license_info(_user: User = Depends(get_current_user)):
+    """
+    Returns license metadata for the dashboard badge. Requires a login (it names the
+    licensed customer and the expiry). Never exposes the license key itself.
+    """
     try:
         info = validate_license()
         return {
