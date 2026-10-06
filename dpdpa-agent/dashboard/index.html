@@ -1970,6 +1970,23 @@
           </div>
         </div>
 
+        <div class="section-header" style="margin-top:0;">
+          <h2>Enrollment Keys</h2>
+          <span style="color:var(--text-muted);font-size:0.8rem;">Keys that let agents register. The key value is shown once, when created.</span>
+        </div>
+        <div class="table-container" style="margin-bottom:2rem;">
+          <div class="table-wrap">
+            <table id="keysTable">
+              <thead>
+                <tr><th>Label</th><th>Status</th><th>Agents enrolled</th><th>Expires</th><th>Created by</th><th>Actions</th></tr>
+              </thead>
+              <tbody id="keysTbody">
+                <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:1.5rem;">No keys issued for this organisation.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         <div class="section-header">
           <h2>Registered Agents</h2>
           <button class="btn btn-primary" onclick="openIssueKeyModal()" data-require-role="SUPER_ADMIN,COMPLIANCE_ADMIN">
@@ -2016,10 +2033,37 @@
 <div class="modal" id="issueKeyModal">
   <div class="modal-close" onclick="closeIssueKeyModal()">✕</div>
   <h3>Issue Registration Key</h3>
-  <div class="modal-sub">A one-time key the Veritas Agent presents on first start to receive its <code>agent_id</code> and <code>auth_token</code>. Valid for <strong>30 minutes</strong>, single-use.</div>
+  <div class="modal-sub" id="issueKeySub">A key the Veritas Agent presents on first start to receive its <code>agent_id</code> and <code>auth_token</code>.</div>
 
   <div id="issueKeyStep1">
     <p style="color:var(--text-muted);margin:1rem 0;">Generating a key for org: <code id="issueKeyOrgLabel"></code></p>
+    <div style="display:flex;flex-direction:column;gap:0.6rem;margin:0.5rem 0 1rem;font-size:0.85rem;">
+      <label style="display:flex;gap:0.5rem;align-items:flex-start;cursor:pointer;">
+        <input type="radio" name="issueKeyKind" value="single" checked onchange="updateIssueKeyForm()">
+        <span><strong>One agent</strong><br><span style="color:var(--text-muted);">Single-use, valid for 30 minutes. For one server.</span></span>
+      </label>
+      <label style="display:flex;gap:0.5rem;align-items:flex-start;cursor:pointer;">
+        <input type="radio" name="issueKeyKind" value="reusable" onchange="updateIssueKeyForm()">
+        <span><strong>Many agents (reusable)</strong><br><span style="color:var(--text-muted);">For a Kubernetes DaemonSet or a fleet: every agent registers itself with this one key, up to the limit below.</span></span>
+      </label>
+    </div>
+    <div id="issueKeyReusableOptions" style="display:none;margin-bottom:1rem;font-size:0.85rem;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+        <label>Maximum agents<br><input type="number" id="issueKeyMaxUses" min="2" max="10000" value="10" style="width:100%;"></label>
+        <label>Valid for<br>
+          <select id="issueKeyExpiry" style="width:100%;">
+            <option value="3600">1 hour</option>
+            <option value="86400" selected>24 hours</option>
+            <option value="604800">7 days</option>
+            <option value="2592000">30 days</option>
+          </select>
+        </label>
+      </div>
+      <label style="display:block;margin-top:0.75rem;">Label (optional)<br><input type="text" id="issueKeyLabel" maxlength="100" placeholder="e.g. production cluster" style="width:100%;"></label>
+      <div class="form-error-box" style="border-color:var(--medium);color:var(--text);margin-top:0.75rem;">
+        Anyone holding this key can enrol agents into this organisation until it expires, reaches its limit or is revoked. Store it as a Kubernetes Secret and revoke it once the rollout is finished.
+      </div>
+    </div>
     <div class="modal-actions">
       <button class="btn btn-primary" onclick="generateKey()">Generate Key</button>
       <button class="btn btn-secondary" onclick="closeIssueKeyModal()">Cancel</button>
@@ -2034,6 +2078,7 @@
       <pre id="issueKeyValue" style="background:var(--code-bg);border:1px solid var(--border);border-radius:6px;padding:1rem 3.5rem 1rem 1rem;font-family:var(--font-mono);font-size:0.82rem;overflow-x:auto;word-break:break-all;margin:0;"></pre>
       <button id="copyKeyBtn" class="btn btn-secondary" onclick="copyKey()" style="position:absolute;top:0.5rem;right:0.5rem;padding:0.2rem 0.55rem;font-size:0.73rem;">Copy</button>
     </div>
+    <div id="issueKeySummary" style="color:var(--text-muted);font-size:0.82rem;margin-bottom:0.75rem;"></div>
     <div style="color:var(--text-muted);font-size:0.8rem;margin-bottom:1.5rem;line-height:1.7;">
       Configure your Agent container:<br/>
       <code>veritas_address: http://&lt;host&gt;:8000</code><br/>
@@ -3149,6 +3194,7 @@ function startOnboarding() {
 // ---- Agents Tab ----
 async function loadAgents() {
   if (!currentOrgId) return;
+  loadKeys();
   try {
     const r = await fetch(`/agents?org_id=${encodeURIComponent(currentOrgId)}`);
     if (!r.ok) return;
@@ -3268,6 +3314,8 @@ function openIssueKeyModal() {
   document.getElementById('issueKeyStep2').style.display = 'none';
   document.getElementById('issueKeyValue').textContent = '';
   document.getElementById('copyKeyBtn').textContent = 'Copy';
+  document.querySelector('input[name="issueKeyKind"][value="single"]').checked = true;
+  updateIssueKeyForm();
   document.getElementById('issueKeyOverlay').classList.add('open');
   document.getElementById('issueKeyModal').classList.add('open');
 }
@@ -3277,12 +3325,31 @@ function closeIssueKeyModal() {
   document.getElementById('issueKeyModal').classList.remove('open');
 }
 
+function issueKeyKind() {
+  return document.querySelector('input[name="issueKeyKind"]:checked').value;
+}
+
+function updateIssueKeyForm() {
+  document.getElementById('issueKeyReusableOptions').style.display = issueKeyKind() === 'reusable' ? '' : 'none';
+}
+
 async function generateKey() {
+  const body = { org_id: currentOrgId };
+  if (issueKeyKind() === 'reusable') {
+    const maxUses = parseInt(document.getElementById('issueKeyMaxUses').value, 10);
+    if (!Number.isInteger(maxUses) || maxUses < 2 || maxUses > 10000) {
+      showToast('Maximum agents must be between 2 and 10000', 'error');
+      return;
+    }
+    body.max_uses = maxUses;
+    body.expires_in_seconds = parseInt(document.getElementById('issueKeyExpiry').value, 10);
+    body.label = document.getElementById('issueKeyLabel').value.trim();
+  }
   try {
     const r = await fetch('/agents/issue-key', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ org_id: currentOrgId }),
+      body: JSON.stringify(body),
     });
     if (!r.ok) {
       const err = await r.json();
@@ -3291,8 +3358,13 @@ async function generateKey() {
     }
     const data = await r.json();
     document.getElementById('issueKeyValue').textContent = data.key;
+    const expires = new Date(data.expires_at).toLocaleString();
+    document.getElementById('issueKeySummary').textContent = data.max_uses > 1
+      ? `Reusable: up to ${data.max_uses} agents, valid until ${expires}.`
+      : `Single use, valid until ${expires}.`;
     document.getElementById('issueKeyStep1').style.display = 'none';
     document.getElementById('issueKeyStep2').style.display = '';
+    loadKeys();
   } catch (e) {
     showToast('Network error generating key', 'error');
   }
@@ -3305,6 +3377,66 @@ function copyKey() {
     btn.textContent = 'Copied!';
     setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
   });
+}
+
+// ---- Enrollment keys list ----
+async function loadKeys() {
+  if (!currentOrgId) return;
+  const tbody = document.getElementById('keysTbody');
+  try {
+    const r = await fetch(`/agents/keys?org_id=${encodeURIComponent(currentOrgId)}`);
+    if (!r.ok) {
+      // Auditors and viewers cannot manage keys; hide the empty state instead of erroring.
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:1.5rem;">${r.status === 403 ? 'Only administrators can see enrollment keys.' : 'Could not load keys.'}</td></tr>`;
+      return;
+    }
+    renderKeysTable((await r.json()).keys || []);
+  } catch (e) {
+    console.error('loadKeys failed', e);
+  }
+}
+
+function keyStatusBadge(status) {
+  const color = { ACTIVE: 'var(--low)', EXHAUSTED: 'var(--text-muted)', EXPIRED: 'var(--text-muted)', REVOKED: 'var(--high)' }[status] || 'var(--text-muted)';
+  return `<span style="color:${color};font-weight:600;font-size:0.8rem;">${escapeHtml(status)}</span>`;
+}
+
+function renderKeysTable(keys) {
+  const tbody = document.getElementById('keysTbody');
+  if (keys.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:1.5rem;">No keys issued for this organisation.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = keys.map(k => {
+    const canRevoke = k.status === 'ACTIVE';
+    const label = k.label ? escapeHtml(k.label) : (k.max_uses > 1 ? '<span style="color:var(--text-subtle)">reusable key</span>' : '<span style="color:var(--text-subtle)">one-time key</span>');
+    return `<tr>
+      <td>${label}</td>
+      <td>${keyStatusBadge(k.status)}</td>
+      <td>${Number(k.uses)} / ${Number(k.max_uses)}</td>
+      <td>${escapeHtml(new Date(k.expires_at).toLocaleString())}</td>
+      <td>${escapeHtml(k.created_by || '—')}</td>
+      <td>${canRevoke
+        ? `<button class="btn btn-danger" style="font-size:0.75rem;padding:0.2rem 0.6rem;" onclick="revokeKey('${escapeHtml(k.key_id)}')">Revoke</button>`
+        : '<span style="color:var(--text-subtle);font-size:0.8rem;">—</span>'}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function revokeKey(keyId) {
+  if (!confirm('Revoke this enrollment key?\n\nNo more agents will be able to register with it. Agents that already registered keep working.')) return;
+  try {
+    const r = await fetch(`/agents/keys/${encodeURIComponent(keyId)}/revoke`, { method: 'POST' });
+    if (!r.ok) {
+      const err = await r.json();
+      showToast(err.detail || 'Revoke failed', 'error');
+      return;
+    }
+    showToast('Key revoked.', 'success');
+    loadKeys();
+  } catch (e) {
+    showToast('Network error revoking key', 'error');
+  }
 }
 
 async function revokeAgent(agentId) {

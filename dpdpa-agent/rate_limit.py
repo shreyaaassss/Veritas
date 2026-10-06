@@ -81,6 +81,38 @@ class _RateLimiter:
 
             bucket.append(now)
 
+    def peek(
+        self,
+        endpoint: str,
+        key: str,
+        *,
+        max_requests: int,
+        window_seconds: int,
+    ) -> None:
+        """Raise HTTP 429 if the limit is already reached, WITHOUT recording a request."""
+        now = time.monotonic()
+        cutoff = now - window_seconds
+        with self._lock:
+            bucket = self._windows[(endpoint, key)]
+            while bucket and bucket[0] < cutoff:
+                bucket.popleft()
+            if len(bucket) >= max_requests:
+                retry_after = int(bucket[0] + window_seconds - now) + 1
+                raise HTTPException(
+                    status_code=429,
+                    detail=(
+                        f"Too many failed attempts. "
+                        f"Maximum {max_requests} per {window_seconds}s. "
+                        f"Try again in {retry_after}s."
+                    ),
+                    headers={"Retry-After": str(retry_after)},
+                )
+
+    def record(self, endpoint: str, key: str) -> None:
+        """Record one event (for example a failed attempt) without enforcing a limit."""
+        with self._lock:
+            self._windows[(endpoint, key)].append(time.monotonic())
+
     def reset(self, endpoint: str, key: str) -> None:
         """Clear the rate limit bucket for a key (e.g. after successful login)."""
         with self._lock:
@@ -137,17 +169,28 @@ def setup_rate_limit(request: Request) -> None:
     )
 
 
+REGISTER_FAILURE_LIMIT = 20          # failed registrations per IP per hour
+
+
 def register_rate_limit(request: Request) -> None:
     """
-    Dependency: rate-limit agent registration by IP.
-    20 registrations per hour (generous — allows fleet enrollment).
+    Dependency: block an IP that keeps presenting bad registration keys.
+
+    Only FAILED attempts count (see record_register_failure). Successful registrations
+    are bounded by the key itself (its use limit and expiry), so enrolling a whole
+    cluster of agents from one egress IP is not throttled, while key guessing is.
     """
-    _limiter.check(
-        "agent_register",
+    _limiter.peek(
+        "agent_register_failed",
         _client_ip(request),
-        max_requests=20,
+        max_requests=REGISTER_FAILURE_LIMIT,
         window_seconds=3600,
     )
+
+
+def record_register_failure(request: Request) -> None:
+    """Count one failed registration attempt against the caller's IP."""
+    _limiter.record("agent_register_failed", _client_ip(request))
 
 
 def issue_key_rate_limit(request: Request) -> None:

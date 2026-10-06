@@ -38,10 +38,31 @@ class Agent(BaseModel):
 
 
 class RegistrationKey(BaseModel):
-    """A one-time key issued to an admin for Agent bootstrap."""
+    """
+    A key issued to an admin for Agent bootstrap. By default it works once and expires
+    after 30 minutes. A reusable key (max_uses > 1) can enrol many agents, for example
+    one per Kubernetes node, until it reaches its use limit, expires or is revoked.
+    """
 
     key_id: str             # UUID string
     org_id: str
     created_at: datetime
-    expires_at: datetime    # created_at + 30 minutes
-    used: bool = False
+    expires_at: datetime
+    used: bool = False      # True once uses has reached max_uses
+    max_uses: int = 1
+    uses: int = 0
+    revoked: bool = False
+    label: str = ""
+    created_by: Optional[str] = None
+
+    def status(self, now: Optional[datetime] = None) -> str:
+        """REVOKED, EXPIRED, EXHAUSTED or ACTIVE."""
+        from datetime import timezone
+        now = now or datetime.now(timezone.utc)
+        if self.revoked:
+            return "REVOKED"
+        if now > self.expires_at:
+            return "EXPIRED"
+        if self.uses >= self.max_uses:
+            return "EXHAUSTED"
+        return "ACTIVE"

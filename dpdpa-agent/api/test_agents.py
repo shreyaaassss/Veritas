@@ -570,3 +570,172 @@ class TestAgentManagementIsTenantScoped:
         v = _user_client(UserRole.VIEWER, orgs=("retail_co",), name="viewer_a")
         assert v.get(f"/agents/{b2}").status_code == 404
         assert "/var/log/app/orders.log" not in v.get("/agents").text
+
+
+# ---------------------------------------------------------------------------
+# Reusable enrollment keys (Kubernetes DaemonSet: one key, many agents)
+# ---------------------------------------------------------------------------
+
+def _issue(org="retail_co", **body):
+    r = client.post("/agents/issue-key", json={"org_id": org, **body})
+    return r
+
+
+def _register_with(key, label="node"):
+    return client.post("/agent/register", json={"registration_key": key, "source_label": label})
+
+
+class TestReusableKeys:
+
+    def test_default_key_is_still_single_use_for_30_minutes(self):
+        r = _issue()
+        assert r.status_code == 200
+        body = r.json()
+        assert body["max_uses"] == 1 and body["expires_in_seconds"] == 1800
+        assert _register_with(body["key"]).status_code == 200
+        again = _register_with(body["key"])
+        assert again.status_code == 400 and "already been used" in again.json()["detail"]
+
+    def test_reusable_key_enrols_up_to_its_limit_then_stops(self):
+        body = _issue(max_uses=3, label="prod cluster").json()
+        assert body["expires_in_seconds"] == 86400, "reusable keys default to 24 hours"
+        for i in range(3):
+            assert _register_with(body["key"], f"node-{i}").status_code == 200
+        over = _register_with(body["key"], "node-3")
+        assert over.status_code == 400
+        assert "use limit (3 agents)" in over.json()["detail"]
+
+    def test_each_registration_creates_a_separate_agent_with_its_own_token(self):
+        key = _issue(max_uses=2).json()["key"]
+        a, b = _register_with(key, "n1").json(), _register_with(key, "n2").json()
+        assert a["agent_id"] != b["agent_id"] and a["auth_token"] != b["auth_token"]
+        ev = {"source_type": "log", "source_system": "order-service", "raw_snippet": "phone 9876543210"}
+        for agent in (a, b):
+            r = client.post(f"/v1/retail_co/events", json=ev,
+                            headers={"Authorization": f"Bearer {agent['auth_token']}"})
+            assert r.status_code == 200
+
+    def test_listing_shows_uses_and_status_but_never_the_key(self):
+        body = _issue(max_uses=2, label="staging").json()
+        _register_with(body["key"])
+        keys = client.get("/agents/keys?org_id=retail_co").json()["keys"]
+        k = next(x for x in keys if x["key_id"] == body["key_id"])
+        assert (k["label"], k["max_uses"], k["uses"], k["status"]) == ("staging", 2, 1, "ACTIVE")
+        assert body["key"] not in client.get("/agents/keys?org_id=retail_co").text
+        _register_with(body["key"])
+        k = next(x for x in client.get("/agents/keys?org_id=retail_co").json()["keys"] if x["key_id"] == body["key_id"])
+        assert k["status"] == "EXHAUSTED"
+
+    def test_revoking_a_key_blocks_new_agents_but_not_existing_ones(self):
+        body = _issue(max_uses=5).json()
+        first = _register_with(body["key"]).json()
+        assert client.post(f"/agents/keys/{body['key_id']}/revoke").status_code == 200
+        blocked = _register_with(body["key"])
+        assert blocked.status_code == 400 and "revoked" in blocked.json()["detail"]
+        r = client.post("/agent/heartbeat", json={"agent_id": first["agent_id"]},
+                        headers={"Authorization": f"Bearer {first['auth_token']}"})
+        assert r.status_code == 200, "agents enrolled before the revocation keep working"
+        status = next(x for x in client.get("/agents/keys?org_id=retail_co").json()["keys"]
+                      if x["key_id"] == body["key_id"])["status"]
+        assert status == "REVOKED"
+
+    @pytest.mark.parametrize("bad", [
+        {"max_uses": 0}, {"max_uses": 10001}, {"expires_in_seconds": 59},
+        {"expires_in_seconds": 30 * 86400 + 1}, {"label": "x" * 101},
+    ])
+    def test_out_of_range_options_are_rejected(self, bad):
+        assert _issue(**bad).status_code == 422
+
+    def test_expiry_can_be_chosen(self):
+        body = _issue(max_uses=2, expires_in_seconds=7 * 86400).json()
+        assert body["expires_in_seconds"] == 7 * 86400
+
+    def test_a_key_past_its_expiry_is_refused(self):
+        from agent_store.store import get_agent_store as store
+        plaintext, _ = store().issue_key_detailed("retail_co", max_uses=3, ttl_minutes=-5)
+        r = _register_with(plaintext)
+        assert r.status_code == 400 and "expired" in r.json()["detail"]
+
+    def test_enrolling_a_big_cluster_from_one_ip_is_not_rate_limited(self):
+        key = _issue(max_uses=30).json()["key"]
+        statuses = [_register_with(key, f"node-{i}").status_code for i in range(30)]
+        assert statuses == [200] * 30, "successful enrolments must not count toward the limit"
+
+    def test_guessing_keys_is_still_rate_limited(self):
+        codes = [_register_with(f"wrong-key-{i}").status_code for i in range(22)]
+        assert codes[:20] == [400] * 20
+        assert 429 in codes[20:], "after 20 failed attempts from one IP the endpoint must refuse"
+
+    def test_key_actions_are_audited(self):
+        body = _issue(max_uses=2, label="audit me").json()
+        _register_with(body["key"], "node-a")
+        client.post(f"/agents/keys/{body['key_id']}/revoke")
+        from audit_log.store import get_audit_store
+        actions = [e["action"] for e in get_audit_store().query(org_id="retail_co", limit=100)]
+        assert {"AGENT_KEY_ISSUED", "AGENT_REGISTERED", "AGENT_KEY_REVOKED"} <= set(actions)
+
+    def test_last_use_is_won_by_exactly_one_of_many_racing_agents(self):
+        import threading
+        from agent_store.store import get_agent_store as store
+        plaintext, _ = store().issue_key_detailed("retail_co", max_uses=1)
+        results = []
+        def go():
+            try:
+                store().consume_key(plaintext)
+                results.append("ok")
+            except ValueError:
+                results.append("refused")
+        threads = [threading.Thread(target=go) for _ in range(12)]
+        [t.start() for t in threads]; [t.join() for t in threads]
+        assert results.count("ok") == 1 and results.count("refused") == 11
+
+
+class TestKeyManagementIsTenantScoped:
+
+    def test_org_admin_cannot_list_or_revoke_another_orgs_keys(self):
+        other = _issue("edtech_co", max_uses=2).json()
+        ca = _user_client(UserRole.COMPLIANCE_ADMIN, orgs=("retail_co",), name="keys_admin_a")
+        assert ca.get("/agents/keys?org_id=edtech_co").status_code == 403
+        assert ca.post(f"/agents/keys/{other['key_id']}/revoke").status_code == 404
+        # and the key still works
+        assert _register_with(other["key"]).status_code == 200
+
+    def test_viewers_and_auditors_cannot_manage_keys(self):
+        v = _user_client(UserRole.VIEWER, orgs=("retail_co",), name="keys_viewer")
+        a = _user_client(UserRole.AUDITOR, orgs=("retail_co",), name="keys_auditor")
+        for c in (v, a):
+            assert c.get("/agents/keys?org_id=retail_co").status_code == 403
+            assert c.post("/agents/issue-key", json={"org_id": "retail_co", "max_uses": 5}).status_code == 403
+
+
+def test_agent_store_migrates_keys_created_before_reusable_keys(tmp_path):
+    import sqlite3
+    from agent_store.store import AgentStore
+    import hashlib
+
+    db = tmp_path / "old_keys.db"
+    h = lambda v: hashlib.sha256(v.encode()).hexdigest()
+    conn = sqlite3.connect(db)
+    conn.executescript(f"""
+        CREATE TABLE registration_keys (
+            key_id TEXT PRIMARY KEY, org_id TEXT NOT NULL, key_hash TEXT NOT NULL UNIQUE,
+            created_at TEXT NOT NULL, expires_at TEXT NOT NULL,
+            used INTEGER NOT NULL DEFAULT 0, used_at TEXT);
+        CREATE TABLE agents (
+            agent_id TEXT PRIMARY KEY, org_id TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE,
+            status TEXT NOT NULL DEFAULT 'ACTIVE', source_label TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL, last_heartbeat_at TEXT, events_received INTEGER NOT NULL DEFAULT 0);
+        INSERT INTO registration_keys VALUES ('k-used','retail_co','{h("usedkey")}','2026-01-01T00:00:00+00:00','2099-01-01T00:00:00+00:00',1,'2026-01-01T00:01:00+00:00');
+        INSERT INTO registration_keys VALUES ('k-open','retail_co','{h("openkey")}','2026-01-01T00:00:00+00:00','2099-01-01T00:00:00+00:00',0,NULL);
+    """)
+    conn.commit(); conn.close()
+
+    store = AgentStore(db)
+    used = store.get_key("k-used")
+    assert (used.max_uses, used.uses, used.used) == (1, 1, True)
+    with pytest.raises(ValueError, match="already been used"):
+        store.consume_key("usedkey")
+    assert store.consume_key("openkey").uses == 1
+    with pytest.raises(ValueError, match="already been used"):
+        store.consume_key("openkey")
+    store.close()
