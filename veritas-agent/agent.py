@@ -397,6 +397,44 @@ def _verify_from_state(config: Dict[str, Any], state: Dict[str, Any]) -> Union[b
 
 
 # ---------------------------------------------------------------------------
+# Counters and rate-limited logging
+# ---------------------------------------------------------------------------
+
+class AgentStats:
+    """Thread-safe counters. Reported in the heartbeat so operators can see health."""
+
+    NAMES = (
+        "lines_read", "forwarded", "retries",
+        "dropped_buffer_full", "dropped_rejected", "dropped_auth", "dropped_other",
+    )
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._counts = {name: 0 for name in self.NAMES}
+
+    def incr(self, name: str, n: int = 1) -> None:
+        with self._lock:
+            self._counts[name] += n
+
+    def snapshot(self) -> Dict[str, int]:
+        with self._lock:
+            return dict(self._counts)
+
+
+STATS = AgentStats()
+
+_last_logged: Dict[str, float] = {}
+
+
+def log_limited(key: str, level: int, message: str, *args: Any, interval: float = 60.0) -> None:
+    """Log at most once per `interval` seconds per key (a bad state must not flood the log)."""
+    now = time.monotonic()
+    if now - _last_logged.get(key, -interval) >= interval:
+        _last_logged[key] = now
+        logger.log(level, message, *args)
+
+
+# ---------------------------------------------------------------------------
 # Event forwarding
 # ---------------------------------------------------------------------------
 
@@ -430,6 +468,117 @@ def forward_event(
 # Forwarding worker (runs on main thread)
 # ---------------------------------------------------------------------------
 
+# How a failed delivery is handled. The queue is processed in order, so an event
+# that can never succeed must not be retried forever: it would block every line
+# behind it. Outages, on the other hand, must not lose data.
+#
+#   outage / overload (retry with backoff, no limit; the bounded queue absorbs it)
+#       connection errors, timeouts, HTTP 408, 429, 502, 503, 504
+#   server error on this event (retry a few times, then drop it and count it)
+#       other HTTP 5xx
+#   rejected (drop at once and count it; retrying cannot change the answer)
+#       other HTTP 4xx except 401/403, for example 400, 413, 422
+#   not authorised (drop and count; the agent may be revoked or the token wrong)
+#       HTTP 401, 403
+#   TLS errors (drop and count; a certificate problem needs an operator)
+#
+# Log lines never contain the event text, which may hold personal data.
+
+INFINITE_RETRY_STATUSES = frozenset({408, 429, 502, 503, 504})
+MAX_SERVER_ERROR_ATTEMPTS = 6
+
+
+def deliver(
+    item: tuple,
+    forward,
+    sleep=time.sleep,
+    stats: AgentStats = STATS,
+    max_backoff: float = MAX_BACKOFF,
+) -> str:
+    """
+    Deliver one (raw_snippet, source_system) item. Returns "delivered" or "dropped".
+    `forward` is called as forward(raw_snippet, source_system).
+    """
+    raw_snippet, source_system = item
+    backoff = 1.0
+    server_error_attempts = 0
+
+    while True:
+        try:
+            forward(raw_snippet, source_system)
+            stats.incr("forwarded")
+            return "delivered"
+
+        except requests.exceptions.SSLError as e:
+            stats.incr("dropped_other")
+            log_limited("tls", logging.ERROR,
+                        "TLS error forwarding events: %s. Check VERITAS_CA_CERT / the server "
+                        "certificate. Dropping events until fixed.", e)
+            return "dropped"
+
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+            stats.incr("retries")
+            log_limited("unreachable", logging.WARNING,
+                        "Veritas server unreachable or slow, retrying in %ds: %s", int(backoff), e)
+            sleep(backoff)
+            backoff = min(backoff * 2, max_backoff)
+
+        except requests.exceptions.HTTPError as e:
+            response = e.response
+            status = response.status_code if response is not None else 0
+
+            if status in (401, 403):
+                stats.incr("dropped_auth")
+                log_limited("auth", logging.ERROR,
+                            "Veritas rejected this agent (HTTP %s). It may be revoked. Dropping "
+                            "events. Register a new agent from the dashboard if needed.", status)
+                return "dropped"
+
+            if status in INFINITE_RETRY_STATUSES:
+                stats.incr("retries")
+                delay = backoff
+                retry_after = response.headers.get("Retry-After") if response is not None else None
+                if status == 429 and retry_after and str(retry_after).isdigit():
+                    delay = min(float(retry_after), max_backoff)
+                log_limited(f"http{status}", logging.WARNING,
+                            "HTTP %s from the server, retrying in %ds", status, int(delay))
+                sleep(delay)
+                backoff = min(backoff * 2, max_backoff)
+                continue
+
+            if 500 <= status < 600:
+                server_error_attempts += 1
+                if server_error_attempts >= MAX_SERVER_ERROR_ATTEMPTS:
+                    stats.incr("dropped_rejected")
+                    log_limited("http5xx-drop", logging.ERROR,
+                                "Server error HTTP %s on the same event %d times; dropping it so "
+                                "the events behind it are not blocked.", status, server_error_attempts)
+                    return "dropped"
+                stats.incr("retries")
+                log_limited(f"http{status}", logging.WARNING,
+                            "HTTP %s from the server, retrying in %ds", status, int(backoff))
+                sleep(backoff)
+                backoff = min(backoff * 2, max_backoff)
+                continue
+
+            # Other 4xx: the server understood and refused this event.
+            stats.incr("dropped_rejected")
+            detail = ""
+            try:
+                detail = (response.text or "")[:200] if response is not None else ""
+            except Exception:
+                pass
+            log_limited("rejected", logging.WARNING,
+                        "Server rejected an event (HTTP %s), dropping it: %s", status, detail)
+            return "dropped"
+
+        except Exception as e:
+            stats.incr("dropped_other")
+            log_limited("unexpected", logging.ERROR,
+                        "Unexpected forwarding error: %s. Dropping the event.", e)
+            return "dropped"
+
+
 def forwarding_worker(
     config: Dict[str, Any],
     state: Dict[str, Any],
@@ -437,80 +586,170 @@ def forwarding_worker(
 ) -> None:
     base_url = config["veritas_address"]
     verify   = _verify_from_state(config, state)
-    backoff  = 1
+
+    def forward(raw_snippet: str, source_system: str) -> None:
+        forward_event(base_url, state, raw_snippet, source_system, verify=verify)
 
     logger.info("Forwarding worker started. Watching queue…")
 
     while True:
         try:
-            raw_snippet, source_system = event_queue.get(timeout=1)
+            item = event_queue.get(timeout=1)
         except queue.Empty:
             continue
-
-        while True:
-            try:
-                forward_event(base_url, state, raw_snippet, source_system, verify=verify)
-                backoff = 1
-                break
-
-            except requests.exceptions.SSLError as e:
-                logger.error(
-                    "TLS error forwarding event: %s — check VERITAS_CA_CERT. Dropping event.", e
-                )
-                break
-
-            except requests.exceptions.ConnectionError as e:
-                logger.warning("Server unreachable, retrying in %ds: %s", backoff, e)
-                time.sleep(backoff)
-                backoff = min(backoff * 2, MAX_BACKOFF)
-
-            except requests.exceptions.HTTPError as e:
-                status = e.response.status_code if e.response is not None else "?"
-                if status in (401, 403):
-                    logger.error(
-                        "Auth rejected (%s) — agent may be revoked. Dropping event. "
-                        "Re-register a new agent from the dashboard.",
-                        status,
-                    )
-                    break
-                logger.warning("HTTP %s from server, retrying in %ds", status, backoff)
-                time.sleep(backoff)
-                backoff = min(backoff * 2, MAX_BACKOFF)
-
-            except Exception as e:
-                logger.error("Unexpected forwarding error: %s — dropping event", e)
-                break
+        deliver(item, forward)
 
 
 # ---------------------------------------------------------------------------
 # Source: file tail
 # ---------------------------------------------------------------------------
 
+class FileFollower:
+    """
+    Follows one log file the way `tail -F` does, without threads or sleeping so it
+    can be tested directly. poll() returns the complete new lines since the last call.
+
+    - Only lines written after the agent starts are read (history is not replayed),
+      unless the file did not exist yet: then everything in it is new.
+    - A line is delivered only once it is complete (ends with a newline), so a
+      writer caught mid-line cannot make one value arrive as two events and hide
+      personal data from detection. A final line without a newline is delivered
+      when the file is rotated away.
+    - Rotation by rename (logrotate default): the rest of the old file is drained,
+      then the new file is read from its start. Nothing is lost or repeated.
+    - Truncation in place (logrotate copytruncate): reading restarts at the top.
+    - While the file is briefly missing during rotation the old handle is kept.
+    """
+
+    def __init__(self, path: Union[str, Path]) -> None:
+        self.path = Path(path)
+        self._fh = None
+        self._ident = None
+        self._pending = b""
+        self._seek_end_on_first_open = self.path.exists()
+
+    @staticmethod
+    def _identity(st: os.stat_result):
+        # (device, inode); inode is 0 on filesystems that do not report one.
+        return (st.st_dev, st.st_ino)
+
+    def _open(self, from_end: bool) -> bool:
+        try:
+            fh = open(self.path, "rb")
+        except FileNotFoundError:
+            return False
+        self._fh = fh
+        self._ident = self._identity(os.fstat(fh.fileno()))
+        if from_end:
+            fh.seek(0, os.SEEK_END)
+        self._pending = b""
+        return True
+
+    def close(self) -> None:
+        if self._fh is not None:
+            try:
+                self._fh.close()
+            finally:
+                self._fh = None
+                self._ident = None
+
+    def _read_available(self) -> list:
+        data = self._pending + self._fh.read()
+        if not data:
+            return []
+        *complete, self._pending = data.split(b"\n")
+        return self._decode(complete)
+
+    @staticmethod
+    def _decode(raw_lines) -> list:
+        out = []
+        for raw in raw_lines:
+            line = raw.decode("utf-8", errors="replace").strip()
+            if line:
+                out.append(line)
+        return out
+
+    def _flush_pending(self) -> list:
+        raw, self._pending = self._pending, b""
+        return self._decode([raw]) if raw else []
+
+    def poll(self) -> list:
+        lines: list = []
+
+        if self._fh is None:
+            first = self._seek_end_on_first_open
+            if not self._open(from_end=first):
+                return lines
+            self._seek_end_on_first_open = False
+            if first:
+                return lines  # started at the end; nothing new yet
+
+        lines += self._read_available()
+
+        try:
+            st = os.stat(self.path)
+        except FileNotFoundError:
+            return lines  # mid-rotation: keep reading the old handle until the new file appears
+
+        if self._identity(st) != self._ident and st.st_ino != 0:
+            # The path now points to a different file: it was rotated.
+            lines += self._read_available()
+            lines += self._flush_pending()
+            self.close()
+            logger.info("Log file rotated, following the new file: %s", self.path)
+            if self._open(from_end=False):
+                lines += self._read_available()
+        elif st.st_size < self._fh.tell():
+            # Same file, now shorter: truncated in place (copytruncate).
+            lines += self._flush_pending()
+            self._fh.seek(0)
+            logger.info("Log file truncated, reading from the start: %s", self.path)
+            lines += self._read_available()
+
+        return lines
+
+
 def tail_file(
     path: str,
     source_system: str,
     event_queue: queue.Queue,
+    poll_interval: float = 0.5,
+    stop_event: Optional[threading.Event] = None,
 ) -> None:
     file_path = Path(path)
     logger.info("Tailing file: %s (source_system: %s)", file_path, source_system)
 
-    while not file_path.exists():
-        logger.warning("Waiting for log file to appear: %s", file_path)
-        time.sleep(5)
+    follower = FileFollower(file_path)
+    last_warning = 0.0
 
-    try:
-        with open(file_path, encoding="utf-8", errors="replace") as f:
-            f.seek(0, 2)
-            while True:
-                line = f.readline()
-                if line:
-                    line = line.strip()
-                    if line:
-                        _enqueue(event_queue, line, source_system)
-                else:
-                    time.sleep(0.5)
-    except Exception as e:
-        logger.error("File tail error for %s: %s", path, e)
+    def warn_rate_limited(message: str, *args) -> None:
+        nonlocal last_warning
+        now = time.monotonic()
+        if now - last_warning >= 60:
+            last_warning = now
+            logger.warning(message, *args)
+
+    while not (stop_event is not None and stop_event.is_set()):
+        try:
+            if not file_path.exists() and follower._fh is None:
+                warn_rate_limited("Waiting for log file to appear: %s", file_path)
+            for line in follower.poll():
+                _enqueue(event_queue, line, source_system)
+        except PermissionError as e:
+            follower.close()
+            warn_rate_limited(
+                "Permission denied reading %s: %s. The agent cannot read this file; grant "
+                "the agent's user read access (on Linux the service user is "
+                "'veritas-agent', in group 'adm'). Retrying.", file_path, e,
+            )
+            time.sleep(max(poll_interval, 5))
+        except OSError as e:
+            follower.close()
+            warn_rate_limited("Error reading %s: %s. Retrying.", file_path, e)
+            time.sleep(max(poll_interval, 5))
+        time.sleep(poll_interval)
+
+    follower.close()
 
 
 # ---------------------------------------------------------------------------
@@ -549,17 +788,24 @@ def tail_docker(
 
 
 def _enqueue(event_queue: queue.Queue, line: str, source_system: str) -> None:
+    STATS.incr("lines_read")
     try:
         event_queue.put_nowait((line, source_system))
     except queue.Full:
+        # Buffer full (server slow or down for a long time): drop the OLDEST line
+        # so memory stays bounded and the newest telemetry is kept.
         try:
             event_queue.get_nowait()
+            STATS.incr("dropped_buffer_full")
         except queue.Empty:
             pass
         try:
             event_queue.put_nowait((line, source_system))
         except queue.Full:
-            logger.warning("Event buffer full — dropped line from %s", source_system)
+            STATS.incr("dropped_buffer_full")
+        log_limited("buffer-full", logging.WARNING,
+                    "Event buffer full (%d lines); dropping the oldest lines until the "
+                    "server accepts events again.", BUFFER_MAX)
 
 
 # ---------------------------------------------------------------------------
