@@ -86,6 +86,7 @@ echo "     Install your license file."
 echo ""
 echo "  3. sudo veritas start"
 echo "     Then open: https://localhost:8000/setup"
+echo "     and enter the code shown by:  sudo veritas setup-code"
 echo ""
 
 # Always exit 0 — let the user complete setup manually

@@ -45,6 +45,16 @@ case "$1" in
   status)   launchctl list | grep veritas || echo "Veritas not running" ;;
   logs)     tail -f /var/log/veritas/veritas.log ;;
 
+  setup-code)
+    CODE_FILE=/var/lib/veritas/secrets/setup_code
+    if [ -s "$CODE_FILE" ]; then
+      echo "Setup code (enter it on the setup page):"; echo; cat "$CODE_FILE"; echo
+    else
+      echo "There is no setup code: setup is already complete, or the service has not started yet." >&2
+      exit 1
+    fi
+    ;;
+
   fingerprint)
     python3 - <<'PYEOF'
 import hashlib, platform, socket, subprocess, uuid
@@ -107,6 +117,7 @@ PYEOF
     echo "  status        Show service status"
     echo "  logs          Stream service logs (Ctrl+C to stop)"
     echo "  fingerprint   Print machine fingerprint (send to Veritas for license)"
+    echo "  setup-code    Print the one-time code the setup page asks for"
     echo "  license <f>   Install license file and restart"
     echo "  version       Print version"
     echo ""
@@ -114,7 +125,7 @@ PYEOF
     echo "  1. sudo veritas fingerprint   → send output to your Veritas contact"
     echo "  2. sudo veritas license /path/to/veritas.vlic"
     echo "  3. sudo veritas start"
-    echo "  4. Open http://localhost:8000/setup"
+    echo "  4. Open https://localhost:8000/setup and enter the code from: sudo veritas setup-code"
     ;;
 esac
 CLISCRIPT

@@ -287,7 +287,7 @@ jobs:
             1. `sudo veritas fingerprint` — send the output to your Veritas contact
             2. `sudo veritas license /path/to/veritas.vlic` — install license
             3. `sudo veritas start` — start the server
-            4. Open https://localhost:8000/setup — create admin account (self-signed certificate)
+            4. Open https://localhost:8000/setup (self-signed certificate) and create the admin account. It asks for a one-time setup code: `sudo veritas setup-code`
 
             CLI: `veritas {start|stop|restart|status|logs|fingerprint|license|check}`
 

@@ -51,6 +51,13 @@ LICENSE_EXIT_CODE = 78
 
 
 def main() -> None:
+    # Output to a pipe or file (the service log) is block-buffered by default, so the start-up
+    # banner, which carries the setup code, could stay invisible for a long time. Flush per line.
+    try:
+        sys.stdout.reconfigure(line_buffering=True)
+    except (AttributeError, ValueError):
+        pass
+
     parser = argparse.ArgumentParser(
         description="Veritas DPDPA Compliance Platform"
     )
@@ -62,6 +69,10 @@ def main() -> None:
         "--fingerprint", action="store_true",
         help="Print this machine's license fingerprint and exit "
              "(send it to Veritas to receive a machine-bound license).",
+    )
+    parser.add_argument(
+        "--setup-code", action="store_true",
+        help="Print the one-time setup code needed to create the first administrator and exit.",
     )
     parser.add_argument(
         "--check", action="store_true",
@@ -77,6 +88,20 @@ def main() -> None:
         except FingerprintError as e:
             print(f"ERROR: {e}", file=sys.stderr)
             raise SystemExit(1)
+        return
+
+    if args.setup_code:
+        from setup_code import from_environment, read_existing
+        from user_store.store import get_user_store
+        if get_user_store().count_users() > 0:
+            print("Setup is already complete, so there is no setup code.", file=sys.stderr)
+            raise SystemExit(1)
+        code = read_existing()
+        if not code:
+            print("No setup code exists yet. Start the Veritas service first; it creates the code "
+                  "when it starts.", file=sys.stderr)
+            raise SystemExit(1)
+        print(code)
         return
 
     if args.check:
@@ -195,12 +220,23 @@ def main() -> None:
     try:
         from user_store.store import get_user_store
         if get_user_store().count_users() == 0:
+            from setup_code import from_environment, get_or_create
+            preset = from_environment() is not None
+            code = get_or_create()
             print()
             print("=" * 60)
             print("  FIRST RUN DETECTED — SETUP REQUIRED")
             print("=" * 60)
             print(f"  Open {dashboard_url}/setup to create")
             print("  your administrator account before logging in.")
+            print()
+            if preset:
+                print("  SETUP CODE: the value of the VERITAS_SETUP_CODE setting")
+            else:
+                print(f"  SETUP CODE: {code}")
+                print("  (also shown by:  sudo veritas setup-code)")
+            print("  The page asks for this code so that only someone with access")
+            print("  to this server can create the first administrator.")
             print("=" * 60)
             print()
     except Exception:

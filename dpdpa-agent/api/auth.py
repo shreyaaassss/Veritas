@@ -7,7 +7,8 @@ Routes:
   POST /api/auth/login    — authenticate with username + password → set httpOnly cookie
   POST /api/auth/logout   — clear session cookie
   GET  /api/auth/me       — return current user info (requires auth)
-  POST /api/auth/setup    — create first administrator (only works if 0 users exist)
+  POST /api/auth/setup    — create first administrator (only works if 0 users exist, and needs
+                            the one-time setup code shown in the server log)
 
 Security notes:
   - Passwords hashed with bcrypt (passlib), never stored or logged as plaintext
@@ -92,6 +93,9 @@ class SetupRequest(BaseModel):
     username: str  = Field(..., min_length=3, max_length=64)
     email:    str  = Field(..., min_length=5, max_length=254)
     password: str  = Field(..., min_length=8, max_length=256)
+    # The one-time code from the server's log or `veritas setup-code`. Optional here only so
+    # that a missing code gets the same helpful 403 as a wrong one.
+    setup_code: str = Field("", max_length=64)
 
 
 class SetupResponse(BaseModel):
@@ -224,6 +228,19 @@ async def setup_first_admin(req: SetupRequest, _rl: None = Depends(setup_rate_li
             detail="Setup already completed. Log in as an existing administrator.",
         )
 
+    # Only someone who can read the server's log or data directory (the operator) knows the
+    # setup code, so a stranger who reaches this page first cannot claim the server.
+    from setup_code import verify as verify_setup_code
+    if not verify_setup_code(req.setup_code):
+        logger.warning("First-administrator setup refused: missing or wrong setup code")
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "A valid setup code is required. Find it in the server log (look for "
+                "'SETUP CODE') or run: sudo veritas setup-code"
+            ),
+        )
+
     # Validate inputs
     username_err = _validate_username(req.username)
     if username_err:
@@ -247,6 +264,8 @@ async def setup_first_admin(req: SetupRequest, _rl: None = Depends(setup_rate_li
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
 
+    from setup_code import clear as clear_setup_code
+    clear_setup_code()   # the code is single-use: it is gone once the first administrator exists
     logger.info("First administrator created: %r", user.username)
     return SetupResponse(
         message=f"Administrator account created. You can now log in.",

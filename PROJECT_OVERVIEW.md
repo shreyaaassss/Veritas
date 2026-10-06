@@ -211,7 +211,7 @@ A worked scenario for a fictional company, **Acme Retail**, which runs an order 
 2. Send that fingerprint to the vendor. The vendor issues a license in the portal and sends back `acme.vlic`.
 3. `sudo veritas license acme.vlic`. The service starts after a minute and the dashboard is available.
 4. Put the reverse proxy in front, or replace the self-signed certificate with one from Acme's internal CA.
-5. Open `/setup`, create the first administrator, then add users with roles: the DPO as COMPLIANCE_ADMIN, the analysts as AUDITOR, and management as VIEWER.
+5. Open `/setup`, enter the one-time setup code from `sudo veritas setup-code` (it proves you have access to the server), create the first administrator, then add users with roles: the DPO as COMPLIANCE_ADMIN, the analysts as AUDITOR, and management as VIEWER.
 
 ### Day 2: describe the data
 The compliance team creates the organisation `acme_retail` and declares the fields each system holds: purpose, consent scope and retention. They set `data_since` for any system that already stores older data, so the retention clock starts correctly.

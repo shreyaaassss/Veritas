@@ -101,9 +101,18 @@
     <div class="success" id="successBox"></div>
 
     <form id="setupForm" onsubmit="handleSetup(event)">
+      <label for="setupCode">Setup code</label>
+      <input id="setupCode" name="setupCode" type="text" autocomplete="off" spellcheck="false"
+             placeholder="XXXX-XXXX-XXXX" required maxlength="40"
+             style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:0.08em;text-transform:uppercase;" autofocus />
+      <div style="color:#888;font-size:0.78rem;margin:-0.5rem 0 1rem;line-height:1.5;">
+        Proves you have access to this server. Run <code>sudo veritas setup-code</code> on the server,
+        or find it in the service log (<code>sudo journalctl -u veritas | grep "SETUP CODE"</code>).
+      </div>
+
       <label for="username">Administrator Username</label>
       <input id="username" name="username" type="text" autocomplete="username"
-             placeholder="e.g. admin" required minlength="3" autofocus />
+             placeholder="e.g. admin" required minlength="3" />
 
       <label for="email">Email Address</label>
       <input id="email" name="email" type="email" autocomplete="email"
@@ -130,6 +139,7 @@
       errorBox.style.display = 'none';
       successBox.style.display = 'none';
 
+      const setup_code = document.getElementById('setupCode').value.trim();
       const username = document.getElementById('username').value.trim();
       const email    = document.getElementById('email').value.trim();
       const password = document.getElementById('password').value;
@@ -148,7 +158,7 @@
         const r = await fetch('/api/auth/setup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, email, password }),
+          body: JSON.stringify({ username, email, password, setup_code }),
           credentials: 'include',
         });
         const data = await r.json().catch(() => ({}));
@@ -159,7 +169,10 @@
           document.getElementById('setupForm').style.display = 'none';
           setTimeout(() => { window.location.href = '/login'; }, 2000);
         } else {
-          errorBox.textContent = data.detail || 'Setup failed.';
+          // detail is text, or a list of validation problems
+          errorBox.textContent = Array.isArray(data.detail)
+            ? data.detail.map(d => d.msg || String(d)).join(' ')
+            : (data.detail || 'Setup failed.');
           errorBox.style.display = 'block';
         }
       } catch {

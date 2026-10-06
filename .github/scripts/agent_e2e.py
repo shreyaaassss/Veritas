@@ -11,6 +11,8 @@ Environment:
   VERITAS_ADMIN_USER      administrator username      (default: ci_admin)
   VERITAS_ADMIN_PASSWORD  administrator password      (default: CiAdmin#12345)
   VERITAS_ORG             organization id             (default: ci_org)
+  VERITAS_SETUP_CODE      the first-administrator setup code the server was started with
+                          (default: ci-setup-code)
 
 The session cookie is cached so the login rate limit (10 per 5 minutes) is never hit.
 
@@ -21,8 +23,9 @@ Commands (each exits non-zero on failure):
                               makes a reusable enrollment key)
   keys                        print the organization's registration keys (metadata) as JSON
   revoke-key  --label L       revoke the newest key with that label
-  wait-agents --prefix P --count N [--version V] [--source ...] [--timeout S]
+  wait-agents --prefix P --count N [--version V] [--source ...] [--updated-after ISO] [--timeout S]
                               wait until N active agents whose label starts with P have reported health
+                              (with --updated-after, a report newer than that UTC time)
   wait-agent  --label L [--version V] [--source TARGET=STATE[:DETAIL]]... [--timeout S]
   agents                      print the organization's agents as JSON
   violations  [--min N] [--timeout S] [--source-system S]
@@ -95,7 +98,9 @@ def cmd_setup(_: argparse.Namespace) -> None:
     s = requests.Session()
     s.verify = False
     r = s.post(f"{URL}/api/auth/setup", json={"username": USER, "email": "ci@example.com",
-                                                "password": PASSWORD}, timeout=30)
+                                                "password": PASSWORD,
+                                                "setup_code": os.environ.get("VERITAS_SETUP_CODE", "ci-setup-code")},
+               timeout=30)
     if r.status_code not in (200, 403):  # 403 = setup already done
         fail(f"setup failed ({r.status_code}): {r.text[:200]}")
     c = session()
@@ -218,6 +223,13 @@ def cmd_wait_agents(a: argparse.Namespace) -> None:
         state, _, detail = state.partition(":")
         wanted.append((target, state, detail))
 
+    after = None
+    if a.updated_after:
+        from datetime import datetime, timezone
+        after = datetime.fromisoformat(a.updated_after.replace("Z", "+00:00"))
+        if after.tzinfo is None:
+            after = after.replace(tzinfo=timezone.utc)
+
     def check():
         mine = [x for x in agents() if x["source_label"].startswith(a.prefix) and x["status"] == "ACTIVE"]
         ready = []
@@ -225,6 +237,16 @@ def cmd_wait_agents(a: argparse.Namespace) -> None:
             health = agent.get("health")
             if not health:
                 continue
+            if after is not None:
+                from datetime import datetime, timezone
+                stamp = agent.get("health_updated_at")
+                if not stamp:
+                    continue
+                reported = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+                if reported.tzinfo is None:
+                    reported = reported.replace(tzinfo=timezone.utc)
+                if reported <= after:
+                    continue
             if a.version and agent.get("agent_version") != a.version:
                 continue
             ok, _ = _source_matches(health, wanted)
@@ -290,6 +312,7 @@ def main() -> None:
     wa.add_argument("--count", type=int, required=True)
     wa.add_argument("--version")
     wa.add_argument("--source", action="append", help="TARGET=STATE[:DETAIL]")
+    wa.add_argument("--updated-after", help="only count agents whose health report is newer than this UTC time (ISO)")
     wa.add_argument("--timeout", type=float, default=180)
     wa.set_defaults(fn=cmd_wait_agents)
     sub.add_parser("agents").set_defaults(fn=lambda a: print(json.dumps(agents(), indent=2)))

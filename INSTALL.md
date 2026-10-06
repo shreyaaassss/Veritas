@@ -85,7 +85,7 @@ sudo veritas start
 sudo veritas status
 
 # 5. Open dashboard in browser
-# https://localhost:8000/setup  (first time — create admin account)
+# https://localhost:8000/setup  (first time — create admin account; asks for the code from: sudo veritas setup-code)
 # https://localhost:8000        (after setup)
 ```
 
@@ -270,15 +270,19 @@ Or view via Windows Event Viewer → Application logs.
 
 After starting Veritas for the first time on any platform:
 
-1. Open **https://localhost:8000/setup** (Linux/macOS) or **http://localhost:8000/setup** (Windows)
-2. Create your administrator account:
+1. Get the **setup code**. It proves you have access to this server, so that nobody else who can reach the page first can create the administrator:
+   - Linux / macOS: `sudo veritas setup-code`
+   - Any platform: it is also printed in the service log when Veritas starts (look for `SETUP CODE`; on Linux `sudo journalctl -u veritas | grep "SETUP CODE"`), and stored in `secrets/setup_code` inside the data directory (`/var/lib/veritas` on Linux and macOS, the installation folder on Windows).
+   - Automated installs can set the code themselves with the `VERITAS_SETUP_CODE` environment variable (then nothing is written to disk).
+2. Open **https://localhost:8000/setup** (Linux/macOS) or **http://localhost:8000/setup** (Windows)
+3. Enter the setup code and create your administrator account:
    - Username (min 3 characters)
    - Email address
    - Password (min 8 characters)
-3. Click **Create Administrator**
-4. Log in at `https://localhost:8000`
+4. Click **Create Administrator Account**
+5. Log in at `https://localhost:8000`
 
-> The `/setup` page is only available when no users exist. Once an admin is created, this page returns a redirect to the login page.
+> The setup code is created when the service first starts, stays the same across restarts until it is used, and is deleted as soon as the administrator exists. The `/setup` page only works while no users exist. After 10 attempts in 10 minutes from one address the page refuses further tries.
 
 ### Upload Your Organisation Config
 

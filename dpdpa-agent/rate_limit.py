@@ -159,12 +159,13 @@ def login_rate_limit(request: Request) -> None:
 def setup_rate_limit(request: Request) -> None:
     """
     Dependency: rate-limit /setup by IP.
-    3 attempts per 10 minutes.
+    10 attempts per 10 minutes: enough for typing mistakes in the code or the form, far too few
+    to guess a 60-bit setup code.
     """
     _limiter.check(
         "setup",
         _client_ip(request),
-        max_requests=3,
+        max_requests=10,
         window_seconds=600,
     )
 

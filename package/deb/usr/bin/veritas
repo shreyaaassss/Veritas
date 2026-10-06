@@ -6,7 +6,7 @@ VERSION=$(dpkg-query -W -f='${Version}' veritas 2>/dev/null || echo unknown)
 URL="https://$(hostname -f 2>/dev/null || hostname):8000"
 
 case "$1" in
-  start)    systemctl start veritas && echo "Veritas started. Open $URL/setup (self-signed certificate; allow the browser warning)." ;;
+  start)    systemctl start veritas && echo "Veritas started. Open $URL/setup (self-signed certificate; allow the browser warning). First time: it asks for a setup code, shown by: sudo veritas setup-code" ;;
   stop)     systemctl stop veritas ;;
   restart)  systemctl restart veritas ;;
   status)   systemctl status veritas ;;
@@ -28,6 +28,23 @@ case "$1" in
     echo
     echo "$FP"
     echo
+    ;;
+
+  setup-code)
+    # The one-time code the setup page asks for, so that only someone with access to this
+    # server can create the first administrator. Created when the service starts; removed
+    # once the first administrator exists.
+    CODE_FILE="$DATA_DIR/secrets/setup_code"
+    if [ -s "$CODE_FILE" ]; then
+      echo "Setup code (enter it on the setup page at $URL/setup):"
+      echo
+      cat "$CODE_FILE"
+      echo
+    else
+      echo "There is no setup code. Either setup is already complete (an administrator exists)," >&2
+      echo "or the service has not started yet. Start it with: sudo veritas start" >&2
+      exit 1
+    fi
     ;;
 
   license)
@@ -83,6 +100,7 @@ case "$1" in
     echo "  logs          Stream service logs (Ctrl+C to stop)"
     echo "  check         Run production acceptance checks"
     echo "  fingerprint   Print machine fingerprint (send to Veritas for license)"
+    echo "  setup-code    Print the one-time code the setup page asks for"
     echo "  license <f>   Install license file and restart"
     echo "  version       Print version"
     echo ""
@@ -90,6 +108,6 @@ case "$1" in
     echo "  1. sudo veritas fingerprint   → send output to your Veritas contact"
     echo "  2. sudo veritas license /path/to/veritas.vlic"
     echo "  3. sudo veritas start"
-    echo "  4. Open $URL/setup"
+    echo "  4. Open $URL/setup and enter the code from: sudo veritas setup-code"
     ;;
 esac

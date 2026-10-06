@@ -12,6 +12,7 @@ start_server() {
   (cd dpdpa-agent && \
    VERITAS_DATA_DIR=/tmp/vdata VERITAS_AI_MODE=disabled \
    VERITAS_JWT_SECRET=ci-agent-e2e-secret VERITAS_SECURE_COOKIES=true \
+   VERITAS_SETUP_CODE=ci-setup-code \
    setsid nohup python run_pipeline.py --port 8000 >> /tmp/server.log 2>&1 &)
 }
 

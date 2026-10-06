@@ -29,7 +29,7 @@ Status: spec only. Nothing in this spec has been built yet.
 Veritas receives events over HTTP, detects personal data (PII), applies rules from the org's uploaded policy, and stores verdicts (violations) in a tamper-evident store.
 
 ### 1.1 Roles and accounts
-- First run: `POST /api/auth/setup` creates the first SUPER_ADMIN, only when no users exist.
+- First run: `POST /api/auth/setup` creates the first SUPER_ADMIN, only when no users exist, and only with the one-time **setup code**. Read it on the server with `sudo veritas setup-code`, or start the server with the `VERITAS_SETUP_CODE` environment variable set to a value you choose (recommended for automation: add `Environment=VERITAS_SETUP_CODE=...` with `sudo systemctl edit veritas`).
 - Roles: `SUPER_ADMIN`, `COMPLIANCE_ADMIN`, `AUDITOR`, `VIEWER`. Org config upload and agent key issuing need `COMPLIANCE_ADMIN` or higher.
 - **Rate limits (per IP, in memory):** login 10 per 5 min, setup 3 per 10 min, agent registration and key issuing a few dozen per hour. Log in once, keep the cookie, and reuse it. Never log in per request.
 
@@ -40,7 +40,7 @@ All HTTPS on port 8000. The server certificate is self-signed: use `verify=False
 | Purpose | Call | Auth | Notes |
 |---|---|---|---|
 | Health | `GET /health` | none | `{"status":"ok"}` |
-| Create first admin | `POST /api/auth/setup` JSON `{username,email,password}` | none (only when no users) | Password must pass the strength check |
+| Create first admin | `POST /api/auth/setup` JSON `{username,email,password,setup_code}` | none (only when no users) | Password must pass the strength check |
 | Login | `POST /api/auth/login` form fields `username`, `password` | none | Sets an httpOnly session cookie. Use a `requests.Session` / cookie jar |
 | Create user | `POST /api/auth/users` (see `CreateUserRequest` in `dpdpa-agent/api/auth.py`) | SUPER_ADMIN cookie | Used to create the checker's AUDITOR account |
 | Upload org config | `POST /v1/orgs/{org}/config` JSON body = the config | COMPLIANCE_ADMIN cookie | Returns `{"status":"ok"}` or `{"status":"error","errors":[...]}`. Takes effect immediately |
@@ -271,7 +271,7 @@ Tasks:
 1. Create `veritas-server` (Ubuntu 22.04, 4 GB RAM or more, 20 GB disk) and `sim-host` (any Linux with Docker, 2 vCPU, 4 GB). Same VPC. Security group on the server: TCP 8000 from `sim-host` only, SSH from your IP. Document the private IPs.
 2. On the server install a release `.deb` newer than v1.0.16 if available, otherwise v1.0.16 (see issue 1 for the consequence): `sudo apt install ./veritas_<ver>_amd64.deb`. Get its fingerprint with `sudo veritas fingerprint`. Obtain a license from the maintainers and install it with `sudo veritas license <file>`. Confirm `curl -k https://localhost:8000/health`.
 3. Raise the memory cap for load work (issue 8).
-4. `POST /api/auth/setup` to create the admin (store the credentials in `.env` on `sim-host` only).
+4. `POST /api/auth/setup` with the setup code (see section 1.1) to create the admin (store the credentials in `.env` on `sim-host` only).
 5. Upload `sim_enterprise.yaml` (section 3) via `POST /v1/orgs/sim_enterprise/config`.
 6. Issue an agent key, register one agent with `source_label: baseline`, and send one hand-written event from `sim-host` with `curl` (use `"source_type": "log"`). Confirm the response shape (section 1.3) and that `GET /api/sim_enterprise/verdicts` shows the verdict.
 7. Send a `log` event containing a valid Aadhaar (for example `2345 6789 0124`) and check the response.

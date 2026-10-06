@@ -41,7 +41,7 @@ else
 fi
 echo "  2. sudo veritas license /path/to/veritas.vlic"
 echo "  3. sudo veritas start"
-echo "  4. Open https://<this-host>:8000/setup (self-signed certificate)"
+echo "  4. Open https://<this-host>:8000/setup (self-signed certificate) and enter the code from: sudo veritas setup-code"
 echo ""
-echo "CLI: veritas {start|stop|restart|status|logs|fingerprint|license|check|version}"
+echo "CLI: veritas {start|stop|restart|status|logs|fingerprint|license|setup-code|check|version}"
 echo ""

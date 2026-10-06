@@ -218,16 +218,16 @@ class TestRateLimiting:
         assert retry_after > 0, "Retry-After must be a positive integer"
 
     def test_setup_rate_limit_enforced(self, anon_client):
-        """Setup endpoint allows max 3 attempts per window."""
+        """Setup endpoint allows max 10 attempts per window."""
         payload = {"username": "adm", "email": "a@b.com", "password": "Short1"}  # too short
         responses = []
-        for _ in range(4):
+        for _ in range(11):
             r = anon_client.post("/api/auth/setup", json=payload)
             responses.append(r.status_code)
 
         # At least one must be 429 (rate limited) — regardless of whether
         # early ones are 422 (validation error) or 403 (already set up)
-        assert 429 in responses, f"Expected 429 in responses after 4 rapid attempts: {responses}"
+        assert 429 in responses, f"Expected 429 in responses after 11 rapid attempts: {responses}"
 
     def test_successful_login_clears_rate_limit(self, anon_client):
         """A successful login resets the IP's failure counter."""
@@ -263,19 +263,23 @@ class TestInputValidation:
         r = anon_client.post("/api/auth/login", data={"username": "only_user"})
         assert r.status_code == 422
 
-    def test_setup_rejects_weak_password(self, anon_client):
+    def test_setup_rejects_weak_password(self, anon_client, monkeypatch):
+        monkeypatch.setenv("VERITAS_SETUP_CODE", "TEST-SETUP-CODE")
         r = anon_client.post("/api/auth/setup", json={
             "username": "admin",
             "email": "admin@test.io",
             "password": "short",          # < 8 chars
+            "setup_code": "TEST-SETUP-CODE",
         })
         assert r.status_code == 422
 
-    def test_setup_rejects_invalid_email(self, anon_client):
+    def test_setup_rejects_invalid_email(self, anon_client, monkeypatch):
+        monkeypatch.setenv("VERITAS_SETUP_CODE", "TEST-SETUP-CODE")
         r = anon_client.post("/api/auth/setup", json={
             "username": "admin",
             "email": "notanemail",
             "password": "GoodPass1!",
+            "setup_code": "TEST-SETUP-CODE",
         })
         assert r.status_code == 422
 
