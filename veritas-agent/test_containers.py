@@ -289,6 +289,7 @@ class TestGlobTailer:
         append(f, cri("43210 leaked", "F"))
         assert poll() == [("phone 9876543210 leaked", "order-service")]
 
+    @posix_only
     def test_a_deleted_file_is_dropped_after_draining(self, tmp_path):
         f = tmp_path / k8s_name("order-1", "shop", "app")
         append(f, "")
