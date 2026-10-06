@@ -1449,6 +1449,11 @@
     .empty p { font-size: 12.5px; color: var(--text-muted); max-width: 320px; }
 
     /* ---- Toast ---- */
+    #alertBanner { padding: 8px 24px; font-size: 12.5px; line-height: 1.5; }
+    #alertBanner .alert-line { display: flex; gap: 8px; align-items: baseline; padding: 2px 0; }
+    #alertBanner .alert-line.warn { color: var(--medium); }
+    #alertBanner .alert-line.bad  { color: var(--high); font-weight: 600; }
+
     .toast {
       position: fixed;
       bottom: 24px;
@@ -1572,6 +1577,9 @@
         </div>
       </div>
     </header>
+
+    <!-- Alerts: license ending, certificate ending, backup or evidence-chain problems -->
+    <div id="alertBanner" role="alert" style="display:none;"></div>
 
     <!-- Page Content -->
     <div class="page-content">
@@ -2548,10 +2556,11 @@ async function refreshHealth() {
     const r = await fetch('/api/system/health', { credentials: 'include' });
     if (!r.ok) return;
     const data = await r.json();
-    const icons = { ok:'🟢', valid:'🟢', active:'🟢', disabled:'🟡', low:'🟡', error:'🔴', no_cert:'🟡' };
+    const icons = { ok:'🟢', valid:'🟢', active:'🟢', disabled:'🟡', pending:'🟡', low:'🟡', expiring:'🟡', stale:'🟡',
+                    error:'🔴', expired:'🔴', no_cert:'🟡' };
     const labels = {
       evidence_store: 'Evidence Store', agent_store: 'Agent Store',
-      license: 'License', tls: 'TLS', disk: 'Disk', runtime: 'Runtime',
+      license: 'License', tls: 'TLS', disk: 'Disk', runtime: 'Runtime', maintenance: 'Backups & Chain',
     };
     container.innerHTML = Object.entries(data.checks).map(([key, val]) => {
       const st    = val.status || 'ok';
@@ -2562,6 +2571,12 @@ async function refreshHealth() {
       else if (key === 'license' && val.days_remaining !== undefined) sub = `${val.days_remaining}d remaining`;
       else if (key === 'agent_store' && val.agents !== undefined) sub = `${val.agents} agent(s)`;
       else if (key === 'runtime' && val.version) sub = `v${val.version}`;
+      else if (key === 'tls' && val.days_remaining != null) sub = `certificate ${val.days_remaining}d left`;
+      else if (key === 'maintenance') {
+        sub = val.problem ? val.problem
+            : val.last_backup_at ? `last backup ${new Date(val.last_backup_at).toLocaleDateString()}`
+            : (val.status === 'disabled' ? 'schedule off' : 'first run pending');
+      }
       return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;">
         <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:4px;">${label}</div>
         <div style="font-size:0.85rem;font-weight:600;">${icon} ${st.toUpperCase()}</div>
@@ -3935,6 +3950,37 @@ async function submitChangePassword() {
   showToast('Password changed. Other sessions were signed out.', 'success');
 }
 
+// ---- Alerts banner ----
+async function refreshAlerts() {
+  const box = document.getElementById('alertBanner');
+  if (!box) return;
+  const lines = [];
+  try {
+    const lr = await fetch('/api/license', { credentials: 'include' });
+    const lic = await lr.json().catch(() => ({}));
+    if (lr.status === 403 || lic.valid === false) {
+      lines.push(['bad', 'License problem: ' + String((lic.error || 'the license is not valid')).split('\n')[0]]);
+    } else if (lic.valid && lic.days_remaining <= 30) {
+      lines.push([lic.days_remaining <= 7 ? 'bad' : 'warn',
+        lic.days_remaining < 0 ? `The license expired on ${lic.expiry}.`
+          : `The license expires in ${lic.days_remaining} day(s), on ${lic.expiry}. Ask your Veritas contact for a renewal.`]);
+    }
+    const hr = await fetch('/api/system/health', { credentials: 'include' });
+    if (hr.ok) {
+      const c = (await hr.json()).checks || {};
+      if (c.tls && c.tls.status === 'expired') lines.push(['bad', 'The server TLS certificate has expired. Agents and browsers will refuse to connect. Install a new one (see OPERATIONS.md).']);
+      else if (c.tls && c.tls.status === 'expiring') lines.push(['warn', `The server TLS certificate expires in ${c.tls.days_remaining} day(s). Install a new one before then (see OPERATIONS.md).`]);
+      if (c.maintenance && (c.maintenance.status === 'error' || c.maintenance.status === 'stale')) {
+        lines.push([c.maintenance.status === 'error' ? 'bad' : 'warn', c.maintenance.problem || 'A scheduled backup or evidence check needs attention.']);
+      }
+      if (c.disk && c.disk.status === 'low') lines.push(['warn', `Disk space is low (${c.disk.free_pct}% free).`]);
+    }
+  } catch (e) { /* the banner just stays as it is */ }
+  box.innerHTML = lines.map(([k, t]) => `<div class="alert-line ${k}"><span>${k === 'bad' ? '⛔' : '⚠️'}</span><span>${escapeHtml(t)}</span></div>`).join('');
+  box.style.display = lines.length ? 'block' : 'none';
+  box.style.background = lines.some(l => l[0] === 'bad') ? 'var(--high-bg)' : 'var(--medium-bg)';
+}
+
 // ---- Server version (sidebar) ----
 async function showServerVersion() {
   try {
@@ -4108,6 +4154,8 @@ async function triggerBackup() {
   }
   await checkLicense();
   showServerVersion();
+  refreshAlerts();
+  setInterval(refreshAlerts, 10 * 60 * 1000);
   await populateOrgSelector();
   connectWS();
   refreshStats();

@@ -75,6 +75,11 @@ def main() -> None:
         help="Print the one-time setup code needed to create the first administrator and exit.",
     )
     parser.add_argument(
+        "--install-cert", nargs=2, metavar=("CERT.pem", "KEY.pem"),
+        help="Install a company-issued TLS certificate and its private key and exit "
+             "(restart the service afterwards).",
+    )
+    parser.add_argument(
         "--check", action="store_true",
         help="Run the production acceptance checks, print the report and exit.",
     )
@@ -102,6 +107,23 @@ def main() -> None:
                   "when it starts.", file=sys.stderr)
             raise SystemExit(1)
         print(code)
+        return
+
+    if args.install_cert:
+        from pathlib import Path
+        from tls import CertificateError, install_certificate
+        try:
+            info = install_certificate(Path(args.install_cert[0]), Path(args.install_cert[1]))
+        except CertificateError as e:
+            print(f"ERROR: {e}", file=sys.stderr)
+            raise SystemExit(1)
+        print("Certificate installed.")
+        print(f"  Subject:  {info['subject']}")
+        print(f"  Names:    {', '.join(info['names']) or '(none listed)'}")
+        print(f"  Expires:  {info['not_after']} ({info['days_remaining']} days)")
+        if info["backup"]:
+            print(f"  The previous certificate was kept as {info['backup']}")
+        print("Restart Veritas to use it. Agents must trust the issuer (or be given the CA file).")
         return
 
     if args.check:

@@ -221,3 +221,107 @@ def cert_fingerprint() -> Optional[str]:
         return ":".join(fp[i:i+2].upper() for i in range(0, len(fp), 2))
     except Exception:
         return None
+
+
+def cert_days_remaining() -> Optional[int]:
+    """Whole days until the current server certificate expires (negative if it already has)."""
+    crt = cert_path()
+    if not crt.exists():
+        return None
+    try:
+        from cryptography import x509
+        cert = x509.load_pem_x509_certificate(crt.read_bytes())
+        not_after = getattr(cert, "not_valid_after_utc", None) or cert.not_valid_after.replace(tzinfo=timezone.utc)
+        return (not_after - datetime.now(timezone.utc)).days
+    except Exception:
+        return None
+
+
+class CertificateError(Exception):
+    """The certificate or key offered for installation is not usable."""
+
+
+def install_certificate(cert_src: Path, key_src: Path) -> dict:
+    """
+    Install a company-issued certificate and its private key as the server's TLS certificate.
+
+    Checks first, and changes nothing if any check fails: both files are PEM, the key belongs
+    to the certificate, the certificate is currently valid. The previous pair is kept next to
+    the new one with a timestamp. Restart Veritas afterwards for the change to take effect.
+    If the certificate file contains a chain (server certificate first, then intermediates)
+    the whole chain is installed.
+
+    Returns {"subject", "not_after", "days_remaining", "names", "backup"}.
+    """
+    from cryptography import x509
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.x509.oid import ExtensionOID
+
+    try:
+        cert_pem = Path(cert_src).read_bytes()
+        key_pem = Path(key_src).read_bytes()
+    except OSError as e:
+        raise CertificateError(f"Cannot read the file: {e}") from e
+
+    try:
+        certs = x509.load_pem_x509_certificates(cert_pem)
+    except Exception:
+        raise CertificateError("The certificate file is not a PEM certificate (it should start with "
+                               "'-----BEGIN CERTIFICATE-----').")
+    if not certs:
+        raise CertificateError("The certificate file contains no certificate.")
+    leaf = certs[0]
+
+    try:
+        key = serialization.load_pem_private_key(key_pem, password=None)
+    except TypeError:
+        raise CertificateError("The private key is protected by a passphrase. Remove the passphrase "
+                               "first (openssl pkey -in key.pem -out key-nopass.pem) so the service can start unattended.")
+    except Exception:
+        raise CertificateError("The key file is not an unencrypted PEM private key.")
+
+    def _public(k):
+        return k.public_bytes(serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
+
+    if _public(key.public_key()) != _public(leaf.public_key()):
+        raise CertificateError("The private key does not belong to this certificate. "
+                               "Check that the first certificate in the file is the server certificate.")
+
+    now = datetime.now(timezone.utc)
+    not_after = getattr(leaf, "not_valid_after_utc", None) or leaf.not_valid_after.replace(tzinfo=timezone.utc)
+    not_before = getattr(leaf, "not_valid_before_utc", None) or leaf.not_valid_before.replace(tzinfo=timezone.utc)
+    if not_after <= now:
+        raise CertificateError(f"The certificate expired on {not_after.date().isoformat()}.")
+    if not_before > now + timedelta(minutes=5):
+        raise CertificateError(f"The certificate is not valid until {not_before.date().isoformat()}.")
+
+    try:
+        san = leaf.extensions.get_extension_for_oid(ExtensionOID.SUBJECT_ALTERNATIVE_NAME).value
+        names = [str(n.value) for n in san]
+    except x509.ExtensionNotFound:
+        names = []
+
+    crt_dst, key_dst = cert_path(), key_path()
+    crt_dst.parent.mkdir(parents=True, exist_ok=True)
+    stamp = now.strftime("%Y%m%dT%H%M%SZ")
+    backup_note = None
+    if crt_dst.exists():
+        backup_note = f"{crt_dst.name}.{stamp}"
+        for old, suffix in ((crt_dst, crt_dst.name), (key_dst, key_dst.name)):
+            if old.exists():
+                (old.parent / f"{suffix}.{stamp}").write_bytes(old.read_bytes())
+                (old.parent / f"{suffix}.{stamp}").chmod(0o600)
+
+    for dst, data in ((key_dst, key_pem), (crt_dst, cert_pem)):
+        tmp = dst.with_name(dst.name + ".new")
+        tmp.write_bytes(data)
+        tmp.chmod(0o600 if dst is key_dst else 0o644)
+        os.replace(tmp, dst)
+
+    return {
+        "subject": leaf.subject.rfc4514_string(),
+        "not_after": not_after.date().isoformat(),
+        "days_remaining": (not_after - now).days,
+        "names": names,
+        "backup": backup_note,
+    }

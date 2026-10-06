@@ -725,7 +725,14 @@ async def system_health(_user: User = Depends(get_current_user)):
             checks["tls"] = {"status": "disabled"}
         elif cert_path().exists():
             fp = cert_fingerprint()
-            checks["tls"] = {"status": "active", "fingerprint": fp}
+            from tls import cert_days_remaining
+            days = cert_days_remaining()
+            state = "active"
+            if days is not None and days < 0:
+                state = "expired"
+            elif days is not None and days <= 30:
+                state = "expiring"
+            checks["tls"] = {"status": state, "fingerprint": fp, "days_remaining": days}
         else:
             checks["tls"] = {"status": "no_cert"}
     except Exception as e:
@@ -762,6 +769,13 @@ async def system_health(_user: User = Depends(get_current_user)):
     except Exception as e:
         checks["ai"] = {"status": "error", "detail": str(e)}
 
+    # Backups and evidence-chain checks
+    try:
+        import maintenance
+        checks["maintenance"] = maintenance.assess()
+    except Exception as e:
+        checks["maintenance"] = {"status": "error", "problem": str(e)}
+
     # Runtime info
     checks["runtime"] = {
         "status": "ok",
@@ -772,7 +786,7 @@ async def system_health(_user: User = Depends(get_current_user)):
     }
 
     overall = all(
-        v.get("status") in ("ok", "valid", "active", "disabled")
+        v.get("status") in ("ok", "valid", "active", "disabled", "pending")
         for v in checks.values()
         if isinstance(v, dict)
     )
@@ -783,7 +797,7 @@ async def system_health(_user: User = Depends(get_current_user)):
         # Everyone else sees the status of each check and the figures the panel shows.
         keep = {
             "evidence_store": (), "agent_store": ("agents",), "license": ("days_remaining",),
-            "tls": (), "disk": ("free_pct",), "runtime": ("version", "min_agent_version"),
+            "tls": ("days_remaining",), "disk": ("free_pct",), "runtime": ("version", "min_agent_version"),
         }
         checks = {
             name: {"status": v.get("status"), **{k: v[k] for k in keep[name] if k in v}}
@@ -827,6 +841,8 @@ async def startup_event():
     # run_pipeline.py's cross-thread publish() calls to reach this server.
     set_server_loop(asyncio.get_running_loop())
     asyncio.create_task(broadcaster_task())
+    import maintenance
+    maintenance.start()      # daily backup and evidence-chain check
     logger.info("Dashboard server started. Tenant-scoped WebSocket broadcaster running.")
 
 

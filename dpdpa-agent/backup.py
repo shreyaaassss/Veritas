@@ -35,6 +35,8 @@ import hashlib
 import json
 import logging
 import shutil
+import sqlite3
+import tempfile
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -78,6 +80,27 @@ def _sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def _consistent_copy(src: Path, tmpdir: Path) -> Path:
+    """
+    A point-in-time copy of a SQLite database that is safe while the server is writing to it.
+    (Copying the file of a live database can capture a half-written page.) Other files are
+    returned unchanged.
+    """
+    if src.suffix != ".db":
+        return src
+    dst = tmpdir / src.name
+    source = sqlite3.connect(f"file:{src}?mode=ro", uri=True, timeout=30)
+    try:
+        target = sqlite3.connect(dst)
+        try:
+            source.backup(target)
+        finally:
+            target.close()
+    finally:
+        source.close()
+    return dst
+
+
 def create_backup(output_path: Optional[Path] = None) -> Path:
     """
     Create a complete backup ZIP of all Veritas data.
@@ -107,7 +130,9 @@ def create_backup(output_path: Optional[Path] = None) -> Path:
     logger.info("Creating backup at %s ...", output_path)
     files_added = 0
 
-    with zipfile.ZipFile(output_path, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
+    with tempfile.TemporaryDirectory(prefix="veritas-backup-") as _tmp, \
+            zipfile.ZipFile(output_path, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
+        tmpdir = Path(_tmp)
         for target in _BACKUP_TARGETS:
             src = root / target
             if not src.exists():
@@ -116,11 +141,12 @@ def create_backup(output_path: Optional[Path] = None) -> Path:
 
             if src.is_file():
                 arcname = target
-                zf.write(src, arcname)
+                snapshot = _consistent_copy(src, tmpdir)
+                zf.write(snapshot, arcname)
                 manifest["files"][arcname] = {
                     "type":   "file",
-                    "sha256": _sha256_file(src),
-                    "size":   src.stat().st_size,
+                    "sha256": _sha256_file(snapshot),
+                    "size":   snapshot.stat().st_size,
                 }
                 files_added += 1
 
@@ -147,6 +173,11 @@ def create_backup(output_path: Optional[Path] = None) -> Path:
     if not ok:
         output_path.unlink(missing_ok=True)
         raise RuntimeError(f"Backup verification failed after creation: {errors}")
+
+    try:
+        output_path.chmod(0o600)    # holds the user database, the license and the signing secrets
+    except OSError:
+        pass
 
     size_mb = output_path.stat().st_size / 1_048_576
     logger.info(
