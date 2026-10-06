@@ -139,6 +139,10 @@ jobs:
           source .github/scripts/agent_ci_lib.sh
           $E2E wait-agents --prefix k8s- --count 2 --source "containers/*.log=reading:ignored" --timeout 120
           for pod in $(kubectl -n veritas-agent get pods -o name); do
+            for _ in $(seq 1 30); do
+              kubectl -n veritas-agent logs "$pod" | grep -q "match no rule" && break
+              sleep 2
+            done
             kubectl -n veritas-agent logs "$pod" | grep -q "match no rule" \
               || { echo "no 'ignored' warning in the logs of $pod"; exit 1; }
           done
@@ -159,9 +163,11 @@ jobs:
       - name: Restarted agents keep their identity (the key is no longer needed)
         run: |
           source .github/scripts/agent_ci_lib.sh
+          RESTARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S+00:00)
           kubectl -n veritas-agent delete pod -l app.kubernetes.io/name=veritas-agent --wait=true
           kubectl -n veritas-agent rollout status ds/veritas-agent --timeout=240s
-          $E2E wait-agents --prefix k8s- --count 2 --version 0.0.0-ci --timeout 240 | tee /tmp/ci_agents_after
+          # the old records still look healthy, so wait for reports sent AFTER the restart
+          $E2E wait-agents --prefix k8s- --count 2 --version 0.0.0-ci --updated-after "$RESTARTED_AT" --timeout 240 | tee /tmp/ci_agents_after
           echo "before: $(cat /tmp/ci_agents_before)"; echo "after:  $(cat /tmp/ci_agents_after)"
           [ "$(cat /tmp/ci_agents_before)" = "$(cat /tmp/ci_agents_after)" ] \
             || { echo "agents registered again after a restart"; exit 1; }
@@ -173,8 +179,12 @@ jobs:
           print("key still at", k["uses"], "uses")
           PY
           for pod in $(kubectl -n veritas-agent get pods -o name); do
+            for _ in $(seq 1 30); do
+              kubectl -n veritas-agent logs "$pod" | grep -q "Using existing identity" && break
+              sleep 2
+            done
             kubectl -n veritas-agent logs "$pod" | grep -q "Using existing identity" \
-              || { echo "$pod did not reuse its saved identity"; exit 1; }
+              || { echo "$pod did not reuse its saved identity"; kubectl -n veritas-agent logs "$pod" | tail -20; exit 1; }
           done
 
       - name: Evidence chain is intact
