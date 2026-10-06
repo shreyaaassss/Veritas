@@ -1517,6 +1517,9 @@
       <div class="nav-item" id="nav-auditlog" onclick="showTab('auditlog')" data-require-role="SUPER_ADMIN">
         <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></span> Audit Log
       </div>
+      <div class="nav-item" id="nav-users" onclick="showTab('users')" data-require-role="SUPER_ADMIN">
+        <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span> Users
+      </div>
       <div class="nav-item" id="nav-simulate" onclick="showTab('simulate')">
         <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6M10 3v5.5L4.5 18a2 2 0 0 0 1.7 3h11.6a2 2 0 0 0 1.7-3L14 8.5V3"/><line x1="8.5" y1="14" x2="15.5" y2="14"/></svg></span> Scan Sandbox
       </div>
@@ -1545,7 +1548,7 @@
           <span class="license-dot"></span>
           <span id="licenseBadgeText">Licensed</span>
         </div>
-        <div class="license-badge" id="userBadge" style="display:none;gap:8px;cursor:pointer;" title="Click to sign out" onclick="signOut()">
+        <div class="license-badge" id="userBadge" style="display:none;gap:8px;cursor:pointer;" title="Account: change password or sign out" onclick="openAccountModal()">
           <span class="license-dot" id="userRoleDot"></span>
           <span id="userBadgeText">User</span>
         </div>
@@ -1871,6 +1874,9 @@
             <option value="LOGOUT">LOGOUT</option>
             <option value="USER_CREATED">USER_CREATED</option>
             <option value="USER_UPDATED">USER_UPDATED</option>
+            <option value="USER_DISABLED">USER_DISABLED</option>
+            <option value="PASSWORD_CHANGED">PASSWORD_CHANGED</option>
+            <option value="PASSWORD_RESET">PASSWORD_RESET</option>
             <option value="ORG_ACCESS_GRANTED">ORG_ACCESS_GRANTED</option>
             <option value="ORG_ACCESS_REVOKED">ORG_ACCESS_REVOKED</option>
             <option value="AGENT_KEY_ISSUED">AGENT_KEY_ISSUED</option>
@@ -1900,6 +1906,35 @@
               </thead>
               <tbody id="auditLogTbody">
                 <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:2rem;">No entries loaded.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+
+      <!-- ====== USERS TAB (SUPER_ADMIN only) ====== -->
+      <main class="page-section" id="main-users">
+        <div class="section-header">
+          <h2>Users</h2>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-secondary" onclick="loadUsers()" style="font-size:0.78rem;">Refresh</button>
+            <button class="btn btn-primary" onclick="openAddUserModal()" style="font-size:0.78rem;">Add User</button>
+          </div>
+        </div>
+        <div class="modal-sub" style="margin-bottom:1rem;">
+          Roles: <b>SUPER ADMIN</b> manages everything, <b>COMPLIANCE ADMIN</b> manages policy, agents and cases,
+          <b>AUDITOR</b> investigates and comments, <b>VIEWER</b> is read-only. Non-admin users see only the organizations listed against them.
+        </div>
+        <div class="table-container">
+          <div class="table-wrap">
+            <table id="usersTable">
+              <thead>
+                <tr>
+                  <th>User</th><th>Role</th><th>Organizations</th><th>Status</th><th>Last login</th><th></th>
+                </tr>
+              </thead>
+              <tbody id="usersTbody">
+                <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:2rem;">Loading…</td></tr>
               </tbody>
             </table>
           </div>
@@ -2087,6 +2122,76 @@
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeIssueKeyModal()">Done</button>
     </div>
+  </div>
+</div>
+
+<!-- ====== USER MODALS ====== -->
+<div class="modal-overlay" id="userModalOverlay" onclick="closeUserModals()"></div>
+
+<div class="modal" id="addUserModal" style="width:min(460px,94vw);">
+  <div class="modal-close" onclick="closeUserModals()">✕</div>
+  <h3>Add User</h3>
+  <div class="modal-sub">The user must choose their own password the first time they sign in.</div>
+  <div class="form-error-box" id="addUserError" style="display:none;"></div>
+  <label style="display:block;margin-bottom:0.6rem;">Username<br><input type="text" id="addUserName" maxlength="64" autocomplete="off" style="width:100%;"></label>
+  <label style="display:block;margin-bottom:0.6rem;">Email<br><input type="email" id="addUserEmail" maxlength="254" autocomplete="off" style="width:100%;"></label>
+  <label style="display:block;margin-bottom:0.6rem;">Role<br>
+    <select id="addUserRole" style="width:100%;">
+      <option value="VIEWER">Viewer (read-only)</option>
+      <option value="AUDITOR">Auditor</option>
+      <option value="COMPLIANCE_ADMIN">Compliance admin</option>
+      <option value="SUPER_ADMIN">Super admin</option>
+    </select>
+  </label>
+  <label style="display:block;margin-bottom:0.4rem;">Initial password<br>
+    <div style="display:flex;gap:6px;">
+      <input type="text" id="addUserPassword" autocomplete="off" style="flex:1;font-family:var(--font-mono);">
+      <button class="btn btn-secondary" type="button" onclick="fillGeneratedPassword('addUserPassword')">Generate</button>
+    </div>
+  </label>
+  <div class="modal-sub">At least 10 characters, not a common password, not containing the username. Share it with the user over a trusted channel.</div>
+  <div class="modal-actions">
+    <button class="btn btn-primary" onclick="submitAddUser()">Create User</button>
+    <button class="btn btn-secondary" onclick="closeUserModals()">Cancel</button>
+  </div>
+</div>
+
+<div class="modal" id="resetPwModal" style="width:min(460px,94vw);">
+  <div class="modal-close" onclick="closeUserModals()">✕</div>
+  <h3>Reset Password</h3>
+  <div class="modal-sub" id="resetPwSub"></div>
+  <div id="resetPwStep1">
+    <div class="form-error-box" id="resetPwError" style="display:none;"></div>
+    <div class="modal-sub">A temporary password is generated and shown once. The user's current sessions end immediately, and they must choose a new password at next sign-in.</div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="submitResetPassword()">Generate Temporary Password</button>
+      <button class="btn btn-secondary" onclick="closeUserModals()">Cancel</button>
+    </div>
+  </div>
+  <div id="resetPwStep2" style="display:none;">
+    <div class="form-error-box" style="border-color:var(--accent-blue);color:var(--text);margin:1rem 0;">
+      Copy this password now — it will <strong>not</strong> be shown again.
+    </div>
+    <div style="position:relative;margin:0.5rem 0 1rem;">
+      <pre id="resetPwValue" style="background:var(--code-bg);border:1px solid var(--border);border-radius:6px;padding:1rem 4rem 1rem 1rem;font-family:var(--font-mono);font-size:0.9rem;margin:0;word-break:break-all;"></pre>
+      <button id="copyResetPwBtn" class="btn btn-secondary" onclick="copyResetPassword()" style="position:absolute;top:0.5rem;right:0.5rem;padding:0.2rem 0.55rem;font-size:0.73rem;">Copy</button>
+    </div>
+    <div class="modal-actions"><button class="btn btn-secondary" onclick="closeUserModals()">Done</button></div>
+  </div>
+</div>
+
+<div class="modal" id="accountModal" style="width:min(460px,94vw);">
+  <div class="modal-close" id="accountModalClose" onclick="closeUserModals()">✕</div>
+  <h3 id="accountTitle">Account</h3>
+  <div class="modal-sub" id="accountSub"></div>
+  <div class="form-error-box" id="accountError" style="display:none;"></div>
+  <label style="display:block;margin-bottom:0.6rem;">Current password<br><input type="password" id="accCurrent" autocomplete="current-password" style="width:100%;"></label>
+  <label style="display:block;margin-bottom:0.6rem;">New password<br><input type="password" id="accNew" autocomplete="new-password" style="width:100%;"></label>
+  <label style="display:block;margin-bottom:0.4rem;">Repeat new password<br><input type="password" id="accNew2" autocomplete="new-password" style="width:100%;"></label>
+  <div class="modal-sub">At least 10 characters and not a common password. Changing it signs you out everywhere else.</div>
+  <div class="modal-actions">
+    <button class="btn btn-primary" onclick="submitChangePassword()">Change Password</button>
+    <button class="btn btn-secondary" id="accountSignOutBtn" onclick="signOut()">Sign Out</button>
   </div>
 </div>
 
@@ -2286,6 +2391,7 @@ function showTab(name) {
     'agents':    'Agents',
     'policy':    'Compliance Policy',
     'auditlog':  'System Audit Log',
+    'users':     'Users',
     'simulate':  'Scan Sandbox',
   };
   document.getElementById('pageTitle').innerText = titleMap[name] || name;
@@ -2294,6 +2400,7 @@ function showTab(name) {
   if (name === 'overview') { refreshOverview(); refreshHealth(); }
   if (name === 'agents')   { loadAgents(); }
   if (name === 'auditlog') { loadAuditLog(); }
+  if (name === 'users')    { loadUsers(); }
   if (name === 'policy')   { loadPolicy(); }
 }
 
@@ -3465,6 +3572,7 @@ async function revokeAgent(agentId) {
 
 // ---- Current User & RBAC ----
 let currentUserRole = null;
+let currentUserInfo = null;
 
 async function loadCurrentUser() {
   try {
@@ -3476,6 +3584,7 @@ async function loadCurrentUser() {
     }
     const u = await r.json();
     currentUserRole = u.role;
+    currentUserInfo = u;
 
     // Show user badge
     const badge = document.getElementById('userBadge');
@@ -3496,6 +3605,7 @@ async function loadCurrentUser() {
 
     // Apply role-based UI restrictions
     applyRoleUI(u.role);
+    return u;
   } catch (e) {
     console.error('Could not load current user:', e);
   }
@@ -3517,6 +3627,241 @@ async function signOut() {
   } finally {
     window.location.href = '/login';
   }
+}
+
+
+// ---- Users & passwords ----
+let _usersCache = [];
+let _allOrgIds = [];
+let _resetTarget = null;
+
+function userMsg(id, text) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = text || '';
+  el.style.display = text ? '' : 'none';
+}
+
+async function jsonOrEmpty(r) { try { return await r.json(); } catch (e) { return {}; } }
+
+function errText(d, fallback) {
+  if (d && typeof d.detail === 'string') return d.detail;
+  if (d && Array.isArray(d.detail) && d.detail.length) return d.detail.map(x => x.msg).join('; ');
+  return fallback;
+}
+
+async function loadUsers() {
+  const tbody = document.getElementById('usersTbody');
+  if (!tbody) return;
+  try {
+    const [ur, or] = await Promise.all([
+      fetch('/api/auth/users', { credentials: 'include' }),
+      fetch('/api/auth/my-orgs', { credentials: 'include' }),
+    ]);
+    if (!ur.ok) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--high);padding:2rem;">Error: ${ur.status}</td></tr>`;
+      return;
+    }
+    _usersCache = await ur.json();
+    _allOrgIds = or.ok ? ((await or.json()).org_ids || []) : [];
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--high);padding:2rem;">Network error.</td></tr>`;
+    return;
+  }
+  renderUsers();
+}
+
+function renderUsers() {
+  const tbody = document.getElementById('usersTbody');
+  const roles = ['SUPER_ADMIN', 'COMPLIANCE_ADMIN', 'AUDITOR', 'VIEWER'];
+  const myId = currentUserInfo && currentUserInfo.user_id;
+  tbody.innerHTML = _usersCache.map(u => {
+    const isMe = u.user_id === myId;
+    const id = escapeAttr(u.user_id);
+    const roleSel = `<select onchange="changeUserRole('${id}', this)" ${isMe ? 'disabled title="You cannot change your own role"' : ''}
+        style="background:var(--input-bg);border:1px solid var(--border);border-radius:6px;padding:0.25rem 0.4rem;color:var(--text);font-size:0.78rem;">
+        ${roles.map(r => `<option value="${r}" ${r === u.role ? 'selected' : ''}>${r.replace('_', ' ')}</option>`).join('')}
+      </select>`;
+    let orgCell;
+    if (u.role === 'SUPER_ADMIN') {
+      orgCell = '<span style="color:var(--text-muted);font-size:0.78rem;">All organizations</span>';
+    } else {
+      const chips = (u.org_ids || []).map(o =>
+        `<span class="badge system" style="margin:0 4px 4px 0;">${escapeHtml(o)}
+           <a href="#" onclick="revokeUserOrg('${id}','${escapeAttr(o)}');return false;" title="Remove access" style="margin-left:4px;color:var(--high);text-decoration:none;">✕</a></span>`).join('');
+      const free = _allOrgIds.filter(o => !(u.org_ids || []).includes(o));
+      const add = free.length
+        ? `<select onchange="grantUserOrg('${id}', this)" style="background:var(--input-bg);border:1px solid var(--border);border-radius:6px;padding:0.2rem 0.4rem;color:var(--text);font-size:0.74rem;">
+             <option value="">+ add</option>${free.map(o => `<option value="${escapeAttr(o)}">${escapeHtml(o)}</option>`).join('')}</select>`
+        : '';
+      orgCell = (chips || '<span style="color:var(--text-muted);font-size:0.78rem;margin-right:6px;">none</span>') + add;
+    }
+    const status = !u.is_active
+      ? '<span class="badge LOW" style="background:var(--surface-hover);color:var(--text-muted);">Disabled</span>'
+      : (u.must_change_password ? '<span class="badge MEDIUM">Must set password</span>' : '<span class="badge LOW">Active</span>');
+    const last = u.last_login ? new Date(u.last_login).toLocaleString() : '<span style="color:var(--text-muted)">never</span>';
+    const actions = isMe
+      ? '<span style="color:var(--text-muted);font-size:0.74rem;">you</span>'
+      : `<button class="btn btn-secondary" style="font-size:0.74rem;padding:0.2rem 0.6rem;" onclick="openResetPwModal('${id}')">Reset password</button>
+         <button class="btn btn-secondary" style="font-size:0.74rem;padding:0.2rem 0.6rem;" onclick="toggleUserActive('${id}', ${u.is_active ? 'false' : 'true'})">${u.is_active ? 'Disable' : 'Enable'}</button>`;
+    return `<tr>
+      <td><div style="color:var(--text-headings);font-weight:600;">${escapeHtml(u.username)}</div><div style="color:var(--text-muted);font-size:0.74rem;">${escapeHtml(u.email)}</div></td>
+      <td>${roleSel}</td><td>${orgCell}</td><td>${status}</td><td style="font-size:0.78rem;">${last}</td>
+      <td style="white-space:nowrap;">${actions}</td></tr>`;
+  }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:2rem;">No users.</td></tr>';
+}
+
+async function userAction(url, method, body, okMsg) {
+  try {
+    const r = await fetch(url, {
+      method, credentials: 'include',
+      headers: body ? { 'Content-Type': 'application/json' } : {},
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const d = await jsonOrEmpty(r);
+    if (!r.ok) { showToast(errText(d, `Failed (${r.status}).`), 'error'); return null; }
+    if (okMsg) showToast(okMsg, 'success');
+    return d;
+  } catch (e) {
+    showToast('Network error.', 'error');
+    return null;
+  }
+}
+
+async function changeUserRole(id, sel) {
+  const d = await userAction(`/api/auth/users/${encodeURIComponent(id)}`, 'PATCH', { role: sel.value }, 'Role updated.');
+  await loadUsers();
+  return d;
+}
+async function toggleUserActive(id, active) {
+  await userAction(`/api/auth/users/${encodeURIComponent(id)}`, 'PATCH', { is_active: active }, active ? 'User enabled.' : 'User disabled.');
+  await loadUsers();
+}
+async function grantUserOrg(id, sel) {
+  if (!sel.value) return;
+  await userAction(`/api/auth/users/${encodeURIComponent(id)}/orgs/${encodeURIComponent(sel.value)}`, 'POST', null, 'Access granted.');
+  await loadUsers();
+}
+async function revokeUserOrg(id, org) {
+  await userAction(`/api/auth/users/${encodeURIComponent(id)}/orgs/${encodeURIComponent(org)}`, 'DELETE', null, 'Access removed.');
+  await loadUsers();
+}
+
+function showUserModal(id) {
+  closeUserModals();
+  document.getElementById('userModalOverlay').classList.add('open');
+  document.getElementById(id).classList.add('open');
+}
+function closeUserModals() {
+  if (window._forcedPasswordChange) return;   // cannot be dismissed
+  document.getElementById('userModalOverlay').classList.remove('open');
+  ['addUserModal', 'resetPwModal', 'accountModal'].forEach(m => document.getElementById(m).classList.remove('open'));
+}
+
+function randomPassword() {
+  const sets = ['abcdefghjkmnpqrstuvwxyz', 'ABCDEFGHJKLMNPQRSTUVWXYZ', '23456789', '#$%&*+-=?@'];
+  const all = sets.join('');
+  const pick = s => s[crypto.getRandomValues(new Uint32Array(1))[0] % s.length];
+  const chars = sets.map(pick);
+  while (chars.length < 16) chars.push(pick(all));
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = crypto.getRandomValues(new Uint32Array(1))[0] % (i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  return chars.join('');
+}
+function fillGeneratedPassword(inputId) { document.getElementById(inputId).value = randomPassword(); }
+
+function openAddUserModal() {
+  ['addUserName', 'addUserEmail', 'addUserPassword'].forEach(i => document.getElementById(i).value = '');
+  document.getElementById('addUserRole').value = 'VIEWER';
+  userMsg('addUserError', '');
+  fillGeneratedPassword('addUserPassword');
+  showUserModal('addUserModal');
+}
+
+async function submitAddUser() {
+  const body = {
+    username: document.getElementById('addUserName').value.trim(),
+    email: document.getElementById('addUserEmail').value.trim(),
+    role: document.getElementById('addUserRole').value,
+    password: document.getElementById('addUserPassword').value,
+    require_password_change: true,
+  };
+  const r = await fetch('/api/auth/users', {
+    method: 'POST', credentials: 'include',
+    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  const d = await jsonOrEmpty(r);
+  if (!r.ok) { userMsg('addUserError', errText(d, `Failed (${r.status}).`)); return; }
+  closeUserModals();
+  showToast(`User ${body.username} created. Share the initial password with them securely.`, 'success');
+  loadUsers();
+}
+
+function openResetPwModal(id) {
+  _resetTarget = _usersCache.find(u => u.user_id === id);
+  if (!_resetTarget) return;
+  document.getElementById('resetPwSub').textContent = `User: ${_resetTarget.username}`;
+  document.getElementById('resetPwStep1').style.display = '';
+  document.getElementById('resetPwStep2').style.display = 'none';
+  document.getElementById('resetPwValue').textContent = '';
+  document.getElementById('copyResetPwBtn').textContent = 'Copy';
+  userMsg('resetPwError', '');
+  showUserModal('resetPwModal');
+}
+
+async function submitResetPassword() {
+  if (!_resetTarget) return;
+  const r = await fetch(`/api/auth/users/${encodeURIComponent(_resetTarget.user_id)}/reset-password`, {
+    method: 'POST', credentials: 'include',
+    headers: { 'Content-Type': 'application/json' }, body: '{}',
+  });
+  const d = await jsonOrEmpty(r);
+  if (!r.ok) { userMsg('resetPwError', errText(d, `Failed (${r.status}).`)); return; }
+  document.getElementById('resetPwValue').textContent = d.temporary_password;
+  document.getElementById('resetPwStep1').style.display = 'none';
+  document.getElementById('resetPwStep2').style.display = '';
+  loadUsers();
+}
+
+async function copyResetPassword() {
+  const btn = document.getElementById('copyResetPwBtn');
+  try {
+    await navigator.clipboard.writeText(document.getElementById('resetPwValue').textContent);
+    btn.textContent = 'Copied';
+  } catch (e) { btn.textContent = 'Select & copy'; }
+}
+
+function openAccountModal(forced) {
+  window._forcedPasswordChange = !!forced;
+  ['accCurrent', 'accNew', 'accNew2'].forEach(i => document.getElementById(i).value = '');
+  userMsg('accountError', '');
+  const u = currentUserInfo || {};
+  document.getElementById('accountTitle').textContent = forced ? 'Choose a new password' : 'Account';
+  document.getElementById('accountSub').textContent = forced
+    ? 'You are using a temporary password. Choose your own to continue.'
+    : `Signed in as ${u.username || ''} (${(u.role || '').replace('_', ' ')}).`;
+  document.getElementById('accountModalClose').style.display = forced ? 'none' : '';
+  showUserModal('accountModal');
+  if (forced) document.getElementById('userModalOverlay').onclick = null;
+}
+
+async function submitChangePassword() {
+  const cur = document.getElementById('accCurrent').value;
+  const n1 = document.getElementById('accNew').value;
+  const n2 = document.getElementById('accNew2').value;
+  if (n1 !== n2) { userMsg('accountError', 'The new passwords do not match.'); return; }
+  const r = await fetch('/api/auth/change-password', {
+    method: 'POST', credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ current_password: cur, new_password: n1 }),
+  });
+  const d = await jsonOrEmpty(r);
+  if (!r.ok) { userMsg('accountError', errText(d, `Failed (${r.status}).`)); return; }
+  if (window._forcedPasswordChange) { window.location.reload(); return; }   // load the real dashboard
+  closeUserModals();
+  showToast('Password changed. Other sessions were signed out.', 'success');
 }
 
 // ---- License Badge ----
@@ -3669,7 +4014,12 @@ async function triggerBackup() {
 
 // ---- Initialization ----
 (async function init() {
-  await loadCurrentUser();   // load role first — gates all UI
+  const me = await loadCurrentUser();   // load role first — gates all UI
+  if (me && me.must_change_password) {
+    // Temporary password: nothing else works until the user chooses their own.
+    openAccountModal(true);
+    return;
+  }
   await checkLicense();
   await populateOrgSelector();
   connectWS();

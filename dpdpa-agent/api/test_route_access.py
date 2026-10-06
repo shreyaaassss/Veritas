@@ -72,6 +72,7 @@ MUTATING_MIN_ROLE = {
     ("POST", "/agents/{agent_id}/revoke"):                   COMPLIANCE_ADMIN,
     ("POST", "/api/auth/users"):                             SUPER_ADMIN,
     ("PATCH", "/api/auth/users/{user_id}"):                  SUPER_ADMIN,
+    ("POST", "/api/auth/users/{user_id}/reset-password"):    SUPER_ADMIN,
     ("POST", "/api/auth/users/{user_id}/orgs/{org_id}"):     SUPER_ADMIN,
     ("DELETE", "/api/auth/users/{user_id}/orgs/{org_id}"):   SUPER_ADMIN,
     ("POST", "/api/system/backup"):                          SUPER_ADMIN,
@@ -83,8 +84,8 @@ MUTATING_MIN_ROLE = {
     ("POST", "/v1/{org_id}/investigate"):                    AUDITOR,
     ("POST", "/v1/{org_id}/scan"):                           AUDITOR,
 }
-# Any logged-in user may end their own session.
-ANY_USER_MUTATING = {("POST", "/api/auth/logout")}
+# Any logged-in user may end their own session and change their own password.
+ANY_USER_MUTATING = {("POST", "/api/auth/logout"), ("POST", "/api/auth/change-password")}
 
 # Read-only routes that need more than a plain login.
 READ_MIN_ROLE = {

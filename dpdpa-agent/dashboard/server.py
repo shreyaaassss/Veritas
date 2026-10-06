@@ -251,6 +251,9 @@ async def websocket_endpoint(ws: WebSocket, org_id: str):
     except HTTPException as exc:
         await ws.close(code=4001 if exc.status_code == 401 else 4003, reason="Authentication required")
         return
+    if ws_user.must_change_password:
+        await ws.close(code=4003, reason="Password change required")
+        return
     # ...that belongs to THIS organization. Without this any logged-in user could watch
     # another organization's live violations.
     if not can_access_org(ws_user, org_id):

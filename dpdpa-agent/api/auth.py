@@ -62,11 +62,11 @@ def _verify_password(plaintext: str, hashed: str) -> bool:
         return False
 
 
-def _validate_password_strength(password: str) -> Optional[str]:
-    """Returns an error message if the password is too weak, else None."""
-    if len(password) < 8:
-        return "Password must be at least 8 characters."
-    return None
+def _validate_password_strength(password: str, username: Optional[str] = None,
+                                email: Optional[str] = None) -> Optional[str]:
+    """Returns an error message if the password is not acceptable, else None."""
+    from api import passwords
+    return passwords.check(password, username=username, email=email)
 
 
 def _validate_username(username: str) -> Optional[str]:
@@ -87,12 +87,23 @@ class MeResponse(BaseModel):
     email:      str
     role:       str
     is_active:  bool
+    must_change_password: bool = False
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(..., min_length=1, max_length=256)
+    new_password:     str = Field(..., min_length=1, max_length=256)
+
+
+class ResetPasswordRequest(BaseModel):
+    # Leave empty to have a temporary password generated.
+    new_password: Optional[str] = Field(None, max_length=256)
 
 
 class SetupRequest(BaseModel):
     username: str  = Field(..., min_length=3, max_length=64)
     email:    str  = Field(..., min_length=5, max_length=254)
-    password: str  = Field(..., min_length=8, max_length=256)
+    password: str  = Field(..., min_length=1, max_length=256)
     # The one-time code from the server's log or `veritas setup-code`. Optional here only so
     # that a missing code gets the same helpful 403 as a wrong one.
     setup_code: str = Field("", max_length=64)
@@ -177,6 +188,7 @@ async def login(
         "user_id":  user.user_id,
         "username": user.username,
         "role":     user.role.value,
+        "must_change_password": user.must_change_password,
     }
 
 
@@ -208,7 +220,37 @@ async def me(user: User = Depends(get_current_user)) -> MeResponse:
         email=user.email,
         role=user.role.value,
         is_active=user.is_active,
+        must_change_password=user.must_change_password,
     )
+
+
+@router.post("/change-password")
+async def change_password(
+    req: ChangePasswordRequest, response: Response,
+    user: User = Depends(get_current_user),
+    _rl: None = Depends(login_rate_limit),
+) -> dict:
+    """
+    Change your own password. Needs the current password. Every other session of this
+    account ends; this one continues with a fresh cookie. Also the way out of the
+    "choose a new password" state after an administrator created or reset the account.
+    """
+    store = get_user_store()
+    if not _verify_password(req.current_password, user.password_hash):
+        _audit("PASSWORD_CHANGE_FAILED", user, result="FAILURE")
+        raise HTTPException(status_code=400, detail="Current password is incorrect.")
+    if req.new_password == req.current_password:
+        raise HTTPException(status_code=422, detail="The new password must differ from the current one.")
+    err = _validate_password_strength(req.new_password, user.username, user.email)
+    if err:
+        raise HTTPException(status_code=422, detail=err)
+
+    store.set_password(user.user_id, _hash_password(req.new_password), must_change=False)
+    fresh = store.get_by_id(user.user_id)
+    response.set_cookie(value=create_access_token(fresh), **cookie_kwargs())
+    _audit("PASSWORD_CHANGED", user, resource=f"user:{user.user_id}")
+    logger.info("User %r changed their password", user.username)
+    return {"ok": True}
 
 
 @router.post("/setup", response_model=SetupResponse)
@@ -249,7 +291,7 @@ async def setup_first_admin(req: SetupRequest, _rl: None = Depends(setup_rate_li
     if "@" not in req.email or "." not in req.email.split("@")[-1]:
         raise HTTPException(status_code=422, detail="Invalid email address.")
 
-    pw_err = _validate_password_strength(req.password)
+    pw_err = _validate_password_strength(req.password, req.username, req.email)
     if pw_err:
         raise HTTPException(status_code=422, detail=pw_err)
 
@@ -281,8 +323,11 @@ async def setup_first_admin(req: SetupRequest, _rl: None = Depends(setup_rate_li
 class CreateUserRequest(BaseModel):
     username: str  = Field(..., min_length=3, max_length=64)
     email:    str  = Field(..., min_length=5, max_length=254)
-    password: str  = Field(..., min_length=8, max_length=256)
+    password: str  = Field(..., min_length=1, max_length=256)
     role:     str  = Field(..., description="SUPER_ADMIN|COMPLIANCE_ADMIN|AUDITOR|VIEWER")
+    # The new user must choose their own password at first login (default). Turn off only for
+    # service-style accounts.
+    require_password_change: bool = True
 
 
 class UpdateUserRequest(BaseModel):
@@ -298,6 +343,28 @@ class UserListItem(BaseModel):
     is_active:     bool
     created_at:    str
     last_login:    Optional[str]
+    must_change_password: bool = False
+    org_ids:       List[str] = []
+
+
+def _list_item(u: User) -> "UserListItem":
+    return UserListItem(
+        user_id=u.user_id, username=u.username, email=u.email,
+        role=u.role.value, is_active=u.is_active,
+        created_at=u.created_at.isoformat(),
+        last_login=u.last_login.isoformat() if u.last_login else None,
+        must_change_password=u.must_change_password,
+        org_ids=get_user_store().get_user_orgs(u.user_id),
+    )
+
+
+def _audit(action: str, actor: Optional[User] = None, **kw) -> None:
+    try:
+        from audit_log.store import get_audit_store
+        get_audit_store().log(action, actor_id=actor.user_id if actor else None,
+                              actor_name=actor.username if actor else None, **kw)
+    except Exception:
+        pass
 
 
 @router.get("/my-orgs")
@@ -359,16 +426,7 @@ async def list_user_orgs(
 @router.get("/users", response_model=List[UserListItem])
 async def list_users(_user: User = Depends(require_roles(UserRole.SUPER_ADMIN))) -> List[UserListItem]:
     """List all user accounts. SUPER_ADMIN only."""
-    users = get_user_store().list_users()
-    return [
-        UserListItem(
-            user_id=u.user_id, username=u.username, email=u.email,
-            role=u.role.value, is_active=u.is_active,
-            created_at=u.created_at.isoformat(),
-            last_login=u.last_login.isoformat() if u.last_login else None,
-        )
-        for u in users
-    ]
+    return [_list_item(u) for u in get_user_store().list_users()]
 
 
 @router.post("/users", response_model=UserListItem, status_code=201)
@@ -380,7 +438,7 @@ async def create_user(req: CreateUserRequest, _admin: User = Depends(require_rol
         raise HTTPException(status_code=422, detail=username_err)
     if "@" not in req.email:
         raise HTTPException(status_code=422, detail="Invalid email address.")
-    pw_err = _validate_password_strength(req.password)
+    pw_err = _validate_password_strength(req.password, req.username, req.email)
     if pw_err:
         raise HTTPException(status_code=422, detail=pw_err)
 
@@ -393,6 +451,9 @@ async def create_user(req: CreateUserRequest, _admin: User = Depends(require_rol
         u = get_user_store().create_user(req.username.strip(), req.email.strip().lower(), _hash_password(req.password), role)
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
+    if req.require_password_change:
+        get_user_store().set_must_change_password(u.user_id, True)
+        u = get_user_store().get_by_id(u.user_id)
 
     logger.info("Admin %r created user %r (role=%s)", _admin.username, u.username, u.role.value)
     try:
@@ -401,11 +462,7 @@ async def create_user(req: CreateUserRequest, _admin: User = Depends(require_rol
                               resource=f"user:{u.user_id}", detail={"username": u.username, "role": u.role.value})
     except Exception:
         pass
-    return UserListItem(
-        user_id=u.user_id, username=u.username, email=u.email,
-        role=u.role.value, is_active=u.is_active,
-        created_at=u.created_at.isoformat(), last_login=None,
-    )
+    return _list_item(u)
 
 
 @router.patch("/users/{user_id}", response_model=UserListItem)
@@ -419,30 +476,74 @@ async def update_user(
     if not target:
         raise HTTPException(status_code=404, detail=f"User {user_id!r} not found.")
 
-    # Prevent self-lockout
-    if target.user_id == _admin.user_id:
-        if req.is_active is False:
-            raise HTTPException(status_code=400, detail="You cannot deactivate your own account.")
-        if req.role is not None and UserRole(req.role) != UserRole.SUPER_ADMIN:
-            raise HTTPException(status_code=400, detail="You cannot remove your own SUPER_ADMIN role.")
-
+    new_role = None
     if req.role is not None:
         try:
             new_role = UserRole(req.role)
         except ValueError:
             raise HTTPException(status_code=422, detail=f"Invalid role: {req.role!r}")
+
+    # Prevent self-lockout
+    if target.user_id == _admin.user_id:
+        if req.is_active is False:
+            raise HTTPException(status_code=400, detail="You cannot deactivate your own account.")
+        if new_role is not None and new_role != UserRole.SUPER_ADMIN:
+            raise HTTPException(status_code=400, detail="You cannot remove your own SUPER_ADMIN role.")
+
+    # Never leave the system without an active administrator.
+    loses_admin = target.role == UserRole.SUPER_ADMIN and target.is_active and (
+        req.is_active is False or (new_role is not None and new_role != UserRole.SUPER_ADMIN))
+    if loses_admin and store.count_active_super_admins() <= 1:
+        raise HTTPException(status_code=400, detail="At least one active SUPER_ADMIN must remain.")
+
+    changes = {}
+    if new_role is not None and new_role != target.role:
         store.update_role(user_id, new_role)
-
-    if req.is_active is not None:
+        changes["role"] = new_role.value
+    if req.is_active is not None and req.is_active != target.is_active:
         store.set_active(user_id, req.is_active)
+        changes["is_active"] = req.is_active
+    if changes:
+        _audit("USER_DISABLED" if changes.get("is_active") is False else "USER_UPDATED",
+               _admin, resource=f"user:{user_id}", detail={"username": target.username, **changes})
 
-    updated = store.get_by_id(user_id)
-    return UserListItem(
-        user_id=updated.user_id, username=updated.username, email=updated.email,
-        role=updated.role.value, is_active=updated.is_active,
-        created_at=updated.created_at.isoformat(),
-        last_login=updated.last_login.isoformat() if updated.last_login else None,
-    )
+    return _list_item(store.get_by_id(user_id))
+
+
+@router.post("/users/{user_id}/reset-password")
+async def reset_password(
+    user_id: str, req: ResetPasswordRequest,
+    _admin: User = Depends(require_roles(UserRole.SUPER_ADMIN)),
+) -> dict:
+    """
+    Reset another user's password. SUPER_ADMIN only. Without new_password a temporary one is
+    generated and returned once; the user must replace it at next login. Ends all of that
+    user's sessions. Use change-password for your own account.
+    """
+    store = get_user_store()
+    target = store.get_by_id(user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail=f"User {user_id!r} not found.")
+    if target.user_id == _admin.user_id:
+        raise HTTPException(status_code=400, detail="Use change-password to change your own password.")
+
+    generated = not req.new_password
+    if generated:
+        from api import passwords
+        password = passwords.generate_temporary_password()
+    else:
+        password = req.new_password
+        err = _validate_password_strength(password, target.username, target.email)
+        if err:
+            raise HTTPException(status_code=422, detail=err)
+
+    store.set_password(user_id, _hash_password(password), must_change=True)
+    _audit("PASSWORD_RESET", _admin, resource=f"user:{user_id}", detail={"username": target.username})
+    logger.info("Admin %r reset the password of %r", _admin.username, target.username)
+    out = {"ok": True, "user_id": user_id, "must_change_password": True}
+    if generated:
+        out["temporary_password"] = password
+    return out
 
 
 # ---------------------------------------------------------------------------

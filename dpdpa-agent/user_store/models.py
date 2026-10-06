@@ -37,3 +37,8 @@ class User:
     is_active:     bool
     created_at:    datetime
     last_login:    Optional[datetime] = None
+    # Bumped whenever the password changes or is reset; every session issued earlier stops working.
+    token_version: int = 0
+    # True after an administrator created the account or reset its password: the user must
+    # choose their own password before using anything else.
+    must_change_password: bool = False

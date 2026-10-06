@@ -97,7 +97,18 @@ class UserStore:
                 CREATE INDEX IF NOT EXISTS idx_memberships_user ON user_org_memberships(user_id);
                 CREATE INDEX IF NOT EXISTS idx_memberships_org  ON user_org_memberships(org_id);
             """)
+            self._migrate_password_columns()
             self._conn.commit()
+
+    def _migrate_password_columns(self) -> None:
+        """Add the password-lifecycle columns to databases created before they existed."""
+        cols = {row["name"] for row in self._conn.execute("PRAGMA table_info(users)")}
+        if "token_version" not in cols:
+            self._conn.execute("ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0")
+        if "must_change_password" not in cols:
+            self._conn.execute("ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0")
+        if "password_changed_at" not in cols:
+            self._conn.execute("ALTER TABLE users ADD COLUMN password_changed_at TEXT")
 
     # ------------------------------------------------------------------
     # Write operations
@@ -153,13 +164,37 @@ class UserStore:
         return cursor.rowcount > 0
 
     def update_password(self, user_id: str, new_hash: str) -> bool:
+        """Set a new password hash and end every session issued before (token_version + 1)."""
+        return self.set_password(user_id, new_hash, must_change=False)
+
+    def set_password(self, user_id: str, new_hash: str, must_change: bool) -> bool:
+        """
+        Set a new password hash. All earlier sessions stop working (token_version + 1).
+        must_change=True makes the user choose their own password at next use (temporary password).
+        """
         with self._lock:
             cursor = self._conn.execute(
-                "UPDATE users SET password_hash = ? WHERE user_id = ?",
-                (new_hash, user_id),
+                "UPDATE users SET password_hash = ?, token_version = token_version + 1, "
+                "must_change_password = ?, password_changed_at = ? WHERE user_id = ?",
+                (new_hash, 1 if must_change else 0, _now().isoformat(), user_id),
             )
             self._conn.commit()
         return cursor.rowcount > 0
+
+    def set_must_change_password(self, user_id: str, must_change: bool) -> bool:
+        with self._lock:
+            cursor = self._conn.execute(
+                "UPDATE users SET must_change_password = ? WHERE user_id = ?",
+                (1 if must_change else 0, user_id),
+            )
+            self._conn.commit()
+        return cursor.rowcount > 0
+
+    def count_active_super_admins(self) -> int:
+        row = self._conn.execute(
+            "SELECT COUNT(*) AS n FROM users WHERE role = 'SUPER_ADMIN' AND is_active = 1"
+        ).fetchone()
+        return int(row["n"])
 
     def update_role(self, user_id: str, role: UserRole) -> bool:
         with self._lock:
@@ -269,6 +304,8 @@ def _row_to_user(row: sqlite3.Row) -> User:
         is_active=bool(row["is_active"]),
         created_at=_dt(row["created_at"]),
         last_login=_dt(row["last_login"]),
+        token_version=int(row["token_version"]) if "token_version" in row.keys() else 0,
+        must_change_password=bool(row["must_change_password"]) if "must_change_password" in row.keys() else False,
     )
 
 

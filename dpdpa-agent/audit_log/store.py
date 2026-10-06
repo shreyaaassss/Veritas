@@ -214,6 +214,8 @@ class AuditAction:
     LOGIN           = "LOGIN"
     LOGIN_FAILED    = "LOGIN_FAILED"
     LOGOUT          = "LOGOUT"
+    PASSWORD_CHANGED = "PASSWORD_CHANGED"
+    PASSWORD_RESET   = "PASSWORD_RESET"
 
     # Users
     USER_CREATED    = "USER_CREATED"

@@ -103,6 +103,7 @@ def create_access_token(user: User) -> str:
         "sub":      user.user_id,
         "username": user.username,
         "role":     user.role.value,
+        "tv":       user.token_version,
         "iat":      int(now.timestamp()),
         "exp":      int(expire.timestamp()),
     }
@@ -131,6 +132,14 @@ def cookie_kwargs() -> dict:
 # ---------------------------------------------------------------------------
 # FastAPI dependencies
 # ---------------------------------------------------------------------------
+
+# While an account has a temporary password, only these routes work.
+PASSWORD_CHANGE_ALLOWED_PATHS = {
+    "/api/auth/change-password",
+    "/api/auth/logout",
+    "/api/auth/me",
+}
+
 
 def user_from_token(token: Optional[str]) -> User:
     """
@@ -162,6 +171,13 @@ def user_from_token(token: Optional[str]) -> User:
         raise HTTPException(status_code=401, detail="User account not found.")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="User account is disabled.")
+    # A password change or reset ends every session issued before it.
+    if int(payload.get("tv", 0)) != user.token_version:
+        raise HTTPException(
+            status_code=401,
+            detail="Session ended because the password was changed. Please log in again.",
+            headers={"WWW-Authenticate": "Cookie"},
+        )
 
     return user
 
@@ -183,7 +199,13 @@ async def get_current_user(request: Request) -> User:
         async def handler(user: User = Depends(get_current_user)):
             ...
     """
-    return user_from_token(request.cookies.get(_COOKIE_NAME))
+    user = user_from_token(request.cookies.get(_COOKIE_NAME))
+    if user.must_change_password and request.url.path not in PASSWORD_CHANGE_ALLOWED_PATHS:
+        raise HTTPException(
+            status_code=403,
+            detail="PASSWORD_CHANGE_REQUIRED: you must choose a new password before continuing.",
+        )
+    return user
 
 
 def org_access(*roles: UserRole):
