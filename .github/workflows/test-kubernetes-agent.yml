@@ -98,7 +98,10 @@ jobs:
           kubectl apply -f veritas-agent/k8s/namespace.yaml
           kubectl -n veritas-agent create secret generic veritas-agent-key --from-literal=registration_key="$KEY"
           sed "s/__SERVER__/${GW}/" .github/k8s-test/agent-configmap.yaml | kubectl apply -f -
-          sed 's#ghcr.io/shreyas[a-z]*/veritas-agent:latest#veritas-agent:ci#' veritas-agent/k8s/agent-daemonset.yaml | kubectl apply -f -
+          sed 's#ghcr.io/[A-Za-z0-9_.-]*/veritas-agent:latest#veritas-agent:ci#' veritas-agent/k8s/agent-daemonset.yaml | kubectl apply -f -
+          # the pods must really run the image we built, not a registry image
+          kubectl -n veritas-agent get ds veritas-agent -o jsonpath='{.spec.template.spec.containers[0].image}' | grep -qx 'veritas-agent:ci' \
+            || { echo "the DaemonSet does not use the locally built image"; exit 1; }
           kubectl -n veritas-agent rollout status ds/veritas-agent --timeout=240s
           test "$(kubectl -n veritas-agent get ds veritas-agent -o jsonpath='{.status.numberReady}')" = "2"
 
