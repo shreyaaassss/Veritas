@@ -301,6 +301,31 @@ def install_certificate(cert_src: Path, key_src: Path) -> dict:
     except x509.ExtensionNotFound:
         names = []
 
+    cn_values = [a.value for a in leaf.subject]
+    for name in names + cn_values:
+        if any(ch in str(name) for ch in "<>{} \t") or "CHANGE_ME" in str(name).upper():
+            raise CertificateError(
+                f"The certificate is issued for {name!r}, which is a placeholder, not a real name. "
+                "Create the certificate again with the server's real host name or IP address.")
+
+    warnings = []
+    host = socket.gethostname().lower()
+
+    def _covers(pattern: str, candidate: str) -> bool:
+        pattern = pattern.lower()
+        if pattern.startswith("*."):
+            return candidate.endswith(pattern[1:]) and candidate.count(".") >= pattern.count(".")
+        return pattern == candidate
+
+    candidates = {host, host.split(".")[0]}
+    if names and not any(_covers(n, c) for n in names for c in candidates):
+        warnings.append(
+            f"The certificate does not list this machine's name ({host}). That is fine if users and "
+            "agents reach Veritas by another name that it lists: " + ", ".join(names) + ".")
+    if not names:
+        warnings.append("The certificate has no Subject Alternative Names; modern browsers and agents "
+                        "reject certificates that rely on the Common Name alone.")
+
     crt_dst, key_dst = cert_path(), key_path()
     crt_dst.parent.mkdir(parents=True, exist_ok=True)
     stamp = now.strftime("%Y%m%dT%H%M%SZ")
@@ -324,4 +349,5 @@ def install_certificate(cert_src: Path, key_src: Path) -> dict:
         "days_remaining": (not_after - now).days,
         "names": names,
         "backup": backup_note,
+        "warnings": warnings,
     }

@@ -86,6 +86,8 @@ def flow(browser, pages: list) -> None:
     page.fill("#email", "smoke@example.com")
     page.fill("#password", ADMIN_PW)
     page.fill("#confirm", ADMIN_PW)
+    expect(page.locator("#pwHints")).to_contain_text("At least 10 characters")
+    expect(page.locator("#pwHints")).to_contain_text("Strong")
     page.click("#submitBtn")
     expect(page.locator("body")).to_contain_text(re.compile("setup code", re.I))
     assert "/setup" in page.url
@@ -231,6 +233,8 @@ def flow(browser, pages: list) -> None:
     expect(page2.locator("#accountTitle")).to_have_text("Choose a new password")
     shot(page2, "10-forced-change")
     page2.fill("#accCurrent", temp)
+    page2.fill("#accNew", "short")
+    expect(page2.locator("#accHints")).to_contain_text("Too weak")
     page2.fill("#accNew", "password123")
     page2.fill("#accNew2", "password123")
     page2.click("#accountModal button:has-text('Change Password')")
@@ -250,6 +254,19 @@ def flow(browser, pages: list) -> None:
     step("the administrator's Users tab now shows the user as active")
     page.click("#main-users button:has-text('Refresh')")
     expect(page.locator("#usersTbody tr", has_text=NEW_USER)).to_contain_text("Active")
+
+    step("resetting the password ends the open session: the viewer's page goes to the sign-in page by itself")
+    page.locator("#usersTbody tr", has_text=NEW_USER).locator("button:has-text('Reset password')").click()
+    page.click("#resetPwModal button:has-text('Generate Temporary Password')")
+    expect(page.locator("#resetPwStep2")).to_be_visible()
+    page.click("#resetPwModal button:has-text('Done')")
+    expect(page2).to_have_url(re.compile(r"/login"), timeout=20_000)
+    shot(page2, "12-viewer-session-ended")
+
+    step("the administrator can sign out with the visible button")
+    expect(page.locator("#signOutBtn")).to_be_visible()
+    page.click("#signOutBtn")
+    expect(page).to_have_url(re.compile(r"/login"))
 
 
 

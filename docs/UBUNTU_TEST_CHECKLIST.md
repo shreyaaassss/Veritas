@@ -2,7 +2,7 @@
 
 For the person testing on Ubuntu 22.04 or 24.04 (x86_64). Tick each box and write down anything that differs from what is described. For every failure, copy the command and its full output.
 
-Replace `<HOST>` with the server's name or IP address. Replace `1.0.19` if you test another release.
+Where a command uses `$(hostname)` it fills in this machine's name by itself; where this document says `<HOST>`, type the server's real name or IP address (never leave `<...>` in a file). Replace `1.0.19` if you test another release.
 
 ## 0. What you need
 
@@ -147,8 +147,8 @@ In the dashboard open **Users → Add User**: username `analyst1`, email `analys
 - [ ] `sudo veritas install-cert` with no arguments prints usage. Create a test certificate and install it:
 
   ```bash
-  openssl req -x509 -newkey rsa:2048 -nodes -days 90 -subj "/CN=<HOST>" \
-    -addext "subjectAltName=DNS:<HOST>" -keyout /tmp/t.key -out /tmp/t.crt
+  openssl req -x509 -newkey rsa:2048 -nodes -days 90 -subj "/CN=$(hostname)" \
+    -addext "subjectAltName=DNS:$(hostname),DNS:localhost" -keyout /tmp/t.key -out /tmp/t.crt
   sudo veritas install-cert /tmp/t.crt /tmp/t.key
   ```
   - [ ] It prints `Certificate installed` and the service restarts and comes back up.

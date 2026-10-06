@@ -152,6 +152,8 @@ def main() -> None:
         print(f"  Subject:  {info['subject']}")
         print(f"  Names:    {', '.join(info['names']) or '(none listed)'}")
         print(f"  Expires:  {info['not_after']} ({info['days_remaining']} days)")
+        for w in info.get("warnings", []):
+            print(f"  WARNING: {w}")
         if info["backup"]:
             print(f"  The previous certificate was kept as {info['backup']}")
         print("Restart Veritas to use it. Agents must trust the issuer (or be given the CA file).")

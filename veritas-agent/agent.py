@@ -104,6 +104,18 @@ MAX_BACKOFF             = 30    # seconds, forwarding retry cap
 # TLS configuration
 # ---------------------------------------------------------------------------
 
+def _silence_insecure_request_warning() -> None:
+    """
+    With verification turned off, urllib3 repeats an InsecureRequestWarning on every request,
+    which floods the service log. The agent has already warned once, clearly, at start-up.
+    """
+    try:
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    except Exception:
+        pass
+
+
 def _tls_verify(config: Dict[str, Any]) -> Union[bool, str]:
     """
     Return the TLS verification setting for requests calls.
@@ -127,6 +139,7 @@ def _tls_verify(config: Dict[str, Any]) -> Union[bool, str]:
             "TLS verification disabled (VERITAS_TLS_VERIFY=false). "
             "This is insecure and should not be used in production."
         )
+        _silence_insecure_request_warning()
         return False
 
     env_ca = os.environ.get("VERITAS_CA_CERT", "").strip()
@@ -148,6 +161,7 @@ def _tls_verify(config: Dict[str, Any]) -> Union[bool, str]:
             "TLS verification disabled in config (tls.verify: false). "
             "This is insecure and should not be used in production."
         )
+        _silence_insecure_request_warning()
         return False
 
     return True  # default: strict verification

@@ -266,6 +266,22 @@ class TestInstallCertificate:
             tls.install_certificate(certdir / "missing.crt", good_k)
         assert not tls.cert_path().exists(), "nothing may be installed when a check fails"
 
+    def test_placeholder_names_are_refused(self, certdir):
+        crt, key = _make_pair(certdir, "ph", cn="<HOST>", sans=("<HOST>",))
+        with pytest.raises(tls.CertificateError, match="placeholder"):
+            tls.install_certificate(crt, key)
+        assert not tls.cert_path().exists()
+
+    def test_warns_when_the_certificate_does_not_cover_this_machine(self, certdir, monkeypatch):
+        monkeypatch.setattr(tls.socket, "gethostname", lambda: "jarvis")
+        other_c, other_k = _make_pair(certdir, "other", sans=("veritas.example.com",))
+        assert any("jarvis" in w for w in tls.install_certificate(other_c, other_k)["warnings"])
+        mine_c, mine_k = _make_pair(certdir, "mine", sans=("jarvis", "localhost"))
+        assert tls.install_certificate(mine_c, mine_k)["warnings"] == []
+        wild_c, wild_k = _make_pair(certdir, "wild", sans=("*.corp.example",))
+        monkeypatch.setattr(tls.socket, "gethostname", lambda: "veritas.corp.example")
+        assert tls.install_certificate(wild_c, wild_k)["warnings"] == []
+
     def test_passphrase_protected_key_gets_a_clear_message(self, certdir):
         from cryptography.hazmat.primitives import serialization
         crt, key = _make_pair(certdir, "pp")

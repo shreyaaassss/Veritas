@@ -120,17 +120,59 @@
 
       <label for="password">Password <span style="color:#555;font-weight:400">(min 10 characters)</span></label>
       <input id="password" name="password" type="password" autocomplete="new-password"
-             placeholder="Choose a strong password" required minlength="10" />
+             placeholder="Choose a strong password" required minlength="10"
+             oninput="renderPasswordHints('pwHints', this.value, document.getElementById('username').value, document.getElementById('email').value)" />
+      <div id="pwHints" aria-live="polite"></div>
 
       <label for="confirm">Confirm Password</label>
       <input id="confirm" name="confirm" type="password" autocomplete="new-password"
-             placeholder="Repeat your password" required minlength="10" />
+             placeholder="Repeat your password" required minlength="10"
+             oninput="document.getElementById('confirmNote').textContent = this.value && this.value !== document.getElementById('password').value ? 'The passwords do not match yet.' : ''" />
+      <div id="confirmNote" style="font-size:0.74rem;color:#e5484d;min-height:1em;"></div>
 
       <button class="btn" type="submit" id="submitBtn">Create Administrator Account</button>
     </form>
   </div>
 
   <script>
+
+// ---- Password hints: live feedback while typing. The server makes the final decision
+// (it also rejects well-known passwords, which the browser cannot check). ----
+function passwordHints(pw, username, email) {
+  const lower = (pw || '').toLowerCase();
+  const user = (username || '').trim().toLowerCase();
+  const mail = ((email || '').split('@')[0] || '').trim().toLowerCase();
+  const rules = [
+    [pw.length >= 10, 'At least 10 characters'],
+    [new Set(pw).size >= 4, 'Not just a few repeated characters'],
+  ];
+  if (user.length >= 4) rules.push([!lower.includes(user), 'Does not contain the username']);
+  if (mail.length >= 4) rules.push([!lower.includes(mail), 'Does not contain the email name']);
+  let score = 0;
+  if (pw.length >= 10) score++;
+  if (pw.length >= 14) score++;
+  if (/[a-z]/.test(pw) && /[A-Z]/.test(pw)) score++;
+  if (/\d/.test(pw)) score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
+  const allOk = rules.every(r => r[0]);
+  const level = !pw ? 0 : (!allOk ? 1 : (score >= 4 ? 3 : 2));
+  return { rules, level, allOk };
+}
+
+function renderPasswordHints(boxId, pw, username, email) {
+  const box = document.getElementById(boxId);
+  if (!box) return;
+  const h = passwordHints(pw, username, email);
+  const colors = ['#555', '#e5484d', '#f5a623', '#00c47a'];
+  const labels = ['', 'Too weak', 'Acceptable', 'Strong'];
+  box.innerHTML =
+    `<div style="height:5px;background:#2a2a2a;border-radius:3px;overflow:hidden;margin:6px 0 4px;">
+       <div style="height:100%;width:${h.level * 33.4}%;background:${colors[h.level]};transition:width .15s;"></div></div>
+     <div style="font-size:0.74rem;color:${colors[h.level]};margin-bottom:4px;">${labels[h.level]}</div>` +
+    h.rules.map(r => `<div style="font-size:0.74rem;color:${r[0] ? '#00c47a' : '#999'};">${r[0] ? '✓' : '○'} ${r[1]}</div>`).join('') +
+    `<div style="font-size:0.72rem;color:#777;margin-top:3px;">Common passwords such as "password123" are refused.</div>`;
+}
+
     async function handleSetup(e) {
       e.preventDefault();
       const btn = document.getElementById('submitBtn');

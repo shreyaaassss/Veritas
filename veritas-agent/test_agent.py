@@ -211,3 +211,31 @@ class TestConfigPlaceholders:
     ])
     def test_real_addresses_load(self, tmp_path, address):
         assert agent.load_config(self.write(tmp_path, address=address))["veritas_address"] == address
+
+
+class TestInsecureWarningNoise:
+    def _ignored(self, warnings_module, category):
+        return any(f[0] == "ignore" and f[2] is category for f in warnings_module.filters)
+
+    def test_verify_false_warns_once_itself_and_silences_urllib3(self, monkeypatch, caplog):
+        import warnings
+        import urllib3
+        monkeypatch.delenv("VERITAS_TLS_VERIFY", raising=False)
+        monkeypatch.delenv("VERITAS_CA_CERT", raising=False)
+        category = urllib3.exceptions.InsecureRequestWarning
+        with warnings.catch_warnings():
+            warnings.resetwarnings()
+            assert not self._ignored(warnings, category), "precondition"
+            assert agent._tls_verify({"tls": {"verify": False}}) is False
+            assert self._ignored(warnings, category), "urllib3's repeated warning must be silenced"
+        assert caplog.text.count("TLS verification disabled") == 1
+
+    def test_verification_on_leaves_the_warning_alone(self, monkeypatch):
+        import warnings
+        import urllib3
+        monkeypatch.delenv("VERITAS_TLS_VERIFY", raising=False)
+        monkeypatch.delenv("VERITAS_CA_CERT", raising=False)
+        with warnings.catch_warnings():
+            warnings.resetwarnings()
+            agent._tls_verify({"tls": {"verify": True}})
+            assert not self._ignored(warnings, urllib3.exceptions.InsecureRequestWarning)
