@@ -22,6 +22,9 @@ mkdir -p /tmp/veritas-agent-deb/opt/veritas-agent
 cp "$AGENT_SRC/agent.py"   /tmp/veritas-agent-deb/opt/veritas-agent/
 cp "$AGENT_SRC/manage.py"  /tmp/veritas-agent-deb/opt/veritas-agent/ 2>/dev/null || true
 
+# The agent reports this version to the server in every heartbeat.
+echo "$VERSION" > /tmp/veritas-agent-deb/opt/veritas-agent/VERSION
+
 # Create log directory
 mkdir -p /tmp/veritas-agent-deb/var/log/veritas-agent
 

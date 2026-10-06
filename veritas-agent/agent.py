@@ -63,8 +63,9 @@ import queue
 import sys
 import threading
 import time
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 import requests
 import yaml
@@ -423,6 +424,52 @@ class AgentStats:
 
 STATS = AgentStats()
 
+START_TIME = time.monotonic()
+
+
+def get_agent_version() -> str:
+    """
+    The release version of this agent: $VERITAS_AGENT_VERSION, else the VERSION file
+    next to this script (written by the package/image build), else "dev".
+    """
+    env = os.environ.get("VERITAS_AGENT_VERSION", "").strip()
+    if env:
+        return env[:64]
+    try:
+        text = (Path(__file__).resolve().parent / "VERSION").read_text(encoding="utf-8").strip()
+    except OSError:
+        text = ""
+    return (text or "dev")[:64]
+
+
+class SourceBoard:
+    """State of each configured log source, reported in the heartbeat."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._sources: Dict[tuple, Dict[str, Any]] = {}
+
+    def update(self, kind: str, target: str, **fields: Any) -> None:
+        with self._lock:
+            entry = self._sources.setdefault(
+                (kind, target),
+                {"type": kind, "target": target, "source_system": "", "state": "waiting",
+                 "detail": "", "last_line_at": None},
+            )
+            entry.update(fields)
+
+    def snapshot(self) -> List[Dict[str, Any]]:
+        with self._lock:
+            return [dict(v) for v in self._sources.values()]
+
+
+SOURCES = SourceBoard()
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
 _last_logged: Dict[str, float] = {}
 
 
@@ -721,6 +768,8 @@ def tail_file(
 
     follower = FileFollower(file_path)
     last_warning = 0.0
+    SOURCES.update("file", str(file_path), source_system=source_system, state="waiting",
+                   detail="file does not exist yet" if not file_path.exists() else "")
 
     def warn_rate_limited(message: str, *args) -> None:
         nonlocal last_warning
@@ -733,10 +782,19 @@ def tail_file(
         try:
             if not file_path.exists() and follower._fh is None:
                 warn_rate_limited("Waiting for log file to appear: %s", file_path)
-            for line in follower.poll():
+            new_lines = follower.poll()
+            for line in new_lines:
                 _enqueue(event_queue, line, source_system)
+            if follower._fh is not None:
+                fields: Dict[str, Any] = {"state": "reading", "detail": ""}
+                if new_lines:
+                    fields["last_line_at"] = _now_iso()
+                SOURCES.update("file", str(file_path), **fields)
+            else:
+                SOURCES.update("file", str(file_path), state="waiting", detail="file does not exist yet")
         except PermissionError as e:
             follower.close()
+            SOURCES.update("file", str(file_path), state="error", detail="Permission denied")
             warn_rate_limited(
                 "Permission denied reading %s: %s. The agent cannot read this file; grant "
                 "the agent's user read access (on Linux the service user is "
@@ -745,6 +803,7 @@ def tail_file(
             time.sleep(max(poll_interval, 5))
         except OSError as e:
             follower.close()
+            SOURCES.update("file", str(file_path), state="error", detail=str(e)[:200])
             warn_rate_limited("Error reading %s: %s. Retrying.", file_path, e)
             time.sleep(max(poll_interval, 5))
         time.sleep(poll_interval)
@@ -762,9 +821,11 @@ def tail_docker(
     event_queue: queue.Queue,
 ) -> None:
     logger.info("Tailing Docker container: %s (source_system: %s)", container_name, source_system)
+    SOURCES.update("docker", container_name, source_system=source_system, state="waiting")
     try:
         import docker  # type: ignore
     except ImportError:
+        SOURCES.update("docker", container_name, state="error", detail="docker package not installed")
         logger.error(
             "docker package not installed. Run: pip install docker>=7.0.0 — "
             "skipping container source '%s'", container_name
@@ -775,15 +836,20 @@ def tail_docker(
         client    = docker.from_env()
         container = client.containers.get(container_name)
     except Exception as e:
+        SOURCES.update("docker", container_name, state="error", detail=f"cannot reach container: {e}"[:200])
         logger.error("Cannot connect to Docker or find container '%s': %s — skipping", container_name, e)
         return
 
+    SOURCES.update("docker", container_name, state="reading", detail="")
     try:
         for log_bytes in container.logs(stream=True, follow=True, tail=0):
             line = log_bytes.decode("utf-8", errors="replace").strip()
             if line:
                 _enqueue(event_queue, line, source_system)
+                SOURCES.update("docker", container_name, last_line_at=_now_iso())
+        SOURCES.update("docker", container_name, state="error", detail="log stream ended")
     except Exception as e:
+        SOURCES.update("docker", container_name, state="error", detail=f"stream error: {e}"[:200])
         logger.error("Docker log stream error for '%s': %s", container_name, e)
 
 
@@ -812,10 +878,23 @@ def _enqueue(event_queue: queue.Queue, line: str, source_system: str) -> None:
 # Heartbeat
 # ---------------------------------------------------------------------------
 
+def build_health(event_queue: Optional[queue.Queue]) -> Dict[str, Any]:
+    """The health report attached to every heartbeat. Contains no event text."""
+    return {
+        "agent_version": get_agent_version(),
+        "uptime_seconds": int(time.monotonic() - START_TIME),
+        "queue_depth": event_queue.qsize() if event_queue is not None else 0,
+        "queue_capacity": BUFFER_MAX,
+        "counters": STATS.snapshot(),
+        "sources": SOURCES.snapshot(),
+    }
+
+
 def heartbeat_loop(
     config: Dict[str, Any],
     state: Dict[str, Any],
     interval: int = HEARTBEAT_INTERVAL,
+    event_queue: Optional[queue.Queue] = None,
 ) -> None:
     base_url = config["veritas_address"].rstrip("/")
     url      = f"{base_url}/agent/heartbeat"
@@ -823,12 +902,15 @@ def heartbeat_loop(
     verify   = _verify_from_state(config, state)
 
     logger.info("Heartbeat thread started (every %ds)", interval)
+    first = True
     while True:
-        time.sleep(interval)
+        if not first:
+            time.sleep(interval)
+        first = False  # report immediately at start so the dashboard shows version and health at once
         try:
             resp = requests.post(
                 url,
-                json={"agent_id": state["agent_id"]},
+                json={"agent_id": state["agent_id"], "health": build_health(event_queue)},
                 headers=headers,
                 timeout=5,
                 verify=verify,
@@ -851,8 +933,12 @@ def main() -> None:
         "--config", type=Path, default=CONFIG_FILE_DEFAULT,
         help=f"Path to agent config YAML (default: {CONFIG_FILE_DEFAULT})",
     )
+    parser.add_argument(
+        "--version", action="version", version=f"Veritas Agent {get_agent_version()}",
+    )
     args = parser.parse_args()
 
+    logger.info("Veritas Agent %s starting", get_agent_version())
     config = load_config(args.config)
     configure_state_dir(config)
     state  = load_state()
@@ -891,7 +977,7 @@ def main() -> None:
 
     hb = threading.Thread(
         target=heartbeat_loop,
-        args=(config, state),
+        args=(config, state, HEARTBEAT_INTERVAL, event_queue),
         daemon=True,
         name="heartbeat",
     )

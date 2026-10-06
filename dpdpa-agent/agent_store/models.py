@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from pydantic import BaseModel
 
@@ -30,6 +30,11 @@ class Agent(BaseModel):
     created_at: datetime
     last_heartbeat_at: Optional[datetime] = None
     events_received: int = 0
+    # Reported by the agent in its heartbeat (None until the first report, and for
+    # agents old enough not to send one).
+    agent_version: Optional[str] = None
+    health: Optional[Dict[str, Any]] = None
+    health_updated_at: Optional[datetime] = None
 
 
 class RegistrationKey(BaseModel):

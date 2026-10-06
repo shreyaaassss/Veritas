@@ -23,6 +23,7 @@ DESIGN FOLLOWS evidence_store/store.py PATTERNS:
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import secrets
 import sqlite3
@@ -113,7 +114,15 @@ class AgentStore:
                 CREATE INDEX IF NOT EXISTS idx_agents_org_id ON agents(org_id);
                 CREATE INDEX IF NOT EXISTS idx_keys_org_id ON registration_keys(org_id);
             """)
+            self._migrate_agent_health_columns()
             self._conn.commit()
+
+    def _migrate_agent_health_columns(self) -> None:
+        """Add the health-report columns to databases created before they existed."""
+        existing = {row["name"] for row in self._conn.execute("PRAGMA table_info(agents)")}
+        for column in ("agent_version", "health_json", "health_updated_at"):
+            if column not in existing:
+                self._conn.execute(f"ALTER TABLE agents ADD COLUMN {column} TEXT")
 
     # ------------------------------------------------------------------
     # Registration keys
@@ -282,13 +291,25 @@ class AgentStore:
             logger.info("Revoked agent %s", agent_id)
         return found
 
-    def record_heartbeat(self, agent_id: str) -> None:
-        """Update last_heartbeat_at for an agent."""
+    def record_heartbeat(self, agent_id: str, health: Optional[dict] = None) -> None:
+        """
+        Update last_heartbeat_at for an agent. If the agent sent a health report
+        (version, queue, counters, per-source state), store it as well.
+        """
+        now = _now().isoformat()
         with self._lock:
-            self._conn.execute(
-                "UPDATE agents SET last_heartbeat_at = ? WHERE agent_id = ?",
-                (_now().isoformat(), agent_id),
-            )
+            if health is None:
+                self._conn.execute(
+                    "UPDATE agents SET last_heartbeat_at = ? WHERE agent_id = ?",
+                    (now, agent_id),
+                )
+            else:
+                self._conn.execute(
+                    "UPDATE agents SET last_heartbeat_at = ?, agent_version = ?, "
+                    "health_json = ?, health_updated_at = ? WHERE agent_id = ?",
+                    (now, health.get("agent_version") or None,
+                     json.dumps(health, separators=(",", ":")), now, agent_id),
+                )
             self._conn.commit()
 
     def increment_events(self, agent_id: str) -> None:
@@ -309,6 +330,13 @@ class AgentStore:
 # ---------------------------------------------------------------------------
 
 def _row_to_agent(row: sqlite3.Row) -> Agent:
+    keys = row.keys()
+    health = None
+    if "health_json" in keys and row["health_json"]:
+        try:
+            health = json.loads(row["health_json"])
+        except ValueError:
+            health = None
     return Agent(
         agent_id=row["agent_id"],
         org_id=row["org_id"],
@@ -317,6 +345,9 @@ def _row_to_agent(row: sqlite3.Row) -> Agent:
         created_at=_dt(row["created_at"]),
         last_heartbeat_at=_dt(row["last_heartbeat_at"]),
         events_received=row["events_received"],
+        agent_version=row["agent_version"] if "agent_version" in keys else None,
+        health=health,
+        health_updated_at=_dt(row["health_updated_at"]) if "health_updated_at" in keys else None,
     )
 
 

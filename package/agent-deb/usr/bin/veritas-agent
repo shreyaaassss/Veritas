@@ -1,6 +1,7 @@
 #!/bin/bash
 # Veritas Agent CLI
 CONFIG=/etc/veritas-agent/config.yaml
+VERSION=$(cat /opt/veritas-agent/VERSION 2>/dev/null || echo unknown)
 
 case "$1" in
   start)
@@ -30,10 +31,10 @@ case "$1" in
     echo "Edit $CONFIG to enable TLS verification."
     ;;
 
-  version)  echo "Veritas Agent 1.0.0" ;;
+  version)  echo "Veritas Agent $VERSION" ;;
 
   *)
-    echo "Veritas Agent v1.0.0 — DPDPA telemetry forwarder"
+    echo "Veritas Agent v$VERSION — DPDPA telemetry forwarder"
     echo ""
     echo "Usage: veritas-agent <command>"
     echo ""

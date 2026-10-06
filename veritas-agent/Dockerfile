@@ -7,6 +7,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY agent.py .
 
+# Release version reported to the server (docker build --build-arg VERSION=1.0.18 ...)
+ARG VERSION=dev
+ENV VERITAS_AGENT_VERSION=$VERSION
+
 # Expected volume mounts at runtime:
 #   /app/agent-config.yaml  — agent config (read-only)
 #   /app/.veritas_state.json — persisted identity across restarts (writable)

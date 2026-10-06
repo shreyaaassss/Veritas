@@ -15,10 +15,10 @@ Agent-facing routes (require Agent Bearer token, NOT human auth):
 from __future__ import annotations
 
 import logging
-from typing import List, Optional
+from typing import Dict, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from agent_store.models import Agent, AgentStatus
 from agent_store.store import get_agent_store
@@ -27,6 +27,7 @@ from api.auth_deps import get_current_user, require_roles
 from config_loader import OrgConfigNotFoundError, load_org_config
 from rate_limit import issue_key_rate_limit, register_rate_limit
 from user_store.models import User, UserRole
+from user_store.store import get_user_store
 
 logger = logging.getLogger("api.agents")
 
@@ -51,6 +52,28 @@ def _require_org(org_id: str) -> None:
         )
 
 
+def _can_access_org(user: User, org_id: str) -> bool:
+    """SUPER_ADMIN reaches every org; everyone else only orgs they were granted."""
+    if user.role == UserRole.SUPER_ADMIN:
+        return True
+    return get_user_store().has_org_access(user.user_id, org_id)
+
+
+def _require_org_access(user: User, org_id: str) -> None:
+    if not _can_access_org(user, org_id):
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                f"You do not have access to organisation {org_id!r}. "
+                f"Ask an administrator to grant you access."
+            ),
+        )
+
+
+def _agent_visible_to(user: User, agent: Agent) -> bool:
+    return _can_access_org(user, agent.org_id)
+
+
 def _agent_to_dict(agent: Agent) -> dict:
     return {
         "agent_id": agent.agent_id,
@@ -60,6 +83,9 @@ def _agent_to_dict(agent: Agent) -> dict:
         "created_at": agent.created_at.isoformat(),
         "last_heartbeat_at": agent.last_heartbeat_at.isoformat() if agent.last_heartbeat_at else None,
         "events_received": agent.events_received,
+        "agent_version": agent.agent_version,
+        "health": agent.health,
+        "health_updated_at": agent.health_updated_at.isoformat() if agent.health_updated_at else None,
     }
 
 
@@ -90,8 +116,47 @@ class RegisterAgentResponse(BaseModel):
     server_version: str = "1.0.0"   # Phase 22 — agent can detect version mismatches
 
 
+class SourceHealth(BaseModel):
+    """State of one log source the agent is reading."""
+    type: str = Field(..., max_length=16)
+    target: str = Field("", max_length=300)          # file path or container name
+    source_system: str = Field("", max_length=200)
+    state: Literal["reading", "waiting", "error"] = "waiting"
+    detail: str = Field("", max_length=200)           # short reason when state is "error"
+    last_line_at: Optional[str] = Field(None, max_length=40)
+
+
+class AgentHealth(BaseModel):
+    """
+    Health report an agent attaches to its heartbeat. Everything is bounded: the
+    agent is untrusted input, and this is stored and shown to administrators.
+    Never contains event text.
+    """
+    agent_version: str = Field("", max_length=64)
+    uptime_seconds: int = Field(0, ge=0)
+    queue_depth: int = Field(0, ge=0)
+    queue_capacity: int = Field(0, ge=0)
+    counters: Dict[str, int] = Field(default_factory=dict)
+    sources: List[SourceHealth] = Field(default_factory=list)
+
+    @field_validator("counters")
+    @classmethod
+    def _bound_counters(cls, v: Dict[str, int]) -> Dict[str, int]:
+        if len(v) > 20 or any(len(k) > 40 for k in v):
+            raise ValueError("too many counters or counter name too long")
+        return v
+
+    @field_validator("sources")
+    @classmethod
+    def _bound_sources(cls, v: List[SourceHealth]) -> List[SourceHealth]:
+        if len(v) > 50:
+            raise ValueError("too many sources (max 50)")
+        return v
+
+
 class HeartbeatRequest(BaseModel):
     agent_id: str = Field(..., min_length=1)
+    health: Optional[AgentHealth] = None   # absent for agents older than v1.0.18
 
 
 # ---------------------------------------------------------------------------
@@ -110,6 +175,7 @@ async def issue_registration_key(
     Returns the plaintext key — show it once, then it's gone.
     """
     _require_org(req.org_id)
+    _require_org_access(_user, req.org_id)
 
     store = get_agent_store()
     key = store.issue_key(req.org_id)
@@ -128,7 +194,12 @@ async def list_agents(org_id: Optional[str] = None, _user: User = Depends(get_cu
     List all registered agents, optionally filtered by org_id.
     Called by the admin UI's Agents section.
     """
-    agents = get_agent_store().list_agents(org_id=org_id)
+    if org_id is not None:
+        _require_org_access(_user, org_id)
+        agents = get_agent_store().list_agents(org_id=org_id)
+    else:
+        # No filter: everything for SUPER_ADMIN, otherwise only the user's own orgs.
+        agents = [a for a in get_agent_store().list_agents() if _agent_visible_to(_user, a)]
     return {"agents": [_agent_to_dict(a) for a in agents]}
 
 
@@ -136,7 +207,7 @@ async def list_agents(org_id: Optional[str] = None, _user: User = Depends(get_cu
 async def get_agent(agent_id: str, _user: User = Depends(get_current_user)) -> dict:
     """Single agent detail by agent_id."""
     agent = get_agent_store().get_agent(agent_id)
-    if agent is None:
+    if agent is None or not _agent_visible_to(_user, agent):
         raise HTTPException(status_code=404, detail=f"Agent {agent_id!r} not found.")
     return _agent_to_dict(agent)
 
@@ -150,6 +221,9 @@ async def revoke_agent(
     Revoke an agent. Subsequent telemetry from this agent will be rejected
     with 403. The agent record is kept for audit purposes.
     """
+    target = get_agent_store().get_agent(agent_id)
+    if target is None or not _agent_visible_to(_user, target):
+        raise HTTPException(status_code=404, detail=f"Agent {agent_id!r} not found.")
     found = get_agent_store().revoke_agent(agent_id)
     if not found:
         raise HTTPException(status_code=404, detail=f"Agent {agent_id!r} not found.")
@@ -231,5 +305,8 @@ async def agent_heartbeat(
             detail="Token does not match the agent_id in the request.",
         )
 
-    get_agent_store().record_heartbeat(agent.agent_id)
+    get_agent_store().record_heartbeat(
+        agent.agent_id,
+        health=req.health.model_dump() if req.health is not None else None,
+    )
     return {"ok": True, "agent_id": agent.agent_id}

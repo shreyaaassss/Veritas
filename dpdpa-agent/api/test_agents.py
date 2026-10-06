@@ -356,3 +356,217 @@ class TestEventsEndpointAuth:
             json={"source_type": "log", "source_system": "x", "raw_snippet": "hello"},
         )
         assert r.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# Heartbeat health report (agent v1.0.18+)
+# ---------------------------------------------------------------------------
+
+HEALTH = {
+    "agent_version": "1.0.18",
+    "uptime_seconds": 3600,
+    "queue_depth": 12,
+    "queue_capacity": 1000,
+    "counters": {"lines_read": 500, "forwarded": 480, "retries": 3,
+                 "dropped_buffer_full": 0, "dropped_rejected": 2, "dropped_auth": 0, "dropped_other": 0},
+    "sources": [
+        {"type": "file", "target": "/var/log/app/orders.log", "source_system": "order-service",
+         "state": "reading", "detail": "", "last_line_at": "2026-10-06T10:00:00+00:00"},
+        {"type": "file", "target": "/var/log/app/secret.log", "source_system": "kyc-service",
+         "state": "error", "detail": "Permission denied", "last_line_at": None},
+    ],
+}
+
+
+class TestHeartbeatHealth:
+
+    def _beat(self, agent_id, token, body):
+        return client.post("/agent/heartbeat", json=body,
+                           headers={"Authorization": f"Bearer {token}"})
+
+    def test_health_report_is_stored_and_listed(self):
+        agent_id, token = _register_agent()
+        r = self._beat(agent_id, token, {"agent_id": agent_id, "health": HEALTH})
+        assert r.status_code == 200
+        agents = client.get("/agents?org_id=retail_co").json()["agents"]
+        a = next(x for x in agents if x["agent_id"] == agent_id)
+        assert a["agent_version"] == "1.0.18"
+        assert a["health"]["queue_depth"] == 12
+        assert a["health"]["counters"]["dropped_rejected"] == 2
+        assert [s["state"] for s in a["health"]["sources"]] == ["reading", "error"]
+        assert a["health_updated_at"] is not None
+
+    def test_old_agents_without_health_still_work(self):
+        agent_id, token = _register_agent()
+        r = self._beat(agent_id, token, {"agent_id": agent_id})
+        assert r.status_code == 200
+        a = client.get(f"/agents/{agent_id}").json()
+        assert a["health"] is None and a["agent_version"] is None
+        assert a["last_heartbeat_at"] is not None
+
+    def test_a_later_heartbeat_without_health_keeps_the_last_report(self):
+        agent_id, token = _register_agent()
+        self._beat(agent_id, token, {"agent_id": agent_id, "health": HEALTH})
+        self._beat(agent_id, token, {"agent_id": agent_id})
+        assert client.get(f"/agents/{agent_id}").json()["agent_version"] == "1.0.18"
+
+    def test_health_is_replaced_by_the_newest_report(self):
+        agent_id, token = _register_agent()
+        self._beat(agent_id, token, {"agent_id": agent_id, "health": HEALTH})
+        newer = {**HEALTH, "agent_version": "1.0.19", "queue_depth": 0}
+        self._beat(agent_id, token, {"agent_id": agent_id, "health": newer})
+        a = client.get(f"/agents/{agent_id}").json()
+        assert a["agent_version"] == "1.0.19" and a["health"]["queue_depth"] == 0
+
+    @pytest.mark.parametrize("bad", [
+        {"sources": [{"type": "file", "state": "reading"}] * 51},                       # too many sources
+        {"sources": [{"type": "file", "state": "exploding"}]},                           # unknown state
+        {"counters": {f"c{i}": 1 for i in range(21)}},                                    # too many counters
+        {"counters": {"x" * 41: 1}},                                                      # counter name too long
+        {"agent_version": "v" * 65},                                                      # version too long
+        {"queue_depth": -1},                                                              # negative number
+        {"sources": [{"type": "file", "detail": "d" * 201, "state": "error"}]},           # detail too long
+    ])
+    def test_oversized_or_invalid_reports_are_rejected(self, bad):
+        agent_id, token = _register_agent()
+        r = self._beat(agent_id, token, {"agent_id": agent_id, "health": {**HEALTH, **bad}})
+        assert r.status_code == 422
+
+    def test_revoked_agent_cannot_report(self):
+        agent_id, token = _register_agent()
+        client.post(f"/agents/{agent_id}/revoke")
+        r = self._beat(agent_id, token, {"agent_id": agent_id, "health": HEALTH})
+        assert r.status_code == 403
+        assert client.get(f"/agents/{agent_id}").json()["health"] is None
+
+
+def test_agent_store_migrates_a_database_created_before_health_columns(tmp_path):
+    import sqlite3
+    from agent_store.store import AgentStore
+
+    db = tmp_path / "old_agents.db"
+    conn = sqlite3.connect(db)
+    conn.executescript("""
+        CREATE TABLE agents (
+            agent_id TEXT PRIMARY KEY, org_id TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE,
+            status TEXT NOT NULL DEFAULT 'ACTIVE', source_label TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL, last_heartbeat_at TEXT, events_received INTEGER NOT NULL DEFAULT 0);
+        INSERT INTO agents (agent_id, org_id, token_hash, created_at, events_received)
+        VALUES ('VERITAS-AGENT-OLD', 'retail_co', 'h', '2026-01-01T00:00:00+00:00', 7);
+    """)
+    conn.commit()
+    conn.close()
+
+    store = AgentStore(db)
+    agent = store.get_agent("VERITAS-AGENT-OLD")
+    assert agent.events_received == 7 and agent.health is None and agent.agent_version is None
+    store.record_heartbeat("VERITAS-AGENT-OLD", health={"agent_version": "1.0.18", "queue_depth": 3})
+    again = store.get_agent("VERITAS-AGENT-OLD")
+    assert again.agent_version == "1.0.18" and again.health["queue_depth"] == 3
+    store.close()
+
+
+def test_health_report_built_by_the_real_agent_is_accepted_by_the_server(monkeypatch):
+    """Contract test: whatever veritas-agent/agent.py sends, the server's model must accept."""
+    import importlib.util
+    import queue
+    from pathlib import Path
+
+    agent_py = Path(__file__).resolve().parents[2] / "veritas-agent" / "agent.py"
+    spec = importlib.util.spec_from_file_location("veritas_agent_for_contract_test", agent_py)
+    agent_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(agent_mod)
+
+    monkeypatch.setenv("VERITAS_AGENT_VERSION", "1.0.18")
+    agent_mod.SOURCES.update("file", "/var/log/app/orders.log", source_system="order-service",
+                             state="reading", last_line_at=agent_mod._now_iso())
+    agent_mod.SOURCES.update("docker", "web", source_system="web", state="error", detail="log stream ended")
+    q: queue.Queue = queue.Queue(maxsize=agent_mod.BUFFER_MAX)
+    q.put(("x", "y"))
+    health = agent_mod.build_health(q)
+
+    agent_id, token = _register_agent()
+    r = client.post("/agent/heartbeat", json={"agent_id": agent_id, "health": health},
+                    headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 200, r.text
+    stored = client.get(f"/agents/{agent_id}").json()
+    assert stored["agent_version"] == "1.0.18"
+    assert stored["health"]["queue_depth"] == 1
+    assert {s["state"] for s in stored["health"]["sources"]} == {"reading", "error"}
+
+
+# ---------------------------------------------------------------------------
+# Tenant isolation of agent management (found while adding health reporting:
+# a user with no organisation could list every organisation's agents)
+# ---------------------------------------------------------------------------
+
+def _user_client(role: UserRole, orgs: tuple = (), name: str = "scoped") -> TestClient:
+    """A separate logged-in client for a user with the given role and org grants."""
+    from passlib.context import CryptContext
+    pw_hash = CryptContext(schemes=["bcrypt"], deprecated="auto").hash("testpass123!")
+    user = get_user_store().create_user(name, f"{name}@test.io", pw_hash, role)
+    for org in orgs:
+        get_user_store().grant_org_access(user.user_id, org)
+    c = TestClient(app)
+    r = c.post("/api/auth/login", data={"username": name, "password": "testpass123!"})
+    assert r.status_code == 200, r.text
+    return c
+
+
+class TestAgentManagementIsTenantScoped:
+
+    def _two_orgs_with_agents(self):
+        a_id, _ = _register_agent(org_id="retail_co", source_label="agent-a")
+        b_id, _ = _register_agent(org_id="edtech_co", source_label="agent-b")
+        return a_id, b_id
+
+    def test_user_with_no_orgs_sees_no_agents(self):
+        self._two_orgs_with_agents()
+        v = _user_client(UserRole.VIEWER, orgs=(), name="nobody")
+        assert v.get("/agents").json()["agents"] == []
+
+    def test_user_sees_only_their_own_orgs_agents(self):
+        a_id, b_id = self._two_orgs_with_agents()
+        v = _user_client(UserRole.VIEWER, orgs=("retail_co",), name="viewer_a")
+        ids = [a["agent_id"] for a in v.get("/agents").json()["agents"]]
+        assert ids == [a_id]
+
+    def test_explicit_filter_for_another_org_is_forbidden(self):
+        self._two_orgs_with_agents()
+        v = _user_client(UserRole.VIEWER, orgs=("retail_co",), name="viewer_a")
+        assert v.get("/agents?org_id=edtech_co").status_code == 403
+        assert v.get("/agents?org_id=retail_co").status_code == 200
+
+    def test_agent_detail_of_another_org_looks_like_not_found(self):
+        a_id, b_id = self._two_orgs_with_agents()
+        v = _user_client(UserRole.VIEWER, orgs=("retail_co",), name="viewer_a")
+        assert v.get(f"/agents/{a_id}").status_code == 200
+        assert v.get(f"/agents/{b_id}").status_code == 404
+
+    def test_org_admin_cannot_issue_keys_for_another_org(self):
+        self._two_orgs_with_agents()
+        ca = _user_client(UserRole.COMPLIANCE_ADMIN, orgs=("retail_co",), name="admin_a")
+        assert ca.post("/agents/issue-key", json={"org_id": "retail_co"}).status_code == 200
+        assert ca.post("/agents/issue-key", json={"org_id": "edtech_co"}).status_code == 403
+
+    def test_org_admin_cannot_revoke_another_orgs_agent(self):
+        a_id, b_id = self._two_orgs_with_agents()
+        ca = _user_client(UserRole.COMPLIANCE_ADMIN, orgs=("retail_co",), name="admin_a")
+        assert ca.post(f"/agents/{b_id}/revoke").status_code == 404
+        assert client.get(f"/agents/{b_id}").json()["status"] == "ACTIVE"
+        assert ca.post(f"/agents/{a_id}/revoke").status_code == 200
+
+    def test_super_admin_still_sees_everything(self):
+        a_id, b_id = self._two_orgs_with_agents()
+        ids = {a["agent_id"] for a in client.get("/agents").json()["agents"]}
+        assert {a_id, b_id} <= ids
+
+    def test_health_reports_are_not_visible_across_orgs(self):
+        a_id, b_id = self._two_orgs_with_agents()
+        _, token = _register_agent(org_id="edtech_co", source_label="agent-b2")
+        b2 = [a for a in client.get("/agents?org_id=edtech_co").json()["agents"] if a["source_label"] == "agent-b2"][0]["agent_id"]
+        client.post("/agent/heartbeat", json={"agent_id": b2, "health": HEALTH},
+                    headers={"Authorization": f"Bearer {token}"})
+        v = _user_client(UserRole.VIEWER, orgs=("retail_co",), name="viewer_a")
+        assert v.get(f"/agents/{b2}").status_code == 404
+        assert "/var/log/app/orders.log" not in v.get("/agents").text

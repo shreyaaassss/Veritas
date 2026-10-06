@@ -1964,6 +1964,10 @@
             <div class="label">Revoked</div>
             <div class="value" style="color:var(--high)" id="ag-revoked">0</div>
           </div>
+          <div class="stat-card">
+            <div class="label">Needs Attention</div>
+            <div class="value" style="color:var(--medium)" id="ag-attention">0</div>
+          </div>
         </div>
 
         <div class="section-header">
@@ -1982,6 +1986,8 @@
                   <th>Agent ID</th>
                   <th>Source</th>
                   <th>Status</th>
+                  <th>Version</th>
+                  <th>Health</th>
                   <th>Events</th>
                   <th>Last Heartbeat</th>
                   <th>Registered</th>
@@ -1990,7 +1996,7 @@
               </thead>
               <tbody id="agentsTbody">
                 <tr id="agentsEmptyRow">
-                  <td colspan="7" style="text-align:center;color:var(--text-muted);padding:2rem;">
+                  <td colspan="9" style="text-align:center;color:var(--text-muted);padding:2rem;">
                     No agents registered for this organisation.
                   </td>
                 </tr>
@@ -3153,33 +3159,99 @@ async function loadAgents() {
   }
 }
 
-function renderAgentsTable(agents) {
-  const tbody   = document.getElementById('agentsTbody');
-  const total   = document.getElementById('ag-total');
-  const active  = document.getElementById('ag-active');
-  const revoked = document.getElementById('ag-revoked');
+// Keep the Agents tab current while it is open (heartbeats and health change over time).
+setInterval(() => {
+  const page = document.getElementById('main-agents');
+  if (page && page.classList.contains('active') && !document.hidden) loadAgents();
+}, 15000);
 
-  const activeCount  = agents.filter(a => a.status === 'ACTIVE').length;
-  const revokedCount = agents.filter(a => a.status === 'REVOKED').length;
+// Heartbeats are sent every 30 s; treat anything older than 3 missed beats as stale.
+const AGENT_STALE_SECONDS = 90;
+
+function escapeAttr(s) {
+  return escapeHtml(String(s)).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function agentHealthSummary(a) {
+  // Returns { html, attention } for the Health column. Untrusted strings are escaped.
+  const h = a.health;
+  if (!h) {
+    return { html: '<span style="color:var(--text-subtle)" title="This agent does not report health (older than v1.0.18)">—</span>', attention: false };
+  }
+  const c = h.counters || {};
+  const dropped = (c.dropped_buffer_full || 0) + (c.dropped_rejected || 0) + (c.dropped_auth || 0) + (c.dropped_other || 0);
+  const sources = h.sources || [];
+  const errors = sources.filter(x => x.state === 'error');
+  const parts = [];
+  parts.push(`Queue ${Number(h.queue_depth) || 0}/${Number(h.queue_capacity) || 0}`);
+  if (dropped > 0) parts.push(`<span style="color:var(--high)">${dropped} dropped</span>`);
+  if (errors.length > 0) {
+    parts.push(`<span style="color:var(--high)">${errors.length} source error${errors.length > 1 ? 's' : ''}</span>`);
+  } else if (sources.length > 0) {
+    parts.push(`${sources.length} source${sources.length > 1 ? 's' : ''} OK`);
+  }
+  const tooltip = sources.map(x =>
+    `${x.type}: ${x.target} -> ${x.source_system || '?'} [${x.state}${x.detail ? ': ' + x.detail : ''}]`
+  ).concat([
+    `lines read ${c.lines_read || 0}, forwarded ${c.forwarded || 0}, retries ${c.retries || 0}`,
+    `dropped: buffer ${c.dropped_buffer_full || 0}, rejected ${c.dropped_rejected || 0}, auth ${c.dropped_auth || 0}, other ${c.dropped_other || 0}`,
+  ]).join('\n');
+  return {
+    html: `<span title="${escapeAttr(tooltip)}" style="font-size:0.8rem;">${parts.join(' · ')}</span>`,
+    attention: dropped > 0 || errors.length > 0,
+  };
+}
+
+function agentHeartbeatCell(a) {
+  if (!a.last_heartbeat_at) return { html: '<span style="color:var(--text-subtle)">never</span>', stale: false };
+  const when = new Date(a.last_heartbeat_at);
+  const ageSeconds = (Date.now() - when.getTime()) / 1000;
+  const stale = ageSeconds > AGENT_STALE_SECONDS;
+  const label = when.toLocaleTimeString();
+  return {
+    html: stale
+      ? `<span style="color:var(--high)" title="No heartbeat for ${Math.round(ageSeconds)}s">${escapeHtml(label)} · stale</span>`
+      : `${escapeHtml(label)}`,
+    stale,
+  };
+}
+
+function renderAgentsTable(agents) {
+  const tbody     = document.getElementById('agentsTbody');
+  const total     = document.getElementById('ag-total');
+  const active    = document.getElementById('ag-active');
+  const revoked   = document.getElementById('ag-revoked');
+  const attention = document.getElementById('ag-attention');
+
+  const activeAgents = agents.filter(a => a.status === 'ACTIVE');
   total.textContent   = agents.length;
-  active.textContent  = activeCount;
-  revoked.textContent = revokedCount;
+  active.textContent  = activeAgents.length;
+  revoked.textContent = agents.filter(a => a.status === 'REVOKED').length;
 
   if (agents.length === 0) {
-    tbody.innerHTML = `<tr id="agentsEmptyRow"><td colspan="7" style="text-align:center;color:var(--text-muted);padding:2rem;">No agents registered for this organisation.</td></tr>`;
+    attention.textContent = 0;
+    tbody.innerHTML = `<tr id="agentsEmptyRow"><td colspan="9" style="text-align:center;color:var(--text-muted);padding:2rem;">No agents registered for this organisation.</td></tr>`;
     return;
   }
 
+  let needAttention = 0;
   tbody.innerHTML = agents.map(a => {
-    const hb      = a.last_heartbeat_at ? new Date(a.last_heartbeat_at).toLocaleTimeString() : '<span style="color:var(--text-subtle)">—</span>';
+    const hb      = agentHeartbeatCell(a);
+    const health  = agentHealthSummary(a);
+    if (a.status === 'ACTIVE' && (hb.stale || health.attention)) needAttention += 1;
     const created = new Date(a.created_at).toLocaleDateString();
     const canRevoke = a.status === 'ACTIVE';
+    const version = a.agent_version
+      ? `<span class="mono" style="font-size:0.8rem;">${escapeHtml(a.agent_version)}</span>`
+      : '<span style="color:var(--text-subtle)">—</span>';
     return `<tr>
       <td class="mono" style="font-size:0.8rem;">${escapeHtml(a.agent_id)}</td>
       <td><span class="badge system">${escapeHtml(a.source_label || 'unlabelled')}</span></td>
       <td><span class="status-badge ${escapeHtml(a.status)}">${escapeHtml(a.status)}</span></td>
+      <td>${version}</td>
+      <td>${health.html}</td>
       <td>${a.events_received}</td>
-      <td>${hb}</td>
+      <td>${hb.html}</td>
       <td>${created}</td>
       <td>${canRevoke
         ? `<button class="btn btn-danger" style="font-size:0.75rem;padding:0.2rem 0.6rem;" onclick="revokeAgent('${escapeHtml(a.agent_id)}')">Revoke</button>`
@@ -3187,6 +3259,7 @@ function renderAgentsTable(agents) {
       }</td>
     </tr>`;
   }).join('');
+  attention.textContent = needAttention;
 }
 
 function openIssueKeyModal() {

@@ -373,6 +373,8 @@ sudo veritas-agent logs        # expect "Registered as VERITAS-AGENT-..." and "T
 
 The agent appears in the Veritas dashboard under **Agents** within seconds.
 
+The **Agents** tab also shows each agent's health, reported with every heartbeat (every 30 seconds): its version, the queue of lines waiting to be sent, lines dropped, and the state of each log source (reading, waiting for the file, or an error such as "Permission denied"). An agent with no heartbeat for 90 seconds is marked stale, and agents that are stale, dropping lines or have a source in error are counted under **Needs Attention**. Hover over the health text for details.
+
 ### How the agent works on Linux
 
 - **Identity:** after registering, the agent keeps its permanent identity (agent ID and token) in `/var/lib/veritas-agent/` (owner-only). The one-time key is not needed again. If you delete that folder the agent needs a new key.
