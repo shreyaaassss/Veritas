@@ -1358,7 +1358,7 @@
       align-items: center;
     }
 
-    .form-row.fields-row { grid-template-columns: repeat(6, 1fr) 26px; }
+    .form-row.fields-row { grid-template-columns: repeat(6, 1fr) 128px 26px; }
     .form-row.identifiers-row { grid-template-columns: 1fr 1.4fr 125px 26px; }
     .form-row.linkage-row { grid-template-columns: 2fr 1fr 26px; }
 
@@ -1809,7 +1809,7 @@
           <h2>Compliance Policy</h2>
           <div style="display:flex;gap:8px;">
             <button class="btn btn-secondary" onclick="loadPolicy()" style="font-size:0.78rem;">Refresh</button>
-            <button class="btn btn-primary" onclick="openAddOrgModal()" style="font-size:0.78rem;" data-require-role="SUPER_ADMIN,COMPLIANCE_ADMIN">Edit Policy</button>
+            <button class="btn btn-primary" onclick="openEditPolicyModal()" style="font-size:0.78rem;" data-require-role="SUPER_ADMIN,COMPLIANCE_ADMIN">Edit Policy</button>
           </div>
         </div>
 
@@ -1832,6 +1832,7 @@
                   <th>Consent Scope</th>
                   <th>Retention (days)</th>
                   <th>Source System</th>
+                  <th title="The retention clock for this field starts on this date">Data Since</th>
                 </tr>
               </thead>
               <tbody id="policyFieldsTbody">
@@ -2251,6 +2252,7 @@
       <h4>Fields <span style="color:var(--high)">*</span> (>=1 required)</h4>
       <span class="hint">PII declaration, purpose, and retention window</span>
     </div>
+    <div class="modal-sub" style="margin-bottom:8px;"><b>Data since</b> (optional): the date you started holding this data. Retention is counted from it, so data you already hold can be flagged as overdue straight away. Leave empty to count from the day this policy is uploaded.</div>
     <div id="orgFieldsRows"></div>
     <button type="button" class="form-add-row" onclick="addFieldRow()">+ Add Field</button>
   </div>
@@ -2855,7 +2857,9 @@ async function askInvestigation(presetQuestion) {
 function openAddOrgModal() {
   document.getElementById('addOrgErrors').style.display = 'none';
   document.getElementById('addOrgErrors').innerHTML = '';
-  document.getElementById('newOrgId').value = '';
+  const idInput = document.getElementById('newOrgId');
+  idInput.value = '';
+  idInput.readOnly = false;
   document.getElementById('orgFieldsRows').innerHTML = '';
   document.getElementById('orgIdentifiersRows').innerHTML = '';
   document.getElementById('orgLinkageRows').innerHTML = '';
@@ -2864,12 +2868,34 @@ function openAddOrgModal() {
   document.getElementById('addOrgModal').classList.add('open');
 }
 
+// Edit Policy: open the form filled with the organization's current policy, so saving
+// creates a new version of it instead of replacing it with a blank one.
+async function openEditPolicyModal() {
+  if (!currentOrgId) { openAddOrgModal(); return; }
+  let config = null;
+  try {
+    const r = await fetch(`/v1/orgs/${encodeURIComponent(currentOrgId)}/config`, { credentials: 'include' });
+    if (r.ok) { const d = await r.json(); config = d.config || d; }
+  } catch (e) { /* fall through */ }
+  if (!config) { showToast('Could not load the current policy.', 'error'); return; }
+  openAddOrgModal();
+  const idInput = document.getElementById('newOrgId');
+  idInput.value = currentOrgId;
+  idInput.readOnly = true;
+  document.getElementById('orgFieldsRows').innerHTML = '';
+  (config.fields || []).forEach(f => addFieldRow(f));
+  if (!(config.fields || []).length) addFieldRow();
+  (config.identifiers || []).forEach(i => addIdentifierRow(i));
+  (config.linkage_rules || []).forEach(l => addLinkageRow(l));
+}
+
 function closeAddOrgModal() {
   document.getElementById('addOrgOverlay').classList.remove('open');
   document.getElementById('addOrgModal').classList.remove('open');
 }
 
-function addFieldRow() {
+function addFieldRow(p) {
+  p = p || {};
   const row = document.createElement('div');
   row.className = 'form-row fields-row';
   row.innerHTML = `
@@ -2879,12 +2905,20 @@ function addFieldRow() {
     <input class="f-consent_scope" placeholder="consent_scope" />
     <input class="f-retention_days" type="number" min="1" placeholder="retention_days" />
     <input class="f-source_system" placeholder="source_system" />
+    <input class="f-data_since" type="date" title="Data since (optional): retention is counted from this date" />
     <button type="button" class="row-remove" onclick="this.parentElement.remove()" title="Remove">✕</button>
   `;
+  // set values through the DOM (never through HTML) so policy text cannot inject markup
+  const set = (cls, v) => { if (v !== undefined && v !== null) row.querySelector(cls).value = v; };
+  set('.f-field_name', p.field_name); set('.f-pii_category', p.pii_category);
+  set('.f-declared_purpose', p.declared_purpose); set('.f-consent_scope', p.consent_scope);
+  set('.f-retention_days', p.retention_days); set('.f-source_system', p.source_system);
+  if (p.data_since) set('.f-data_since', String(p.data_since).slice(0, 10));
   document.getElementById('orgFieldsRows').appendChild(row);
 }
 
-function addIdentifierRow() {
+function addIdentifierRow(p) {
+  p = p || {};
   const row = document.createElement('div');
   row.className = 'form-row identifiers-row';
   row.innerHTML = `
@@ -2897,10 +2931,14 @@ function addIdentifierRow() {
     </select>
     <button type="button" class="row-remove" onclick="this.parentElement.remove()" title="Remove">✕</button>
   `;
+  row.querySelector('.i-name').value = p.name || '';
+  row.querySelector('.i-pattern').value = p.pattern || '';
+  if (p.validator) row.querySelector('.i-validator').value = p.validator;
   document.getElementById('orgIdentifiersRows').appendChild(row);
 }
 
-function addLinkageRow() {
+function addLinkageRow(p) {
+  p = p || {};
   const row = document.createElement('div');
   row.className = 'form-row linkage-row';
   row.innerHTML = `
@@ -2908,20 +2946,27 @@ function addLinkageRow() {
     <input class="l-risk" placeholder="risk label" value="LINKAGE_RISK" />
     <button type="button" class="row-remove" onclick="this.parentElement.remove()" title="Remove">✕</button>
   `;
+  if (p.fields) row.querySelector('.l-fields').value = p.fields.join(', ');
+  if (p.risk) row.querySelector('.l-risk').value = p.risk;
   document.getElementById('orgLinkageRows').appendChild(row);
 }
 
 function buildOrgConfigFromForm() {
   const org_id = document.getElementById('newOrgId').value.trim();
 
-  const fields = [...document.querySelectorAll('#orgFieldsRows .fields-row')].map(row => ({
-    field_name: row.querySelector('.f-field_name').value.trim(),
-    pii_category: row.querySelector('.f-pii_category').value.trim(),
-    declared_purpose: row.querySelector('.f-declared_purpose').value.trim(),
-    consent_scope: row.querySelector('.f-consent_scope').value.trim(),
-    retention_days: parseInt(row.querySelector('.f-retention_days').value, 10),
-    source_system: row.querySelector('.f-source_system').value.trim(),
-  }));
+  const fields = [...document.querySelectorAll('#orgFieldsRows .fields-row')].map(row => {
+    const f = {
+      field_name: row.querySelector('.f-field_name').value.trim(),
+      pii_category: row.querySelector('.f-pii_category').value.trim(),
+      declared_purpose: row.querySelector('.f-declared_purpose').value.trim(),
+      consent_scope: row.querySelector('.f-consent_scope').value.trim(),
+      retention_days: parseInt(row.querySelector('.f-retention_days').value, 10),
+      source_system: row.querySelector('.f-source_system').value.trim(),
+    };
+    const since = row.querySelector('.f-data_since').value;   // YYYY-MM-DD or ''
+    if (since) f.data_since = since;                          // omitted when empty: upload date is used
+    return f;
+  });
 
   const identifiers = [...document.querySelectorAll('#orgIdentifiersRows .identifiers-row')]
     .map(row => ({
@@ -2961,6 +3006,9 @@ function validateOrgFormClientSide(config) {
     if (!Number.isInteger(f.retention_days) || f.retention_days <= 0) {
       errors.push(`Field #${n}: retention_days must be a positive whole number.`);
     }
+    if (f.data_since && f.data_since > new Date().toISOString().slice(0, 10)) {
+      errors.push(`Field #${n}: "data since" cannot be in the future.`);
+    }
   });
   config.identifiers.forEach((ident, i) => {
     const n = i + 1;
@@ -2979,7 +3027,7 @@ function validateOrgFormClientSide(config) {
 
 function showAddOrgErrors(messages) {
   const box = document.getElementById('addOrgErrors');
-  box.innerHTML = messages.map(m => `<div>• ${m}</div>`).join('');
+  box.innerHTML = messages.map(m => `<div>• ${escapeHtml(String(m))}</div>`).join('');
   box.style.display = 'block';
 }
 
@@ -3008,9 +3056,11 @@ async function submitNewOrg() {
     if (r.ok && data.status === 'ok') {
       closeAddOrgModal();
       dismissWelcomeOverlay();
-      showToast(`Organization "${config.org_id}" created`, 'success');
+      const editing = document.getElementById('newOrgId').readOnly;
+      showToast(editing ? `Policy for "${config.org_id}" updated (new version)` : `Organization "${config.org_id}" created`, 'success');
       activateOrg(config.org_id);
       await populateOrgSelector();
+      if (editing) loadPolicy();
     } else {
       showAddOrgErrors(data.errors && data.errors.length ? data.errors : ['Unknown error creating organization.']);
     }
@@ -3925,7 +3975,7 @@ async function loadPolicyVersion() {
     const tbody = document.getElementById('policyFieldsTbody');
     const fields = config.fields || [];
     if (fields.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:2rem;">No fields declared yet.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:2rem;">No fields declared yet.</td></tr>`;
     } else {
       tbody.innerHTML = fields.map(f => `<tr>
         <td class="mono" style="font-size:0.8rem;">${escapeHtml(f.field_name||'')}</td>
@@ -3934,6 +3984,7 @@ async function loadPolicyVersion() {
         <td style="font-size:0.78rem;color:var(--text-muted);">${escapeHtml(f.consent_scope||'')}</td>
         <td style="font-size:0.8rem;text-align:center;">${f.retention_days||'—'}</td>
         <td><span class="badge rule" style="font-size:0.7rem;">${escapeHtml(f.source_system||'')}</span></td>
+        <td style="font-size:0.78rem;color:var(--text-muted);" title="${f.data_since ? 'Retention is counted from this date' : 'Not declared: retention is counted from when this policy was first uploaded'}">${f.data_since ? escapeHtml(String(f.data_since).slice(0,10)) : 'upload date'}</td>
       </tr>`).join('');
     }
 

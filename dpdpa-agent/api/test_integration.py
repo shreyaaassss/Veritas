@@ -207,6 +207,44 @@ class TestOrgConfigUpload:
             from registry.loader import _reset_cache
             _reset_cache()
 
+    def test_data_since_is_stored_returned_and_starts_the_retention_clock(self):
+        """A date typed in the policy form comes back unchanged and makes old data overdue."""
+        from datetime import date, timedelta
+        old = (date.today() - timedelta(days=400)).isoformat()
+        config = {
+            "org_id": "since_test_org",
+            "fields": [
+                {"field_name": "old_phone", "pii_category": "phone", "declared_purpose": "support",
+                 "consent_scope": "support", "retention_days": 90, "source_system": "helpdesk",
+                 "data_since": old},
+                {"field_name": "new_phone", "pii_category": "phone", "declared_purpose": "support",
+                 "consent_scope": "support", "retention_days": 90, "source_system": "helpdesk"},
+            ],
+        }
+        try:
+            r = client.post("/v1/orgs/since_test_org/config", json=config)
+            assert r.json()["status"] == "ok", r.text
+
+            got = client.get("/v1/orgs/since_test_org/config").json()
+            got = got.get("config", got)
+            by_name = {f["field_name"]: f for f in got["fields"]}
+            assert str(by_name["old_phone"]["data_since"]).startswith(old)
+            assert not by_name["new_phone"].get("data_since")
+
+            def retention_rules(field):
+                resp = client.post("/v1/since_test_org/scan",
+                                   json={"fields": {field: "9876543210"}, "source_system": "helpdesk"})
+                assert resp.status_code == 200, resp.text
+                return {v["rule_id"] for v in resp.json()["verdicts"]}
+
+            assert "RETENTION_001" in retention_rules("old_phone")        # 400 days old > 90 days
+            assert "RETENTION_001" not in retention_rules("new_phone")    # clock starts at upload
+        finally:
+            from org_config.store import delete_org_configs
+            delete_org_configs("since_test_org")
+            from registry.loader import _reset_cache
+            _reset_cache()
+
     def test_invalid_config_rejected_with_errors(self):
         r = client.post("/v1/orgs/broken_api_test_org/config", json={"org_id": "broken_api_test_org"})
         assert r.status_code == 200  # per org_config.store's contract: never raises, returns error dict
