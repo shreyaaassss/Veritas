@@ -180,11 +180,71 @@ jobs:
         with:
           files: dist/veritas-agent_*.deb
 
+  # ── Agent container image (GitHub Container Registry) ─────────────────
+  build-agent-image:
+    name: Agent container image (ghcr.io, amd64 + arm64)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Work out the image name and version
+        run: |
+          echo "VER=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          # registry names must be lower case
+          echo "IMAGE=ghcr.io/$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')/veritas-agent" >> "$GITHUB_ENV"
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: veritas-agent
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: VERSION=${{ env.VER }}
+          tags: |
+            ${{ env.IMAGE }}:${{ env.VER }}
+            ${{ env.IMAGE }}:latest
+
+  # ── Kubernetes manifests with the image pinned to this release ───────
+  publish-k8s-manifests:
+    name: Kubernetes manifests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Render the manifests with the release image
+        run: |
+          VER=${GITHUB_REF_NAME#v}
+          OWNER=$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')
+          cd veritas-agent/k8s
+          kubectl kustomize . | sed "s#ghcr.io/[A-Za-z0-9_.-]*/veritas-agent:latest#ghcr.io/${OWNER}/veritas-agent:${VER}#" \
+            > ../../veritas-agent-k8s_${VER}.yaml
+          grep -q "veritas-agent:${VER}" ../../veritas-agent-k8s_${VER}.yaml
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: veritas-agent-k8s_*.yaml
+
   # ── Release notes ─────────────────────────────────────────────────────
   publish-release-notes:
     name: Publish release notes with install instructions
     runs-on: ubuntu-latest
-    needs: [build-linux-deb, build-macos-pkg, build-windows-exe, build-agent-deb]
+    needs: [build-linux-deb, build-macos-pkg, build-windows-exe, build-agent-deb, build-agent-image, publish-k8s-manifests]
     permissions:
       contents: write
     steps:
@@ -227,7 +287,7 @@ jobs:
             1. `sudo veritas fingerprint` — send the output to your Veritas contact
             2. `sudo veritas license /path/to/veritas.vlic` — install license
             3. `sudo veritas start` — start the server
-            4. Open http://localhost:8000/setup — create admin account
+            4. Open https://localhost:8000/setup — create admin account (self-signed certificate)
 
             CLI: `veritas {start|stop|restart|status|logs|fingerprint|license|check}`
 
@@ -237,11 +297,16 @@ jobs:
             wget https://github.com/shreyaaassss/Veritas/releases/download/${{ github.ref_name }}/veritas-agent_${{ env.VER }}_all.deb
             sudo dpkg -i veritas-agent_${{ env.VER }}_all.deb
             sudo veritas-agent fetch-cert https://your-veritas-server:8000
-            sudo nano /etc/veritas-agent/config.yaml   # set server_url, org_id, registration_key
+            sudo nano /etc/veritas-agent/config.yaml   # set veritas_address, registration_key and the sources to read
             sudo veritas-agent start
             ```
 
-            Get a registration key from the Veritas dashboard → **Agents** tab → **Issue Key**.
+            Get a registration key from the Veritas dashboard → **Agents** tab → **Issue Registration Key**.
+
+            ### Kubernetes (one agent per node, no change to your applications)
+
+            Image: `ghcr.io/shreyaaassss/veritas-agent:${{ env.VER }}` · Manifests: `veritas-agent-k8s_${{ env.VER }}.yaml` (attached below).
+            See `veritas-agent/k8s/README.md` for the steps: create a **reusable** key in the dashboard (Agents → Issue Registration Key → *Many agents*), store it as a Secret, set the server address and the naming rules in the ConfigMap, then apply.
 
             ### Requirements
 

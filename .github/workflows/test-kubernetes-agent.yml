@@ -1,0 +1,193 @@
+name: Test Kubernetes Agent
+
+# Runs the agent DaemonSet from veritas-agent/k8s on a real two-node Kubernetes (kind)
+# cluster, next to a Veritas server run from source, and checks the claims of the
+# Kubernetes design: one reusable key enrols every node's agent, pod logs on each node
+# reach Veritas under the right system name, pods without a rule stay out, a log line
+# split by the container runtime is joined, and a restarted agent keeps its identity.
+
+on:
+  push:
+    tags: ['v*']
+    branches: [main]
+    paths:
+      - 'veritas-agent/**'
+      - 'dpdpa-agent/api/agents.py'
+      - 'dpdpa-agent/agent_store/**'
+      - 'dpdpa-agent/rate_limit.py'
+      - '.github/k8s-test/**'
+      - '.github/scripts/agent_e2e.py'
+      - '.github/scripts/agent_ci_lib.sh'
+      - '.github/workflows/test-kubernetes-agent.yml'
+  workflow_dispatch:
+
+jobs:
+  kind:
+    name: DaemonSet on a two-node kind cluster
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    env:
+      VERITAS_URL: https://localhost:8000
+      VERITAS_ORG: ci_org
+      VERITAS_ADMIN_USER: ci_admin
+      VERITAS_ADMIN_PASSWORD: CiAdmin#12345
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: dpdpa-agent/requirements.txt
+
+      - name: Create the two-node cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: veritas
+          config: .github/k8s-test/kind-2node.yaml
+
+      - name: Work out the address pods use to reach the server on this machine
+        run: |
+          GW=$(docker network inspect kind -f '{{range .IPAM.Config}}{{println .Gateway}}{{end}}' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+          test -n "$GW" || { echo "could not find the kind network gateway"; docker network inspect kind; exit 1; }
+          echo "pods reach this machine at $GW"
+          echo "GW=$GW" >> "$GITHUB_ENV"
+          kubectl get nodes -o wide
+
+      # ── The Veritas server, run from source ──────────────────────────────
+      - name: Install server dependencies
+        working-directory: dpdpa-agent
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl
+
+      - name: Create an any-machine test license
+        env:
+          VERITAS_PRIVATE_KEY_B64: ${{ secrets.VERITAS_PRIVATE_KEY_B64 }}
+        run: |
+          test -n "$VERITAS_PRIVATE_KEY_B64" || { echo "VERITAS_PRIVATE_KEY_B64 secret is not set"; exit 1; }
+          mkdir -p /tmp/vdata
+          echo "$VERITAS_PRIVATE_KEY_B64" | base64 -d > /tmp/ci_private_key.pem
+          chmod 600 /tmp/ci_private_key.pem
+          python tools/generate_license.py --org ci-k8s-test --tier enterprise \
+            --expiry 2027-12-31 --key /tmp/ci_private_key.pem --out /tmp/vdata/veritas.vlic
+          rm -f /tmp/ci_private_key.pem
+
+      - name: Start the server (its certificate also covers the pods' address) and create the organization
+        env:
+          VERITAS_TLS_SANS: ${{ env.GW }}
+        run: |
+          source .github/scripts/agent_ci_lib.sh
+          start_server
+          wait_server
+          $E2E setup
+
+      # ── The agent image and the DaemonSet ────────────────────────────────
+      - name: Build the agent image and load it into the cluster
+        run: |
+          docker build -t veritas-agent:ci --build-arg VERSION=0.0.0-ci veritas-agent
+          kind load docker-image veritas-agent:ci --name veritas
+
+      - name: Issue a reusable key and deploy the DaemonSet
+        run: |
+          source .github/scripts/agent_ci_lib.sh
+          KEY=$($E2E issue-key --max-uses 5 --label k8s-ci --expires 3600)
+          echo "$KEY" > /tmp/ci_k8s_key
+          kubectl apply -f veritas-agent/k8s/namespace.yaml
+          kubectl -n veritas-agent create secret generic veritas-agent-key --from-literal=registration_key="$KEY"
+          sed "s/__SERVER__/${GW}/" .github/k8s-test/agent-configmap.yaml | kubectl apply -f -
+          sed 's#ghcr.io/shreyas[a-z]*/veritas-agent:latest#veritas-agent:ci#' veritas-agent/k8s/agent-daemonset.yaml | kubectl apply -f -
+          kubectl -n veritas-agent rollout status ds/veritas-agent --timeout=240s
+          test "$(kubectl -n veritas-agent get ds veritas-agent -o jsonpath='{.status.numberReady}')" = "2"
+
+      - name: One reusable key enrols the agent on every node
+        run: |
+          source .github/scripts/agent_ci_lib.sh
+          $E2E wait-agents --prefix k8s- --count 2 --version 0.0.0-ci --timeout 240 | tee /tmp/ci_agents_before
+          $E2E keys > /tmp/ci_keys.json
+          python - <<'PY'
+          import json
+          k = [x for x in json.load(open("/tmp/ci_keys.json")) if x["label"] == "k8s-ci"][0]
+          print("key:", k["uses"], "of", k["max_uses"], "uses,", k["status"])
+          assert k["uses"] == 2 and k["max_uses"] == 5 and k["status"] == "ACTIVE", k
+          PY
+          set_baseline
+
+      # ── Pod logs reach Veritas ───────────────────────────────────────────
+      - name: Pod logs on every node become violations under the rule's system name
+        run: |
+          source .github/scripts/agent_ci_lib.sh
+          kubectl apply -f .github/k8s-test/workloads.yaml
+          kubectl -n shop rollout status ds/order-gen --timeout=180s
+          # 5 Aadhaar lines per node (order-gen) + 1 long, runtime-split phone line per node
+          # (order-big) = 12. cart-gen pods have no rule: nothing from them may arrive.
+          $E2E violations --min 12 --source-system order-service --timeout 240
+          sleep 15
+          TOTAL=$($E2E count)
+          MAPPED=$($E2E count --source-system order-service)
+          echo "violations: total=$TOTAL order-service=$MAPPED (expected 12 and 12)"
+          [ "$TOTAL" = "12" ] || { echo "unexpected number of violations"; exit 1; }
+          [ "$MAPPED" = "12" ] || { echo "violations arrived under the wrong system name"; exit 1; }
+
+      - name: Pods without a rule are reported as ignored and never forwarded
+        run: |
+          source .github/scripts/agent_ci_lib.sh
+          $E2E wait-agents --prefix k8s- --count 2 --source "containers/*.log=reading:ignored" --timeout 120
+          for pod in $(kubectl -n veritas-agent get pods -o name); do
+            kubectl -n veritas-agent logs "$pod" | grep -q "match no rule" \
+              || { echo "no 'ignored' warning in the logs of $pod"; exit 1; }
+          done
+
+      # ── Key revocation, pod restarts and the identity kept on the node ───
+      - name: Revoking the key blocks new agents; existing agents are unaffected
+        run: |
+          source .github/scripts/agent_ci_lib.sh
+          KEY=$(cat /tmp/ci_k8s_key)
+          $E2E revoke-key --label k8s-ci
+          CODE=$(curl -sk -o /tmp/reg.out -w '%{http_code}' -X POST "$VERITAS_URL/agent/register" \
+            -H 'Content-Type: application/json' -d "{\"registration_key\":\"$KEY\",\"source_label\":\"late-node\"}")
+          cat /tmp/reg.out; echo
+          [ "$CODE" = "400" ] || { echo "expected 400 for a revoked key, got $CODE"; exit 1; }
+          grep -q "revoked" /tmp/reg.out || { echo "no 'revoked' reason in the answer"; exit 1; }
+          $E2E wait-agents --prefix k8s- --count 2 --timeout 90
+
+      - name: Restarted agents keep their identity (the key is no longer needed)
+        run: |
+          source .github/scripts/agent_ci_lib.sh
+          kubectl -n veritas-agent delete pod -l app.kubernetes.io/name=veritas-agent --wait=true
+          kubectl -n veritas-agent rollout status ds/veritas-agent --timeout=240s
+          $E2E wait-agents --prefix k8s- --count 2 --version 0.0.0-ci --timeout 240 | tee /tmp/ci_agents_after
+          echo "before: $(cat /tmp/ci_agents_before)"; echo "after:  $(cat /tmp/ci_agents_after)"
+          [ "$(cat /tmp/ci_agents_before)" = "$(cat /tmp/ci_agents_after)" ] \
+            || { echo "agents registered again after a restart"; exit 1; }
+          $E2E keys > /tmp/ci_keys.json
+          python - <<'PY'
+          import json
+          k = [x for x in json.load(open("/tmp/ci_keys.json")) if x["label"] == "k8s-ci"][0]
+          assert k["uses"] == 2, f"the key was used again after the restart: {k}"
+          print("key still at", k["uses"], "uses")
+          PY
+          for pod in $(kubectl -n veritas-agent get pods -o name); do
+            kubectl -n veritas-agent logs "$pod" | grep -q "Using existing identity" \
+              || { echo "$pod did not reuse its saved identity"; exit 1; }
+          done
+
+      - name: Evidence chain is intact
+        run: |
+          source .github/scripts/agent_ci_lib.sh
+          $E2E verify-chain
+
+      - name: Collect diagnostics on failure
+        if: failure()
+        run: |
+          kubectl get nodes,pods -A -o wide || true
+          kubectl -n veritas-agent describe pods || true
+          kubectl -n veritas-agent logs -l app.kubernetes.io/name=veritas-agent --all-containers --tail=150 --prefix || true
+          echo "=== server log ==="; tail -80 /tmp/server.log || true
+          echo "=== agents ==="; python .github/scripts/agent_e2e.py agents || true
+
+      - name: Remove secrets
+        if: always()
+        run: rm -f /tmp/ci_private_key.pem /tmp/vdata/veritas.vlic /tmp/ci_k8s_key

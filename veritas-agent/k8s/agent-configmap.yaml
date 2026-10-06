@@ -1,55 +1,37 @@
-# Veritas Agent — Configuration ConfigMap
-# =========================================
-# Contains agent-config.yaml as a ConfigMap so the Agent container can
-# mount it at /app/agent-config.yaml.
+# Agent configuration for the DaemonSet (one agent per node).
 #
-# Edit the values below before applying:
-#   veritas_address — IP or hostname of your Veritas Runtime server
-#   source_label    — human label shown in the Agents tab of the dashboard
-#   sources         — which log files or containers to tail
+# Edit before applying:
+#   veritas_address  where the Veritas server can be reached from the cluster
+#   rules            which pods' logs to send, and the source_system each one belongs to.
+#                    source_system must match a system declared in the organisation's
+#                    policy in Veritas. Logs of pods that match no rule are ignored.
 #
-# Apply: kubectl apply -f agent-configmap.yaml
-
+# ${NAME} is filled in from the pod's environment: the key comes from the Secret and
+# NODE_NAME from the node, so nothing secret lives in this file.
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: veritas-agent-config
-  namespace: default
+  namespace: veritas-agent
   labels:
-    app: veritas-agent
-    component: config
+    app.kubernetes.io/name: veritas-agent
 data:
   agent-config.yaml: |
-    # Veritas Agent Configuration
-    # ============================
-    # The registration_key is injected from the Secret at runtime.
-    # Do not paste the key here — it lives in agent-secret.yaml.
-
-    # Address of the Veritas Runtime (change to your server's IP or hostname)
-    veritas_address: http://192.168.1.50:8000
-
-    # The registration_key is mounted from the Secret via an environment
-    # variable and written here by the entrypoint. Leave as-is.
+    veritas_address: https://veritas.example.internal:8000
     registration_key: "${VERITAS_REGISTRATION_KEY}"
+    source_label: "k8s-${NODE_NAME}"
 
-    # Human label shown in the Agents tab of the Veritas dashboard
-    source_label: k8s-production
-
-    # Log sources to tail. Add one entry per log file or container.
-    # source_system must match the value declared in your org's Veritas config.
     sources:
-      # Example: tail a log file on the host (requires hostPath volume mount)
-      - type: file
-        path: /var/log/order-service/app.log
-        source_system: order-service
-
-      # Example: tail a Kubernetes container's stdout/stderr
-      # Requires the Docker socket to be mounted (see agent-deployment.yaml)
-      - type: docker
-        container: marketing-service
-        source_system: marketing-analytics
-
-      # Add more sources as needed:
-      # - type: file
-      #   path: /var/log/support-ticketing/app.log
-      #   source_system: support-ticketing
+      # Container logs written by the container runtime on this node.
+      - type: kubernetes_logs
+        path: /var/log/containers/*.log
+        format: auto                    # understands containerd/CRI-O and Docker json-file lines
+        rules:
+          # all keys in "match" must match (shell wildcards); the first matching rule wins
+          - match: {namespace: shop, pod: "order-*"}
+            source_system: order-service
+          - match: {namespace: shop, container: "payments*"}
+            source_system: payments-service
+          # placeholders: {namespace} {pod} {container}
+          # - match: {namespace: "team-*"}
+          #   source_system: "{namespace}-{container}"

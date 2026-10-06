@@ -1,116 +1,88 @@
-# Veritas Agent — Kubernetes Deployment
-# ========================================
-# Runs a single Veritas Agent instance in the cluster.
-# Use this when you have a fixed set of log files or containers to monitor.
+# Alternative to the DaemonSet: ONE agent that reads specific files, for example log files
+# your applications write to a shared volume. For node-level pod logs use the DaemonSet.
 #
-# For node-level log collection (one agent per node), use agent-daemonset.yaml instead.
+# Before applying, create the namespace, the key Secret and the ConfigMap, and change the
+# ConfigMap's sources to plain file sources, for example:
 #
-# Apply: kubectl apply -f agent-deployment.yaml
-
+#   sources:
+#     - type: file
+#       path: /logs/*.log             # wildcards are allowed
+#       source_system: order-service
+#
+# and replace the "logs" volume below with the volume your applications write to.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: veritas-agent
-  namespace: default
+  namespace: veritas-agent
   labels:
-    app: veritas-agent
-    version: "1.0.0"
+    app.kubernetes.io/name: veritas-agent
 spec:
-  replicas: 1      # Always exactly 1 — multiple agents would duplicate events
+  replicas: 1                        # exactly one; more would send every line twice
+  strategy:
+    type: Recreate                   # the identity volume can be used by one pod at a time
   selector:
     matchLabels:
-      app: veritas-agent
+      app.kubernetes.io/name: veritas-agent
   template:
     metadata:
       labels:
-        app: veritas-agent
+        app.kubernetes.io/name: veritas-agent
     spec:
-      # Restart policy: always restart on crash (matches Block 4's retry behaviour)
-      restartPolicy: Always
-
+      automountServiceAccountToken: false
       containers:
-        - name: veritas-agent
-          image: veritas-agent:latest
+        - name: agent
+          image: ghcr.io/shreyaaassss/veritas-agent:latest
           imagePullPolicy: IfNotPresent
-
-          # Inject the registration key from the Secret as an environment variable.
-          # The agent-config.yaml template references ${VERITAS_REGISTRATION_KEY}.
+          command: ["python", "/app/agent.py"]
+          args: ["--config", "/config/agent-config.yaml"]
+          workingDir: /state
           env:
+            - name: VERITAS_STATE_DIR
+              value: /state
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
             - name: VERITAS_REGISTRATION_KEY
               valueFrom:
                 secretKeyRef:
-                  name: veritas-agent-secret
+                  name: veritas-agent-key
                   key: registration_key
-
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           volumeMounts:
-            # Agent configuration (from ConfigMap)
-            - name: config
-              mountPath: /app/agent-config.yaml
-              subPath: agent-config.yaml
-              readOnly: true
-
-            # Persistent state — stores agent identity after first registration.
-            # Without this, the agent re-registers on every pod restart,
-            # consuming a new registration key each time.
-            - name: state
-              mountPath: /app
-
-            # Docker socket — needed to tail container logs via Docker API.
-            # Remove this mount if you only use file-based log sources.
-            - name: docker-socket
-              mountPath: /var/run/docker.sock
-              readOnly: true
-
-            # Host log directory — mount if tailing files from the host.
-            # Adjust hostPath.path to match where your logs are written.
-            - name: host-logs
-              mountPath: /var/log
-              readOnly: true
-
+            - {name: config, mountPath: /config, readOnly: true}
+            - {name: state,  mountPath: /state}
+            - {name: logs,   mountPath: /logs,   readOnly: true}
+            - {name: tmp,    mountPath: /tmp}
           resources:
-            requests:
-              cpu: "50m"
-              memory: "64Mi"
-            limits:
-              cpu: "200m"
-              memory: "256Mi"
-
+            requests: {cpu: 50m,  memory: 64Mi}
+            limits:   {cpu: 250m, memory: 256Mi}
       volumes:
-        # ConfigMap containing agent-config.yaml
         - name: config
           configMap:
             name: veritas-agent-config
-
-        # PersistentVolumeClaim for agent state (.veritas_state.json)
         - name: state
           persistentVolumeClaim:
             claimName: veritas-agent-state
-
-        # Docker socket (for container log tailing)
-        - name: docker-socket
-          hostPath:
-            path: /var/run/docker.sock
-            type: Socket
-
-        # Host log directory (for file log tailing)
-        - name: host-logs
-          hostPath:
-            path: /var/log
-            type: Directory
-
+        - name: logs
+          emptyDir: {}               # REPLACE with the volume your applications write logs to
+        - name: tmp
+          emptyDir: {}
 ---
-# PersistentVolumeClaim — stores .veritas_state.json across pod restarts.
-# This means the agent only registers once, even if the pod is restarted.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: veritas-agent-state
-  namespace: default
-  labels:
-    app: veritas-agent
+  namespace: veritas-agent
 spec:
-  accessModes:
-    - ReadWriteOnce
+  accessModes: [ReadWriteOnce]
   resources:
     requests:
-      storage: 10Mi    # Agent state is tiny — just a JSON file
+      storage: 10Mi

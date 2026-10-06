@@ -1,148 +1,144 @@
-# Veritas Agent — Kubernetes Deployment Guide
+# Veritas Agent on Kubernetes
 
-Deploy the Veritas Agent into your Kubernetes cluster in under 5 minutes.
+One Veritas agent runs on every node (a DaemonSet). Each agent reads the logs of the pods on its node and sends them to your Veritas server, where personal data is detected and compliance rules are applied. **You do not change or restart your applications.**
 
----
+```
+Node 1                         Node 2
+  pods: order-..., cart-...      pods: order-..., payments-...
+        │ stdout logs                  │ stdout logs
+        ▼                              ▼
+  veritas-agent (1 per node)     veritas-agent (1 per node)
+        └──────────────┬───────────────┘
+                       ▼
+                 Veritas server
+```
 
-## Prerequisites
+The agent is a log bridge: it does not detect or judge anything itself. Only the logs of pods that match a rule you write (see [Choosing which pods to send](#choosing-which-pods-to-send)) are read.
 
-- Kubernetes cluster (1.20+)
-- `kubectl` configured and connected to your cluster
-- Veritas Runtime running and accessible from the cluster (e.g. `http://192.168.1.50:8000`)
-- Veritas Agent Docker image built and available:
-  ```bash
-  cd ../   # veritas-agent directory
-  docker build -t veritas-agent:latest .
-  # If using a private registry:
-  docker tag veritas-agent:latest your-registry/veritas-agent:latest
-  docker push your-registry/veritas-agent:latest
-  ```
+## What you need
 
----
+- Kubernetes 1.20 or newer, `kubectl` access, and permission to create a namespace.
+- A running Veritas server that the cluster's nodes can reach (HTTPS, port 8000), with your organization already created and its policy configured.
+- The agent image: `ghcr.io/shreyaaassss/veritas-agent:<version>` (published with each release), or build it yourself from `veritas-agent/` and push it to your registry.
+- Container logs written by containerd or CRI-O (the default on EKS, GKE, AKS, k3s, kind) or by Docker's json-file driver. Both line formats are understood.
 
-## Step 1 — Issue a Registration Key
+## Install
 
-1. Open the Veritas dashboard in your browser
-2. Select your organisation from the dropdown
-3. Go to **Agents** tab → **Issue Registration Key**
-4. Copy the key (it expires in 30 minutes, single-use)
+### 1. Create a reusable key
 
----
+In the Veritas dashboard open **Agents → Issue Registration Key**, choose **Many agents (reusable)**, set the maximum number of agents (at least your node count, with some spare for nodes added later) and a validity period, and copy the key. Every node's agent registers itself with this one key.
 
-## Step 2 — Encode the Key
+### 2. Create the namespace and store the key as a Secret
 
 ```bash
-# Linux / Mac
-echo -n "YOUR_KEY_HERE" | base64
-
-# Windows PowerShell
-[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("YOUR_KEY_HERE"))
+kubectl apply -f namespace.yaml
+kubectl -n veritas-agent create secret generic veritas-agent-key \
+  --from-literal=registration_key='<THE KEY>'
 ```
 
----
-
-## Step 3 — Fill In the Secret
-
-Edit `agent-secret.yaml` and replace `REPLACE_WITH_BASE64_ENCODED_KEY` with the output from Step 2:
-
-```yaml
-data:
-  registration_key: eW91ci1rZXktaGVyZQ==   # ← your base64 key
-```
-
----
-
-## Step 4 — Configure the Agent
+### 3. Tell the agent where the server is and which pods to read
 
 Edit `agent-configmap.yaml`:
 
 ```yaml
-veritas_address: http://192.168.1.50:8000   # ← your Veritas Runtime IP
-source_label: k8s-production                 # ← label shown in dashboard
-sources:
-  - type: file
-    path: /var/log/order-service/app.log
+veritas_address: https://veritas.yourcompany.internal:8000
+...
+rules:
+  - match: {namespace: shop, pod: "order-*"}
     source_system: order-service
-  - type: docker
-    container: marketing-service
-    source_system: marketing-analytics
 ```
 
-The `source_system` values must match what's declared in your Veritas organisation config.
+Then `kubectl apply -f agent-configmap.yaml`.
 
----
+If the server is reached by an IP address or a name that its certificate does not list, set `VERITAS_TLS_SANS` on the server (a comma-separated list of extra names and IPs) before its certificate is first generated, or install a certificate that covers it.
 
-## Step 5 — Deploy
-
-### Option A — Single instance (recommended for most setups)
+### 4. Deploy
 
 ```bash
-kubectl apply -f agent-secret.yaml
-kubectl apply -f agent-configmap.yaml
-kubectl apply -f agent-deployment.yaml
+kubectl apply -f agent-daemonset.yaml        # or: kubectl apply -k .
 ```
 
-### Option B — One agent per node (DaemonSet)
+Use the manifest attached to the release (`veritas-agent-k8s_<version>.yaml`) to get the image already pinned to that version, or change the `image:` line yourself.
 
-Use this if your application pods run across multiple nodes and you need host-level log collection on each node.
+### 5. Check it
 
 ```bash
-kubectl apply -f agent-secret.yaml
-kubectl apply -f agent-configmap.yaml
-kubectl apply -f agent-daemonset.yaml
+kubectl -n veritas-agent get pods -o wide                       # one Running pod per node
+kubectl -n veritas-agent logs ds/veritas-agent --tail=20        # "Registered as VERITAS-AGENT-..."
 ```
 
----
+In the dashboard, **Agents** shows one agent per node (labelled `k8s-<node name>`), each with its version and health. A source line such as `12 file(s) followed, 30 ignored (no rule matches)` means it is working.
 
-## Step 6 — Verify
+### 6. Revoke the key when the rollout is done
+
+In **Agents → Enrollment Keys**, revoke the key. Agents that already registered keep working (they hold their own identity). A node added later needs a valid key: issue a new one, update the Secret, and the new node's pod will register.
+
+## Choosing which pods to send
+
+Each node log file is named by the kubelet `<pod>_<namespace>_<container>-<id>.log`. A rule says which files belong to which system:
+
+```yaml
+rules:
+  - match: {namespace: shop, pod: "order-*"}          # every key must match; * and ? are wildcards
+    source_system: order-service
+  - match: {namespace: shop, container: "payments*"}
+    source_system: payments-service
+  - match: {namespace: "team-*"}
+    source_system: "{namespace}-{container}"          # placeholders: {namespace} {pod} {container}
+```
+
+- The **first** rule that matches wins.
+- `source_system` must be a system declared in the organization's policy in Veritas. A system the policy does not declare produces purpose violations for personal data.
+- Pods that match **no** rule are not read at all. The agent logs one warning naming a few of them, and the dashboard shows how many files were ignored. This includes the agent's own pods, so there is no feedback loop.
+- To see the names to match, run `kubectl get pods -A`.
+
+## What the agent sends and keeps
+
+- It sends each log line of a matched pod: the text, the `source_system` and (via the agent's identity) the organization. Detection and rules run on the Veritas server.
+- It keeps an in-memory queue of 1,000 lines while the server is unreachable and drops the oldest lines beyond that. Nothing is written to disk except its identity.
+- Lines the container runtime split into pieces (long lines) are joined before being sent.
+- Multi-line messages such as stack traces arrive as separate lines.
+- Its identity (agent id and token) is stored on the node in `/var/lib/veritas-agent`, owner-only, so restarts and upgrades need no new key.
+
+## Security notes
+
+- The pod runs as root because the kubelet writes container logs as root-only files. The root filesystem is read-only, all Linux capabilities are dropped, privilege escalation is off, and it has no Kubernetes API access. The only writable host path is its own state directory; `/var/log` is mounted read-only.
+- The key is a Kubernetes Secret and is only needed for the first registration on each node.
+
+## Upgrading
 
 ```bash
-# Check the pod is running
-kubectl get pods -l app=veritas-agent
-
-# Follow logs
-kubectl logs -l app=veritas-agent -f
-
-# Expected output:
-# [Veritas] License valid — ...
-# [Veritas] Registered as VERITAS-AGENT-XXXXXX
-# [Veritas] Forwarding worker started. Watching queue...
+kubectl -n veritas-agent set image ds/veritas-agent agent=ghcr.io/shreyaaassss/veritas-agent:<new version>
+kubectl -n veritas-agent rollout status ds/veritas-agent
 ```
 
-Within seconds, the agent appears as **ACTIVE** in the Veritas dashboard Agents tab.
-
----
-
-## Updating the Configuration
+## Uninstalling
 
 ```bash
-# Edit the ConfigMap
-kubectl edit configmap veritas-agent-config
-
-# Restart the agent to pick up changes
-kubectl rollout restart deployment/veritas-agent
+kubectl delete namespace veritas-agent
+# on each node, remove the saved identity:  rm -rf /var/lib/veritas-agent
 ```
 
----
+Then revoke the agents in the dashboard (**Agents → Revoke**).
 
-## Revoking the Agent
+## Troubleshooting
 
-From the Veritas dashboard: **Agents** → find the agent → **Revoke**.
+| What you see | Likely cause and fix |
+|---|---|
+| A pod ends right after starting (`Error` or `CrashLoopBackOff`) | Read `kubectl -n veritas-agent logs <pod>`. Exit code 78 means a setting retrying cannot fix; the log says which. |
+| `Registration rejected ... reached its use limit` | The key was used up. Issue a new reusable key with a higher limit and update the Secret. |
+| `Registration rejected ... expired` or `revoked` | Issue a new key and update the Secret. |
+| `Config refers to environment variable(s) that are not set` | The Secret or `NODE_NAME` is missing from the pod; check the Secret name and key (`registration_key`). |
+| `TLS certificate verification failed` | The server's certificate does not cover the address in `veritas_address`. Add the name or IP with `VERITAS_TLS_SANS` on the server, or use a name the certificate lists. |
+| Agents show in the dashboard but no violations appear | The rules match no pods (the source line says `... ignored`), or the `source_system` is not in the organization's policy. Check `kubectl get pods -A` against your rules. |
+| `Permission denied` on the logs | Another security layer (such as SELinux or a restricted Pod Security policy) blocks hostPath access. The DaemonSet needs read access to `/var/log` on the node. |
+| Docker-runtime nodes: files are listed but empty | `/var/log/containers` holds symlinks into `/var/lib/docker/containers`. Add a read-only hostPath mount of `/var/lib/docker/containers` to the DaemonSet. (Docker as a runtime was removed in Kubernetes 1.24.) |
+| Too many files | The agent follows at most 500 files per source; raise `max_files` on the source or tighten the rules. |
 
-The agent will be rejected with HTTP 403 on its next event submission and log an error. Delete the pod to stop it completely:
+## Alternative: one agent for specific files
 
-```bash
-kubectl delete deployment veritas-agent   # or daemonset
-kubectl delete pvc veritas-agent-state    # removes saved identity
-```
+`agent-deployment.yaml` runs a single agent that reads plain files (wildcards allowed), for example logs your applications write to a shared volume. Change the ConfigMap to `type: file` sources and replace the `logs` volume with yours. For pod logs use the DaemonSet.
 
----
+## Reading Docker container logs through the Docker socket
 
-## Choosing Between Deployment and DaemonSet
-
-| | Deployment | DaemonSet |
-|---|---|---|
-| **Instances** | 1 | 1 per node |
-| **Best for** | Fixed log files, specific containers | Host-level logs across all nodes |
-| **State** | PersistentVolumeClaim | hostPath per node |
-| **Registration keys needed** | 1 | 1 per node |
+A source of `type: docker` still works where the Docker socket is available: mount `/var/run/docker.sock` read-only, set `container: <name>`, and use the `veritas-agent` image with the `docker` Python package (included). Most current clusters have no Docker socket; use `kubernetes_logs` instead.

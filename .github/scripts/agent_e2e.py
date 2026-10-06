@@ -16,7 +16,13 @@ The session cookie is cached so the login rate limit (10 per 5 minutes) is never
 
 Commands (each exits non-zero on failure):
   setup                       create the admin (first run) and the organization
-  issue-key                   print a one-time agent registration key
+  issue-key   [--max-uses N] [--label L] [--expires SECONDS]
+                              print an agent registration key (one-time by default; --max-uses > 1
+                              makes a reusable enrollment key)
+  keys                        print the organization's registration keys (metadata) as JSON
+  revoke-key  --label L       revoke the newest key with that label
+  wait-agents --prefix P --count N [--version V] [--source ...] [--timeout S]
+                              wait until N active agents whose label starts with P have reported health
   wait-agent  --label L [--version V] [--source TARGET=STATE[:DETAIL]]... [--timeout S]
   agents                      print the organization's agents as JSON
   violations  [--min N] [--timeout S] [--source-system S]
@@ -99,11 +105,39 @@ def cmd_setup(_: argparse.Namespace) -> None:
     print(f"ready: admin '{USER}', organization '{ORG}'")
 
 
-def cmd_issue_key(_: argparse.Namespace) -> None:
-    r = session().post(f"{URL}/agents/issue-key", json={"org_id": ORG}, timeout=30)
+def cmd_issue_key(a: argparse.Namespace) -> None:
+    body = {"org_id": ORG}
+    if a.max_uses:
+        body["max_uses"] = a.max_uses
+    if a.label:
+        body["label"] = a.label
+    if a.expires:
+        body["expires_in_seconds"] = a.expires
+    r = session().post(f"{URL}/agents/issue-key", json=body, timeout=30)
     if r.status_code != 200:
         fail(f"issue-key failed ({r.status_code}): {r.text[:200]}")
     print(r.json()["key"])
+
+
+def list_keys() -> list:
+    r = session().get(f"{URL}/agents/keys", params={"org_id": ORG}, timeout=30)
+    if r.status_code != 200:
+        fail(f"listing keys failed ({r.status_code}): {r.text[:200]}")
+    return r.json()["keys"]
+
+
+def cmd_keys(_: argparse.Namespace) -> None:
+    print(json.dumps(list_keys(), indent=2))
+
+
+def cmd_revoke_key(a: argparse.Namespace) -> None:
+    matches = [k for k in list_keys() if k["label"] == a.label]
+    if not matches:
+        fail(f"no key labelled {a.label!r}")
+    r = session().post(f"{URL}/agents/keys/{matches[0]['key_id']}/revoke", timeout=30)
+    if r.status_code != 200:
+        fail(f"revoke failed ({r.status_code}): {r.text[:200]}")
+    print(f"revoked key {matches[0]['key_id']}")
 
 
 def agents() -> list:
@@ -166,6 +200,44 @@ def cmd_wait_agent(a: argparse.Namespace) -> None:
                                   for s in agent["health"]["sources"]]}))
 
 
+def _source_matches(health: dict, wanted: list) -> tuple:
+    sources = health.get("sources", [])
+    for target, state, detail in wanted:
+        hit = [s for s in sources if target in s["target"]]
+        if not hit:
+            return False, f"source {target!r} not reported (have {[s['target'] for s in sources]})"
+        if hit[0]["state"] != state or (detail and detail not in hit[0]["detail"]):
+            return False, f"source {target!r} is {hit[0]['state']} {hit[0]['detail']!r}"
+    return True, ""
+
+
+def cmd_wait_agents(a: argparse.Namespace) -> None:
+    wanted = []
+    for spec in a.source or []:
+        target, _, state = spec.partition("=")
+        state, _, detail = state.partition(":")
+        wanted.append((target, state, detail))
+
+    def check():
+        mine = [x for x in agents() if x["source_label"].startswith(a.prefix) and x["status"] == "ACTIVE"]
+        ready = []
+        for agent in mine:
+            health = agent.get("health")
+            if not health:
+                continue
+            if a.version and agent.get("agent_version") != a.version:
+                continue
+            ok, _ = _source_matches(health, wanted)
+            if ok:
+                ready.append(agent)
+        if len(ready) >= a.count:
+            return True, ready
+        return False, f"{len(ready)}/{a.count} ready; labels seen: {sorted(x['source_label'] for x in mine)}"
+
+    ready = poll(check, a.timeout, f"{a.count} agents with label prefix {a.prefix!r} to be healthy")
+    print(json.dumps(sorted((x["source_label"], x["agent_id"]) for x in ready)))
+
+
 def count_violations(source_system: str | None = None) -> int:
     params = {"source_system": source_system} if source_system else {}
     r = session().get(f"{URL}/api/{ORG}/verdicts", params=params, timeout=30)
@@ -204,7 +276,22 @@ def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("setup").set_defaults(fn=cmd_setup)
-    sub.add_parser("issue-key").set_defaults(fn=cmd_issue_key)
+    ik = sub.add_parser("issue-key")
+    ik.add_argument("--max-uses", type=int)
+    ik.add_argument("--label")
+    ik.add_argument("--expires", type=int)
+    ik.set_defaults(fn=cmd_issue_key)
+    sub.add_parser("keys").set_defaults(fn=cmd_keys)
+    rk = sub.add_parser("revoke-key")
+    rk.add_argument("--label", required=True)
+    rk.set_defaults(fn=cmd_revoke_key)
+    wa = sub.add_parser("wait-agents")
+    wa.add_argument("--prefix", required=True)
+    wa.add_argument("--count", type=int, required=True)
+    wa.add_argument("--version")
+    wa.add_argument("--source", action="append", help="TARGET=STATE[:DETAIL]")
+    wa.add_argument("--timeout", type=float, default=180)
+    wa.set_defaults(fn=cmd_wait_agents)
     sub.add_parser("agents").set_defaults(fn=lambda a: print(json.dumps(agents(), indent=2)))
     sub.add_parser("verify-chain").set_defaults(fn=cmd_verify_chain)
 

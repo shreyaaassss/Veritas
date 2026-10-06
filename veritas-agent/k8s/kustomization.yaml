@@ -1,0 +1,11 @@
+# kubectl apply -k veritas-agent/k8s/   (after creating the key Secret, see README.md)
+#
+# To use a specific release instead of "latest":
+#   kustomize edit set image ghcr.io/shreyaaassss/veritas-agent=ghcr.io/shreyaaassss/veritas-agent:1.0.19
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: veritas-agent
+resources:
+  - namespace.yaml
+  - agent-configmap.yaml
+  - agent-daemonset.yaml

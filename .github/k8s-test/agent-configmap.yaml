@@ -1,0 +1,19 @@
+# Test configuration for the agent DaemonSet (the repository's own DaemonSet is used as it is).
+# __SERVER__ is replaced with the address the pods can reach the test server on.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: veritas-agent-config
+  namespace: veritas-agent
+data:
+  agent-config.yaml: |
+    veritas_address: https://__SERVER__:8000
+    registration_key: "${VERITAS_REGISTRATION_KEY}"
+    source_label: "k8s-${NODE_NAME}"
+    sources:
+      - type: kubernetes_logs
+        path: /var/log/containers/*.log
+        format: auto
+        rules:
+          - match: {namespace: shop, pod: "order-*"}
+            source_system: order-service

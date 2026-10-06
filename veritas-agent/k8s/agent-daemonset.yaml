@@ -1,26 +1,26 @@
-# Veritas Agent — Kubernetes DaemonSet
-# ======================================
-# Runs one Veritas Agent on EVERY node in the cluster.
-# Use this when you want to tail host-level logs from all nodes,
-# or when your application pods are spread across multiple nodes.
+# Veritas Agent as a DaemonSet: one agent on every node, reading the logs of the pods on
+# that node. No change to your applications is needed.
 #
-# For a single-instance deployment, use agent-deployment.yaml instead.
+# Before applying, create the namespace, the key Secret and the ConfigMap (see README.md).
 #
-# Apply: kubectl apply -f agent-daemonset.yaml
-
+# Why it looks the way it does:
+#  * The agent's identity (its id and token) is kept in /state on the node, so a pod restart
+#    or an image upgrade does not need a new key. It is NOT mounted over /app, which holds
+#    the agent program.
+#  * It runs as root because the kubelet writes container logs as root-only files. The
+#    root filesystem is read-only, all Linux capabilities are dropped, and the only host
+#    path mounted read-write is the agent's own state directory.
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: veritas-agent
-  namespace: default
+  namespace: veritas-agent
   labels:
-    app: veritas-agent
-    mode: daemonset
-    version: "1.0.0"
+    app.kubernetes.io/name: veritas-agent
 spec:
   selector:
     matchLabels:
-      app: veritas-agent
+      app.kubernetes.io/name: veritas-agent
   updateStrategy:
     type: RollingUpdate
     rollingUpdate:
@@ -28,85 +28,57 @@ spec:
   template:
     metadata:
       labels:
-        app: veritas-agent
+        app.kubernetes.io/name: veritas-agent
     spec:
-      # Use the host's network namespace so the agent can reach the
-      # Veritas Runtime via the cluster's internal network.
-      hostNetwork: false
-      restartPolicy: Always
-
-      # Tolerate all taints so the agent runs on every node,
-      # including control-plane nodes if desired.
+      automountServiceAccountToken: false    # the agent never talks to the Kubernetes API
       tolerations:
-        - operator: Exists
-          effect: NoSchedule
-        - operator: Exists
-          effect: NoExecute
-
+        - operator: Exists                   # run on every node, including control-plane nodes
       containers:
-        - name: veritas-agent
-          image: veritas-agent:latest
+        - name: agent
+          image: ghcr.io/shreyaaassss/veritas-agent:latest
           imagePullPolicy: IfNotPresent
-
+          command: ["python", "/app/agent.py"]
+          args: ["--config", "/config/agent-config.yaml"]
+          workingDir: /state
           env:
-            - name: VERITAS_REGISTRATION_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: veritas-agent-secret
-                  key: registration_key
-
-            # NODE_NAME is injected automatically — useful for source_label
+            - name: VERITAS_STATE_DIR
+              value: /state
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
             - name: NODE_NAME
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
-
+            - name: VERITAS_REGISTRATION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: veritas-agent-key
+                  key: registration_key
+          securityContext:
+            runAsUser: 0
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           volumeMounts:
-            - name: config
-              mountPath: /app/agent-config.yaml
-              subPath: agent-config.yaml
-              readOnly: true
-
-            # Node-local state directory — one per node, persists registrations.
-            # hostPath ensures each node's agent has its own identity.
-            - name: state
-              mountPath: /app
-
-            # Docker socket — for container log tailing on this node
-            - name: docker-socket
-              mountPath: /var/run/docker.sock
-              readOnly: true
-
-            # All host logs on this node
-            - name: host-logs
-              mountPath: /var/log
-              readOnly: true
-
+            - {name: config,  mountPath: /config,    readOnly: true}
+            - {name: state,   mountPath: /state}
+            - {name: varlog,  mountPath: /var/log,   readOnly: true}
+            - {name: tmp,     mountPath: /tmp}
           resources:
-            requests:
-              cpu: "50m"
-              memory: "64Mi"
-            limits:
-              cpu: "200m"
-              memory: "256Mi"
-
+            requests: {cpu: 50m,  memory: 64Mi}
+            limits:   {cpu: 250m, memory: 256Mi}
       volumes:
         - name: config
           configMap:
             name: veritas-agent-config
-
-        # Node-local hostPath for state — each node gets its own agent identity
         - name: state
           hostPath:
             path: /var/lib/veritas-agent
             type: DirectoryOrCreate
-
-        - name: docker-socket
-          hostPath:
-            path: /var/run/docker.sock
-            type: Socket
-
-        - name: host-logs
+        - name: varlog
           hostPath:
             path: /var/log
             type: Directory
+        - name: tmp
+          emptyDir: {}

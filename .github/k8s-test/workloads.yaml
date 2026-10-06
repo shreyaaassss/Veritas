@@ -1,0 +1,74 @@
+# Test applications, one pod per node each. Names matter: the agent's rule maps pods
+# named order-* in namespace "shop" to order-service; cart-* pods have no rule.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: shop
+---
+# Five lines containing an Aadhaar number per node, then silence: exactly 5 violations a node.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata: {name: order-gen, namespace: shop}
+spec:
+  selector: {matchLabels: {app: order-gen}}
+  template:
+    metadata: {labels: {app: order-gen}}
+    spec:
+      tolerations: [{operator: Exists}]
+      containers:
+        - name: app
+          image: busybox:1.36
+          command: ["sh", "-c"]
+          args:
+            - |
+              for i in 1 2 3 4 5; do
+                echo "DEBUG customer verified with Aadhaar 2345 6789 0124"
+                echo "INFO order ORD-583927 status updated to packed"
+                sleep 2
+              done
+              sleep 100000
+---
+# One very long line per node with a phone number placed so that the container runtime's
+# 16 KiB split falls inside the number: the agent must join the pieces to see it. Exactly
+# 1 violation a node.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata: {name: order-big, namespace: shop}
+spec:
+  selector: {matchLabels: {app: order-big}}
+  template:
+    metadata: {labels: {app: order-big}}
+    spec:
+      tolerations: [{operator: Exists}]
+      containers:
+        - name: app
+          image: busybox:1.36
+          command: ["sh", "-c"]
+          args:
+            - |
+              sleep 5
+              printf '%s' "$(head -c 16372 /dev/zero | tr '\0' x)"
+              printf ' phone 9876543210\n'
+              sleep 100000
+---
+# Writes personal data too, but no rule maps cart-* pods, so none of it may reach Veritas.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata: {name: cart-gen, namespace: shop}
+spec:
+  selector: {matchLabels: {app: cart-gen}}
+  template:
+    metadata: {labels: {app: cart-gen}}
+    spec:
+      tolerations: [{operator: Exists}]
+      containers:
+        - name: app
+          image: busybox:1.36
+          command: ["sh", "-c"]
+          args:
+            - |
+              for i in 1 2 3 4 5; do
+                echo "DEBUG cart owner phone 9123456780 must never be forwarded"
+                sleep 2
+              done
+              sleep 100000
