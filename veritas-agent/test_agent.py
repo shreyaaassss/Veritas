@@ -174,3 +174,40 @@ class TestBootstrap:
         with pytest.raises(SystemExit) as e:
             agent.load_config(tmp_path / "nope.yaml")
         assert e.value.code == agent.EXIT_CONFIG
+
+
+class TestConfigPlaceholders:
+    """A config copied from instructions with the placeholders left in must stop once, clearly."""
+
+    def write(self, tmp_path, address="https://veritas.example.com:8000", key="abc123", extra=""):
+        p = tmp_path / "config.yaml"
+        p.write_text(f'veritas_address: "{address}"\nregistration_key: "{key}"\n{extra}'
+                     "sources:\n  - type: file\n    path: /tmp/x.log\n    source_system: s\n")
+        return p
+
+    @pytest.mark.parametrize("address", [
+        "https://<HOST>:8000", "<HOST>", "https://CHANGE_ME:8000", "https://your-server:8000x:y",
+        "veritas.example.com:8000", "ftp://host:8000", "https://", "https://host:notaport", "",
+    ])
+    def test_bad_address_exits_78_with_a_reason(self, tmp_path, caplog, address):
+        with pytest.raises(SystemExit) as e:
+            agent.load_config(self.write(tmp_path, address=address))
+        assert e.value.code == agent.EXIT_CONFIG
+        assert caplog.records, "a reason must be logged"
+
+    def test_placeholder_gets_a_specific_message(self, tmp_path, caplog):
+        with pytest.raises(SystemExit):
+            agent.load_config(self.write(tmp_path, address="https://<HOST>:8000"))
+        assert "placeholder" in caplog.text and "<HOST>" in caplog.text
+
+    def test_placeholder_key_exits_78(self, tmp_path, caplog):
+        with pytest.raises(SystemExit) as e:
+            agent.load_config(self.write(tmp_path, key="<PASTE THE KEY>"))
+        assert e.value.code == agent.EXIT_CONFIG and "registration_key" in caplog.text
+
+    @pytest.mark.parametrize("address", [
+        "https://localhost:8000", "http://192.168.1.50:8000", "https://veritas.corp.example:8443",
+        "https://[::1]:8000", "https://veritas",
+    ])
+    def test_real_addresses_load(self, tmp_path, address):
+        assert agent.load_config(self.write(tmp_path, address=address))["veritas_address"] == address

@@ -270,6 +270,24 @@ def validate_sources(sources: Any) -> List[str]:
     return problems
 
 
+def validate_address(address: Any) -> Optional[str]:
+    """Explain what is wrong with veritas_address, or None. Retrying cannot fix any of these."""
+    from urllib.parse import urlparse
+    text = str(address or "").strip()
+    if "<" in text or ">" in text or "CHANGE_ME" in text.upper() or "YOUR-" in text.upper():
+        return (f"veritas_address is still a placeholder ({text!r}). Replace it with the real address "
+                "of the Veritas server, for example https://veritas.yourcompany.internal:8000")
+    try:
+        parsed = urlparse(text)
+        port = parsed.port           # raises ValueError for a non-numeric port
+    except ValueError:
+        return f"veritas_address {text!r} is not a valid address (check the port number)."
+    if parsed.scheme not in ("http", "https") or not parsed.hostname:
+        return (f"veritas_address {text!r} must start with http:// or https:// and name a host, "
+                "for example https://192.168.1.50:8000")
+    return None
+
+
 def load_config(path: Path) -> Dict[str, Any]:
     if not path.exists():
         logger.error("Config file not found: %s", path)
@@ -286,6 +304,15 @@ def load_config(path: Path) -> Dict[str, Any]:
 
     if not cfg.get("veritas_address"):
         logger.error("Config missing required field: veritas_address")
+        sys.exit(EXIT_CONFIG)
+    address_problem = validate_address(cfg.get("veritas_address"))
+    if address_problem:
+        logger.error("Config problem: %s", address_problem)
+        sys.exit(EXIT_CONFIG)
+    key = str(cfg.get("registration_key") or "")
+    if key and ("<" in key or ">" in key):
+        logger.error("Config problem: registration_key is still a placeholder (%r). Paste the key "
+                     "issued in the Veritas dashboard (Agents > Issue Registration Key).", key)
         sys.exit(EXIT_CONFIG)
     problems = validate_sources(cfg.get("sources"))
     if problems:

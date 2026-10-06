@@ -92,8 +92,8 @@ sudo touch /var/log/testapp/app.log
 sudo chown root:adm /var/log/testapp/app.log && sudo chmod 640 /var/log/testapp/app.log
 
 sudo tee /etc/veritas-agent/config.yaml >/dev/null <<'EOF'
-veritas_address: https://<HOST>:8000
-registration_key: "<PASTE THE KEY>"
+veritas_address: https://localhost:8000     # use the server's name or IP if the agent is on another machine
+registration_key: "PASTE-THE-KEY-HERE"
 source_label: ubuntu-test
 tls:
   verify: false        # the server's certificate is self-signed
@@ -103,8 +103,11 @@ sources:
     source_system: kyc-service
 EOF
 sudo chown veritas-agent:veritas-agent /etc/veritas-agent/config.yaml && sudo chmod 640 /etc/veritas-agent/config.yaml
+sudo nano /etc/veritas-agent/config.yaml     # replace PASTE-THE-KEY-HERE with the real key, save
 sudo systemctl start veritas-agent
 ```
+
+Nothing in the file may be left as a placeholder: `<HOST>` or `<...>` in the address stops v1.0.19's agent from connecting (retrying forever); later versions stop with a clear message.
 
 - [ ] `systemctl is-active veritas-agent` prints `active`.
 - [ ] `sudo journalctl -u veritas-agent -n 20` shows `Registered as VERITAS-AGENT-...`.
