@@ -11,7 +11,21 @@ WorkingDirectory=/opt/veritas-agent
 ExecStart=/usr/bin/python3 /opt/veritas-agent/agent.py --config /etc/veritas-agent/config.yaml
 Restart=on-failure
 RestartSec=10
+# 78 = configuration problem retrying cannot fix (used/invalid key, unwritable
+# state directory, bad config). Report it once instead of looping every 10 s.
+RestartPreventExitStatus=78
 TimeoutStopSec=15
+
+# The agent's permanent identity (agent id + token) lives here. systemd creates
+# it owned by the service user, so it is writable even though the rest of the
+# filesystem is read-only for this service.
+StateDirectory=veritas-agent
+StateDirectoryMode=0700
+Environment=VERITAS_STATE_DIR=/var/lib/veritas-agent
+
+# Most system and application logs under /var/log are readable by group "adm"
+# only (root:adm 0640). Without this the agent cannot tail them.
+SupplementaryGroups=adm
 
 NoNewPrivileges=true
 ProtectSystem=strict

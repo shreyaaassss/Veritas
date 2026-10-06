@@ -3,6 +3,7 @@ Version: 1.0.0
 Architecture: all
 Maintainer: Veritas <support@veritas.app>
 Depends: python3 (>= 3.8), python3-requests, python3-yaml, systemd
+Recommends: python3-docker
 Section: utils
 Priority: optional
 Homepage: https://github.com/shreyaaassss/Veritas

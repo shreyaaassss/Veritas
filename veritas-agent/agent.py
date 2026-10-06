@@ -18,6 +18,20 @@ TLS support:
   The server certificate can be obtained from:
     GET {veritas_address}/api/tls/cert
 
+State (the agent's permanent identity):
+  After registering, the agent saves its identity (agent id, token, endpoint)
+  and the server certificate it trusts in a state directory. The directory is,
+  in order of priority: $VERITAS_STATE_DIR, "state_dir" in the config, or the
+  current working directory. It must be writable: it is checked BEFORE
+  registering, because the registration key can only be used once.
+
+Exit codes:
+  0   clean shutdown
+  1   transient failure (server unreachable); supervisors may restart the agent
+  78  configuration problem that retrying cannot fix (bad/used key, unwritable
+      state directory, missing config, TLS misconfiguration); the systemd unit
+      lists 78 in RestartPreventExitStatus so it is reported once, not looped
+
 Usage:
     python agent.py [--config agent-config.yaml]
 
@@ -71,8 +85,10 @@ logger = logging.getLogger("veritas.agent")
 # Constants
 # ---------------------------------------------------------------------------
 
-STATE_FILE              = Path(".veritas_state.json")
+STATE_FILE_NAME         = ".veritas_state.json"
+SERVER_CERT_NAME        = ".veritas_server.crt"
 CONFIG_FILE_DEFAULT     = Path("agent-config.yaml")
+EXIT_CONFIG             = 78    # configuration error that retrying cannot fix
 HEARTBEAT_INTERVAL      = 30    # seconds
 BUFFER_MAX              = 1000  # max queued events before dropping
 FORWARD_TIMEOUT         = 10    # seconds per HTTP request
@@ -159,12 +175,12 @@ def _fetch_server_cert(base_url: str, dest: Path, verify: Union[bool, str]) -> b
 def load_config(path: Path) -> Dict[str, Any]:
     if not path.exists():
         logger.error("Config file not found: %s", path)
-        sys.exit(1)
+        sys.exit(EXIT_CONFIG)
     with open(path, encoding="utf-8") as f:
-        cfg = yaml.safe_load(f)
+        cfg = yaml.safe_load(f) or {}
     if not cfg.get("veritas_address"):
         logger.error("Config missing required field: veritas_address")
-        sys.exit(1)
+        sys.exit(EXIT_CONFIG)
     return cfg
 
 
@@ -172,19 +188,80 @@ def load_config(path: Path) -> Dict[str, Any]:
 # State persistence
 # ---------------------------------------------------------------------------
 
+_state_dir_override: Optional[Path] = None
+
+
+def configure_state_dir(config: Dict[str, Any]) -> None:
+    """Pick the state directory: $VERITAS_STATE_DIR, then config 'state_dir', else cwd."""
+    global _state_dir_override
+    env = os.environ.get("VERITAS_STATE_DIR", "").strip()
+    cfg = str(config.get("state_dir", "") or "").strip()
+    chosen = env or cfg
+    _state_dir_override = Path(chosen) if chosen else None
+
+
+def state_dir() -> Path:
+    return _state_dir_override if _state_dir_override is not None else Path(".")
+
+
+def state_file() -> Path:
+    return state_dir() / STATE_FILE_NAME
+
+
+def server_cert_path() -> Path:
+    """Where the trusted server certificate is kept (absolute, inside the state dir)."""
+    return (state_dir() / SERVER_CERT_NAME).resolve()
+
+
+def ensure_state_writable() -> None:
+    """
+    Fail fast, BEFORE using the one-time registration key, if the identity cannot
+    be saved. Exits with EXIT_CONFIG and a clear message.
+    """
+    d = state_dir()
+    try:
+        d.mkdir(parents=True, exist_ok=True)
+        probe = d / f".veritas_write_test_{os.getpid()}"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink()
+    except OSError as e:
+        logger.error(
+            "Cannot write to the agent state directory %s: %s. The agent must be able "
+            "to save its identity after registering, and the registration key can only "
+            "be used once, so registration was NOT attempted. Make the directory "
+            "writable for this user, or set VERITAS_STATE_DIR (or 'state_dir' in the "
+            "config) to a writable path.", d.resolve(), e,
+        )
+        sys.exit(EXIT_CONFIG)
+
+
 def load_state() -> Dict[str, Any]:
-    if STATE_FILE.exists():
+    path = state_file()
+    if path.exists():
         try:
-            with open(STATE_FILE, encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 return json.load(f)
         except Exception as e:
-            logger.warning("Could not read state file: %s — starting fresh", e)
+            logger.warning("Could not read state file %s: %s — starting fresh", path, e)
     return {}
 
 
 def save_state(state: Dict[str, Any]) -> None:
-    with open(STATE_FILE, "w", encoding="utf-8") as f:
-        json.dump(state, f, indent=2)
+    """Write the identity atomically with owner-only permissions (it holds the auth token)."""
+    path = state_file()
+    tmp = path.with_name(path.name + ".tmp")
+    fd = os.open(str(tmp), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(state, f, indent=2)
+        os.replace(tmp, path)
+    finally:
+        if tmp.exists():
+            tmp.unlink()
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        pass
 
 
 def state_is_valid(state: Dict[str, Any]) -> bool:
@@ -205,7 +282,10 @@ def bootstrap(config: Dict[str, Any], state: Dict[str, Any]) -> Dict[str, Any]:
             "No registration_key in config and no saved identity. "
             "Issue a key from the Veritas dashboard and add it to agent-config.yaml."
         )
-        sys.exit(1)
+        sys.exit(EXIT_CONFIG)
+
+    # The key is single-use: make sure the identity can be saved before spending it.
+    ensure_state_writable()
 
     base = config["veritas_address"].rstrip("/")
     url  = f"{base}/agent/register"
@@ -221,7 +301,7 @@ def bootstrap(config: Dict[str, Any], state: Dict[str, Any]) -> Dict[str, Any]:
 
     # If HTTPS + strict verify but no CA cert configured → try to fetch server cert first
     if is_https and verify is True:
-        default_ca_path = Path(".veritas_server.crt")
+        default_ca_path = server_cert_path()
         if not default_ca_path.exists():
             logger.info(
                 "HTTPS server detected but no CA cert configured. "
@@ -252,7 +332,16 @@ def bootstrap(config: Dict[str, Any], state: Dict[str, Any]) -> Dict[str, Any]:
                 "event_endpoint": data["event_endpoint"],
                 "tls_verify":     str(verify),   # persist for future calls
             })
-            save_state(state)
+            try:
+                save_state(state)
+            except OSError as e:
+                logger.error(
+                    "Registered as %s but could NOT save the identity to %s: %s. The "
+                    "registration key is now used up. Revoke this agent in the Veritas "
+                    "dashboard (Agents tab), fix the directory permissions, and issue a "
+                    "new key.", state["agent_id"], state_file().resolve(), e,
+                )
+                sys.exit(EXIT_CONFIG)
 
             logger.info(
                 "Registered as %s | org: %s | endpoint: %s | TLS: %s",
@@ -270,13 +359,14 @@ def bootstrap(config: Dict[str, Any], state: Dict[str, Any]) -> Dict[str, Any]:
                 "  3. Download cert: GET %s/api/tls/cert",
                 e, base,
             )
-            sys.exit(1)
+            sys.exit(EXIT_CONFIG)
 
         except requests.exceptions.ConnectionError:
             logger.warning("Server unreachable. Retrying in %ds…", REGISTRATION_RETRY_DELAY)
         except requests.exceptions.HTTPError as e:
             logger.error("Registration rejected (%s): %s", e.response.status_code, e.response.text)
-            sys.exit(1)
+            # A rejected key (used, expired, unknown) cannot be fixed by retrying.
+            sys.exit(EXIT_CONFIG)
         except Exception as e:
             logger.warning("Registration attempt failed: %s. Retrying…", e)
 
@@ -518,6 +608,7 @@ def main() -> None:
     args = parser.parse_args()
 
     config = load_config(args.config)
+    configure_state_dir(config)
     state  = load_state()
     state  = bootstrap(config, state)
 

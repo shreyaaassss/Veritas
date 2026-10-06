@@ -330,15 +330,13 @@ sudo nano /etc/veritas-agent/config.yaml
 # Veritas server address
 veritas_address: https://your-veritas-server:8000
 
-# Your organisation ID (must match what's configured on the server)
-org_id: your_org_name
-
-# Registration key from the dashboard (one-time use, consumed on first connect)
+# Registration key from the dashboard (one-time use, valid 30 minutes, consumed on first connect)
 registration_key: "AkBOPDQygiU4fjZTdXAI4w"
 
-# TLS verification
+# TLS verification. The agent downloads and remembers the server certificate on
+# first contact. To pin the certificate from Step 3 instead, uncomment ca_cert.
 tls:
-  ca_cert: /etc/veritas-agent/server.crt
+  # ca_cert: /etc/veritas-agent/server.crt
   verify: true
 
 # Label shown in the dashboard
@@ -370,10 +368,17 @@ sudo veritas-agent start
 
 ```bash
 sudo veritas-agent status
-sudo veritas-agent logs
+sudo veritas-agent logs        # expect "Registered as VERITAS-AGENT-..." and "Tailing file: ..."
 ```
 
 The agent appears in the Veritas dashboard under **Agents** within seconds.
+
+### How the agent works on Linux
+
+- **Identity:** after registering, the agent keeps its permanent identity (agent ID and token) in `/var/lib/veritas-agent/` (owner-only). The one-time key is not needed again. If you delete that folder the agent needs a new key.
+- **Log access:** the service runs as the `veritas-agent` user with the `adm` group, which can read most files under `/var/log`. For log files owned by other users or groups, give `veritas-agent` read access (for example `setfacl -m u:veritas-agent:r /path/to/app.log`). To read Docker container logs, add the user to the `docker` group.
+- **Configuration errors stop the service once.** A used or expired key, an unwritable state folder or a missing config makes the agent exit with code 78, and systemd does not restart it. Read the reason with `sudo veritas-agent logs`, fix it, then `sudo systemctl start veritas-agent`.
+- **Log rotation is not handled yet.** After a log file rotates, restart the agent (`sudo veritas-agent restart`) until this is fixed.
 
 ---
 
