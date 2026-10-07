@@ -1,0 +1,251 @@
+name: Test macOS Agent .pkg Installation
+
+# Builds the Mac agent (single-file binary + .pkg) from the current commit, installs it on a clean
+# Apple Silicon runner next to a Veritas server (run from source, with a real self-signed
+# certificate) and checks the whole path: registration, log reading as the unprivileged service
+# account, rotation, bad events, restart, outage, upgrade, uninstall.
+
+on:
+  push:
+    tags: ['v*']
+    branches: [main]
+    paths:
+      - 'veritas-agent/**'
+      - 'package/macos-agent/**'
+      - 'package/macos/build-agent-pkg.sh'
+      - 'dpdpa-agent/api/agents.py'
+      - 'dpdpa-agent/api/agent_auth.py'
+      - 'dpdpa-agent/agent_store/**'
+      - '.github/scripts/agent_e2e.py'
+      - '.github/scripts/agent_ci_lib.sh'
+      - '.github/scripts/agent_ci_lib_mac.sh'
+      - '.github/workflows/test-macos-agent.yml'
+  workflow_dispatch:
+
+jobs:
+  test-macos-agent:
+    name: Build, install and exercise the agent .pkg on macOS (arm64)
+    runs-on: macos-latest
+    timeout-minutes: 60
+    env:
+      VERITAS_URL: https://localhost:8000
+      VERITAS_ORG: ci_org
+      VERITAS_ADMIN_USER: ci_admin
+      VERITAS_ADMIN_PASSWORD: CiAdmin#12345
+      PKG_VERSION: 0.0.0-ci
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: dpdpa-agent/requirements.txt
+
+      # ── The Veritas server, run from source ──────────────────────────────
+      - name: Install server dependencies
+        working-directory: dpdpa-agent
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl
+
+      - name: Create an any-machine test license
+        env:
+          VERITAS_PRIVATE_KEY_B64: ${{ secrets.VERITAS_PRIVATE_KEY_B64 }}
+        run: |
+          test -n "$VERITAS_PRIVATE_KEY_B64" || { echo "VERITAS_PRIVATE_KEY_B64 secret is not set"; exit 1; }
+          mkdir -p /tmp/vdata
+          echo "$VERITAS_PRIVATE_KEY_B64" | base64 -d > /tmp/ci_private_key.pem
+          chmod 600 /tmp/ci_private_key.pem
+          python tools/generate_license.py --org ci-agent-test --tier enterprise \
+            --expiry 2027-12-31 --key /tmp/ci_private_key.pem --out /tmp/vdata/veritas.vlic
+          rm -f /tmp/ci_private_key.pem
+
+      - name: Start the server and create the test organization
+        run: |
+          source .github/scripts/agent_ci_lib_mac.sh
+          start_server
+          wait_server
+          $E2E setup
+
+      # ── Build exactly what the release builds ────────────────────────────
+      - name: Build the agent binary and the .pkg
+        run: |
+          pip install pyinstaller -r veritas-agent/requirements.txt
+          echo "$PKG_VERSION" > veritas-agent/VERSION
+          (cd veritas-agent && python -m PyInstaller veritas-agent-mac.spec --noconfirm)
+          bash package/macos/build-agent-pkg.sh veritas-agent/dist/veritas-agent-runtime "$PKG_VERSION" arm64
+          ls -lh dist/
+
+      - name: Package contents
+        run: |
+          pkgutil --payload-files "dist/veritas-agent_${PKG_VERSION}_arm64.pkg" > /tmp/payload.txt
+          cat /tmp/payload.txt
+          for f in opt/veritas-agent/veritas-agent-runtime opt/veritas-agent/VERSION \
+                   opt/veritas-agent/com.veritas.agent.plist opt/veritas-agent/config.yaml.example \
+                   usr/local/bin/veritas-agent; do
+            grep -q "$f" /tmp/payload.txt || { echo "missing from package: $f"; exit 1; }
+          done
+          if grep -q '/\._' /tmp/payload.txt; then echo "macOS metadata files in the package"; exit 1; fi
+
+      - name: Install the .pkg
+        run: sudo installer -pkg "dist/veritas-agent_${PKG_VERSION}_arm64.pkg" -target /
+
+      - name: Package layout
+        run: |
+          id _veritas-agent
+          test "$(veritas-agent version)" = "Veritas Agent $PKG_VERSION"
+          test "$(cat /opt/veritas-agent/VERSION)" = "$PKG_VERSION"
+          test "$(/opt/veritas-agent/veritas-agent-runtime --version | tr -d '\n')" != ""
+          test -f /Library/LaunchDaemons/com.veritas.agent.plist
+          test "$(stat -f '%Su %Lp' /etc/veritas-agent/config.yaml)" = "_veritas-agent 640"
+          test "$(sudo stat -f '%Su %Lp' /var/lib/veritas-agent)" = "_veritas-agent 700"
+          if launchctl print system/com.veritas.agent >/dev/null 2>&1; then echo "agent is running before it was configured"; exit 1; fi
+          grep -q "Crashed" /Library/LaunchDaemons/com.veritas.agent.plist
+          # the account must not be an administrator
+          if dseditgroup -o checkmember -m _veritas-agent admin 2>&1 | grep -q "^yes"; then echo "service account is an administrator"; exit 1; fi
+
+      # ── A bad key stops the service once, with a clear reason ────────────
+      - name: Invalid key stops the service once and does not loop
+        run: |
+          source .github/scripts/agent_ci_lib_mac.sh
+          write_agent_config "not-a-real-key"
+          sudo veritas-agent start || true
+          wait_service_failed
+          agent_log_has "Registration rejected" || { echo "no clear rejection reason in the log"; agent_log | tail -20; exit 1; }
+          if sudo test -e /var/lib/veritas-agent/.veritas_state.json; then echo "an identity was saved although registration was rejected"; exit 1; fi
+          sleep 25   # longer than the launchd throttle: it must not have been started again
+          [ "$(agent_state)" = failed ] || { echo "service state changed after the failure: $(agent_state)"; exit 1; }
+          sudo veritas-agent stop
+
+      # ── Real registration and log reading ────────────────────────────────
+      - name: Register with a real key and read logs as the unprivileged account
+        run: |
+          source .github/scripts/agent_ci_lib_mac.sh
+          sudo mkdir -p "$LOGDIR"
+          sudo touch "$LOGDIR/app.log" "$LOGDIR/secret.log"
+          sudo chmod 755 "$LOGDIR"
+          sudo chown root:wheel "$LOGDIR/app.log" "$LOGDIR/secret.log"
+          sudo chmod 600 "$LOGDIR/app.log" "$LOGDIR/secret.log"   # nobody but root can read them yet
+          # the agent account cannot read app.log until it is granted access
+          if sudo -u "$AGENT_USER" test -r "$LOGDIR/app.log"; then echo "app.log is readable before grant-read"; exit 1; fi
+          sudo veritas-agent grant-read "$LOGDIR/app.log"
+          sudo -u "$AGENT_USER" test -r "$LOGDIR/app.log"
+          if sudo -u "$AGENT_USER" test -r "$LOGDIR/secret.log"; then echo "secret.log became readable"; exit 1; fi
+          KEY=$($E2E issue-key)
+          write_agent_config "$KEY"
+          sudo veritas-agent start
+          $E2E wait-agent --label ci-agent --version "$PKG_VERSION" \
+            --source "app.log=reading" \
+            --source "secret.log=error:Permission denied" \
+            --source "later.log=waiting" --timeout 150
+          test "$(sudo stat -f '%Su %Lp' /var/lib/veritas-agent/.veritas_state.json)" = "_veritas-agent 600"
+          if agent_log_has "$KEY"; then echo "the registration key appears in the agent log"; exit 1; fi
+          set_baseline
+
+      # ── Telemetry end to end ─────────────────────────────────────────────
+      - name: Log lines become violations; clean lines do not
+        run: |
+          source .github/scripts/agent_ci_lib_mac.sh
+          append_log app.log "DEBUG customer verified with Aadhaar 2345 6789 0124"
+          append_log app.log "INFO order ORD-583927 status updated to packed"
+          append_log app.log "DEBUG receipt sent to phone 9876543210"
+          expect_new_violations 2
+
+      - name: Rotation by rename loses nothing and repeats nothing
+        run: |
+          source .github/scripts/agent_ci_lib_mac.sh
+          append_log app.log "DEBUG last line before rotation, phone 9123456780"
+          sudo mv "$LOGDIR/app.log" "$LOGDIR/app.log.1"
+          printf '%s\n' "DEBUG first line after rotation, phone 9234567801" | sudo tee "$LOGDIR/app.log" >/dev/null
+          sudo chmod 644 "$LOGDIR/app.log"
+          expect_new_violations 4
+
+      - name: Truncation in place (copytruncate) is followed
+        run: |
+          source .github/scripts/agent_ci_lib_mac.sh
+          sudo truncate -s 0 "$LOGDIR/app.log" 2>/dev/null || sudo sh -c ": > '$LOGDIR/app.log'"
+          append_log app.log "DEBUG after copytruncate, phone 9345678012"
+          expect_new_violations 5
+
+      - name: A file that appears later is read from its start
+        run: |
+          source .github/scripts/agent_ci_lib_mac.sh
+          printf '%s\n' "DEBUG from a late file, phone 9567801234" | sudo tee "$LOGDIR/later.log" >/dev/null
+          sudo chmod 644 "$LOGDIR/later.log"
+          expect_new_violations 6
+          $E2E wait-agent --label ci-agent --source "later.log=reading" --timeout 60
+
+      # ── Restart and outage ───────────────────────────────────────────────
+      - name: Restart keeps the identity (no second registration)
+        run: |
+          source .github/scripts/agent_ci_lib_mac.sh
+          BEFORE=$(agent_ids)
+          sudo veritas-agent restart
+          $E2E wait-agent --label ci-agent --version "$PKG_VERSION" --timeout 90
+          AFTER=$(agent_ids)
+          echo "before: $BEFORE"; echo "after:  $AFTER"
+          [ "$BEFORE" = "$AFTER" ] || { echo "the agent registered again after a restart"; exit 1; }
+          agent_log_has "Using existing identity" || { echo "the agent did not reuse its saved identity"; exit 1; }
+          append_log app.log "DEBUG after restart, phone 9678012345"
+          expect_new_violations 7
+
+      - name: A server outage is buffered and delivered afterwards
+        run: |
+          source .github/scripts/agent_ci_lib_mac.sh
+          stop_server
+          append_log app.log "DEBUG during outage 1, phone 9789012345"
+          append_log app.log "DEBUG during outage 2, phone 9890123456"
+          append_log app.log "DEBUG during outage 3, phone 9901234567"
+          sleep 8
+          start_server
+          wait_server
+          expect_new_violations 10 240
+          $E2E counter --label ci-agent --name retries --min 1 --timeout 60
+          [ "$(agent_state)" = running ]
+
+      - name: Evidence chain is intact
+        run: |
+          source .github/scripts/agent_ci_lib_mac.sh
+          $E2E verify-chain
+
+      # ── Upgrade keeps the identity and the configuration ─────────────────
+      - name: Reinstalling over a running agent keeps identity and config
+        run: |
+          source .github/scripts/agent_ci_lib_mac.sh
+          BEFORE=$(agent_ids)
+          sudo cp /etc/veritas-agent/config.yaml /tmp/agent-config-before.yaml
+          sudo installer -pkg "dist/veritas-agent_${PKG_VERSION}_arm64.pkg" -target /
+          sudo diff /etc/veritas-agent/config.yaml /tmp/agent-config-before.yaml || { echo "the configuration was overwritten"; exit 1; }
+          $E2E wait-agent --label ci-agent --version "$PKG_VERSION" --timeout 90
+          [ "$BEFORE" = "$(agent_ids)" ] || { echo "the agent identity changed after the upgrade"; exit 1; }
+          [ "$(agent_state)" = running ]
+
+      # ── Removal ──────────────────────────────────────────────────────────
+      - name: Uninstall keeps the identity; purge removes everything
+        run: |
+          sudo veritas-agent uninstall
+          if launchctl print system/com.veritas.agent >/dev/null 2>&1; then echo "agent still loaded after uninstall"; exit 1; fi
+          test ! -e /opt/veritas-agent
+          test ! -e /usr/local/bin/veritas-agent
+          test -e /etc/veritas-agent/config.yaml
+          sudo test -e /var/lib/veritas-agent/.veritas_state.json
+          sudo installer -pkg "dist/veritas-agent_${PKG_VERSION}_arm64.pkg" -target /
+          sudo veritas-agent uninstall --purge-data
+          sudo test ! -e /var/lib/veritas-agent
+          test ! -e /etc/veritas-agent
+          if id _veritas-agent >/dev/null 2>&1; then echo "user still exists after purge"; exit 1; fi
+
+      - name: Collect logs on failure
+        if: failure()
+        run: |
+          echo "=== launchd ==="; sudo launchctl print system/com.veritas.agent 2>&1 | head -40 || true
+          echo "=== agent log ==="; sudo tail -150 /var/log/veritas-agent/agent.log || true
+          echo "=== server log ==="; tail -80 /tmp/server.log || true
+          echo "=== agents ==="; python .github/scripts/agent_e2e.py agents || true
+
+      - name: Remove secrets
+        if: always()
+        run: rm -f /tmp/ci_private_key.pem /tmp/vdata/veritas.vlic

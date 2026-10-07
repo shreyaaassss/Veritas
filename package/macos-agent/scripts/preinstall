@@ -1,0 +1,5 @@
+#!/bin/bash
+# Stop the agent before an upgrade (graceful, never fails)
+PLIST=/Library/LaunchDaemons/com.veritas.agent.plist
+launchctl bootout system "$PLIST" 2>/dev/null || launchctl unload -w "$PLIST" 2>/dev/null || true
+exit 0

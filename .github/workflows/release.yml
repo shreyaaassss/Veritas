@@ -111,6 +111,37 @@ jobs:
         with:
           files: dist/veritas_*.pkg
 
+  # ── macOS agent .pkg ──────────────────────────────────────────────────
+  build-macos-agent-pkg:
+    name: macOS agent .pkg (Apple Silicon arm64)
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build the agent binary
+        working-directory: veritas-agent
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+          echo "${GITHUB_REF_NAME#v}" > VERSION     # the agent reports this release version
+          python -m PyInstaller veritas-agent-mac.spec --noconfirm
+
+      - name: Build the agent .pkg
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          bash package/macos/build-agent-pkg.sh veritas-agent/dist/veritas-agent-runtime $VERSION arm64
+
+      - name: Upload agent .pkg to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/veritas-agent_*.pkg
+
   # ── Windows .exe installer ────────────────────────────────────────────
   build-windows-exe:
     name: Windows installer (amd64)
@@ -249,7 +280,7 @@ jobs:
   publish-release-notes:
     name: Publish release notes with install instructions
     runs-on: ubuntu-latest
-    needs: [build-linux-deb, build-macos-pkg, build-windows-exe, build-agent-deb, build-agent-image, publish-k8s-manifests]
+    needs: [build-linux-deb, build-macos-pkg, build-macos-agent-pkg, build-windows-exe, build-agent-deb, build-agent-image, publish-k8s-manifests]
     permissions:
       contents: write
     steps:
@@ -306,6 +337,15 @@ jobs:
             sudo veritas-agent start
             ```
 
+            **macOS agent (Apple Silicon, no Python needed):**
+            ```bash
+            curl -LO https://github.com/shreyaaassss/Veritas/releases/download/${{ github.ref_name }}/veritas-agent_${{ env.VER }}_arm64.pkg
+            sudo installer -pkg veritas-agent_${{ env.VER }}_arm64.pkg -target /
+            sudo nano /etc/veritas-agent/config.yaml   # set veritas_address, registration_key and the sources to read
+            sudo veritas-agent grant-read /path/to/a/log/file   # for each file the agent should read
+            sudo veritas-agent start
+            ```
+
             Get a registration key from the Veritas dashboard → **Agents** tab → **Issue Registration Key**.
 
             ### Kubernetes (one agent per node, no change to your applications)
@@ -316,5 +356,5 @@ jobs:
             ### Requirements
 
             - **Server**: Ubuntu 22.04+ / Debian 11+ or macOS 12+, systemd, 2 GB RAM, 1 GB disk
-            - **Agent**: Ubuntu 18.04+, python3, python3-requests, python3-yaml (auto-installed)
+            - **Agent**: Ubuntu 18.04+ (python3, python3-requests, python3-yaml auto-installed) or macOS 12+ on Apple Silicon (self-contained)
           append_body: false

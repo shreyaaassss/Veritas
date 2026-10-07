@@ -1,0 +1,63 @@
+#!/bin/bash
+# Veritas Agent macOS post-install. Never use set -e: the installer treats any
+# non-zero exit as fatal, so each step is handled explicitly.
+
+PLIST_SRC=/opt/veritas-agent/com.veritas.agent.plist
+PLIST_DST=/Library/LaunchDaemons/com.veritas.agent.plist
+CONF_DIR=/etc/veritas-agent
+STATE_DIR=/var/lib/veritas-agent
+LOG_DIR=/var/log/veritas-agent
+USER_NAME=_veritas-agent
+
+# ── service account (no login, no home, not an administrator) ───────────────
+if ! id "$USER_NAME" &>/dev/null 2>&1; then
+    USED=$(dscl . -list /Users UniqueID 2>/dev/null | awk '{print $2}')
+    NEW_UID=397
+    while echo "$USED" | grep -q "^${NEW_UID}$" 2>/dev/null; do NEW_UID=$((NEW_UID + 1)); done
+    dscl . -create /Users/$USER_NAME 2>/dev/null || true
+    dscl . -create /Users/$USER_NAME UserShell /usr/bin/false 2>/dev/null || true
+    dscl . -create /Users/$USER_NAME RealName "Veritas Agent" 2>/dev/null || true
+    dscl . -create /Users/$USER_NAME UniqueID "$NEW_UID" 2>/dev/null || true
+    dscl . -create /Users/$USER_NAME PrimaryGroupID 20 2>/dev/null || true
+    dscl . -create /Users/$USER_NAME NFSHomeDirectory /opt/veritas-agent 2>/dev/null || true
+    dscl . -create /Users/$USER_NAME IsHidden 1 2>/dev/null || true
+fi
+
+# ── folders and config (an existing config is never overwritten) ────────────
+mkdir -p "$CONF_DIR" "$STATE_DIR" "$LOG_DIR" 2>/dev/null || true
+if [ ! -f "$CONF_DIR/config.yaml" ]; then
+    cp /opt/veritas-agent/config.yaml.example "$CONF_DIR/config.yaml" 2>/dev/null || true
+fi
+chown -R "$USER_NAME":staff "$CONF_DIR" "$STATE_DIR" "$LOG_DIR" 2>/dev/null || true
+chmod 750 "$CONF_DIR" 2>/dev/null || true
+chmod 640 "$CONF_DIR/config.yaml" 2>/dev/null || true
+chmod 700 "$STATE_DIR" 2>/dev/null || true
+
+# ── LaunchDaemon: installed but only started once the agent is configured ───
+cp -f "$PLIST_SRC" "$PLIST_DST" 2>/dev/null || true
+chown root:wheel "$PLIST_DST" 2>/dev/null || true
+chmod 644 "$PLIST_DST" 2>/dev/null || true
+
+# On an upgrade the agent already has a key or identity: start it again.
+if [ -s "$STATE_DIR/.veritas_state.json" ]; then
+    launchctl bootstrap system "$PLIST_DST" 2>/dev/null || launchctl load -w "$PLIST_DST" 2>/dev/null || true
+    echo "[Veritas Agent] Upgraded. The agent keeps its identity and is running again."
+else
+cat <<'MSG'
+
+Veritas Agent installed.
+
+Next steps:
+  1. In the Veritas dashboard: Agents -> Issue Registration Key (valid 30 minutes)
+  2. sudo nano /etc/veritas-agent/config.yaml
+     Set: veritas_address, registration_key, source_label and the sources to read
+  3. sudo veritas-agent fetch-cert https://your-veritas-server:8000   (optional, pins the certificate)
+  4. sudo veritas-agent start
+  5. sudo veritas-agent logs   (expect "Registered as VERITAS-AGENT-...")
+
+The agent runs as the unprivileged account _veritas-agent. To let it read a log file:
+  sudo veritas-agent grant-read /path/to/file
+
+MSG
+fi
+exit 0

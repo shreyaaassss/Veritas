@@ -1,0 +1,34 @@
+# Veritas Agent Configuration (macOS)
+# ===================================
+# Edit this file, then: sudo veritas-agent restart
+
+# Veritas server address (where the compliance dashboard is running)
+veritas_address: https://your-veritas-server:8000
+
+# Registration key from the Veritas dashboard -> Agents -> Issue Registration Key.
+# It works once and expires after 30 minutes. After the agent has registered it
+# is no longer needed (the agent keeps its permanent identity in /var/lib/veritas-agent).
+registration_key: ""
+
+# TLS. By default the agent downloads the server's certificate the first time it
+# connects and trusts only that certificate afterwards. To pin a certificate you
+# fetched yourself (recommended for production), run:
+#     sudo veritas-agent fetch-cert https://your-veritas-server:8000
+# and uncomment ca_cert below.
+tls:
+  # ca_cert: /etc/veritas-agent/server.crt
+  verify: true
+
+# Label for this agent (appears in the dashboard)
+source_label: my-mac-1
+
+# Log sources to monitor (add as many as needed).
+# The agent runs as the unprivileged account _veritas-agent. For each file it should
+# read, run: sudo veritas-agent grant-read /path/to/file
+sources:
+  - type: file
+    path: /var/log/install.log
+    source_system: macos-install
+  # - type: file
+  #   path: /var/log/app/app.log
+  #   source_system: my-app

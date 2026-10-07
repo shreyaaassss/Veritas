@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.veritas.agent</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/veritas-agent/veritas-agent-runtime</string>
+        <string>--config</string>
+        <string>/etc/veritas-agent/config.yaml</string>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <!-- The agent's permanent identity (agent id + token) lives here, owner-only. -->
+        <key>VERITAS_STATE_DIR</key>
+        <string>/var/lib/veritas-agent</string>
+    </dict>
+
+    <key>WorkingDirectory</key>
+    <string>/opt/veritas-agent</string>
+
+    <key>UserName</key>
+    <string>_veritas-agent</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- Restart only after a crash. A configuration problem (exit 78: bad or used
+         registration key, unwritable state folder) is reported once, not looped. -->
+    <key>KeepAlive</key>
+    <dict>
+        <key>Crashed</key>
+        <true/>
+    </dict>
+
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+
+    <key>StandardOutPath</key>
+    <string>/var/log/veritas-agent/agent.log</string>
+    <key>StandardErrorPath</key>
+    <string>/var/log/veritas-agent/agent.log</string>
+</dict>
+</plist>

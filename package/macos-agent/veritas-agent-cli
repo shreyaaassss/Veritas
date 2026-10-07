@@ -1,0 +1,138 @@
+#!/bin/bash
+# Veritas Agent CLI for macOS. Installed as /usr/local/bin/veritas-agent.
+# Most commands need sudo.
+PLIST=/Library/LaunchDaemons/com.veritas.agent.plist
+LABEL=com.veritas.agent
+CONFIG=/etc/veritas-agent/config.yaml
+STATE_DIR=/var/lib/veritas-agent
+LOG=/var/log/veritas-agent/agent.log
+SVC_USER=_veritas-agent
+VERSION=$(cat /opt/veritas-agent/VERSION 2>/dev/null || echo unknown)
+
+need_root() {
+  if [ "$(id -u)" -ne 0 ]; then
+    echo "This command needs administrator rights. Run: sudo veritas-agent $1" >&2
+    exit 1
+  fi
+}
+
+stop_service()  { launchctl bootout system "$PLIST" 2>/dev/null || launchctl unload "$PLIST" 2>/dev/null || true; }
+start_service() { launchctl bootstrap system "$PLIST" 2>/dev/null || launchctl load -w "$PLIST" 2>/dev/null; }
+
+# running | stopped | failed | absent
+service_state() {
+  local out
+  out=$(launchctl print "system/$LABEL" 2>/dev/null) || { echo absent; return; }
+  if grep -q "state = running" <<<"$out"; then echo running; return; fi
+  if grep -Eq "last exit code = [1-9]" <<<"$out"; then echo failed; return; fi
+  echo stopped
+}
+
+report_start() {
+  local state
+  for _ in $(seq 1 20); do
+    sleep 1
+    state=$(service_state)
+    if [ "$state" = failed ]; then
+      echo "  Status: NOT running. Last log lines:" >&2
+      tail -n 15 "$LOG" 2>/dev/null >&2
+      exit 1
+    fi
+    if grep -q "Registered as\|Using existing identity" "$LOG" 2>/dev/null && [ "$state" = running ]; then
+      echo "  Status: running"; return
+    fi
+  done
+  echo "  Status: $(service_state). Check with: sudo veritas-agent logs"
+}
+
+case "$1" in
+  start)
+    need_root start
+    stop_service; sleep 1
+    if start_service; then echo "Veritas Agent starting..."; report_start
+    else echo "Failed to start. Try: sudo launchctl bootstrap system $PLIST" >&2; exit 1; fi
+    ;;
+  stop)    need_root stop; stop_service; echo "Veritas Agent stopped." ;;
+  restart)
+    need_root restart
+    stop_service; sleep 2
+    if start_service; then echo "Veritas Agent restarting..."; report_start
+    else echo "Failed to start. Try: sudo launchctl bootstrap system $PLIST" >&2; exit 1; fi
+    ;;
+  status)
+    state=$(service_state)
+    echo "Veritas Agent $VERSION: $state"
+    [ "$state" = running ] || exit 3
+    ;;
+  logs)    tail -n 50 -f "$LOG" ;;
+
+  fetch-cert)
+    need_root fetch-cert
+    if [ -z "$2" ]; then
+      echo "Usage: sudo veritas-agent fetch-cert <server-url>"
+      echo "Example: sudo veritas-agent fetch-cert https://192.168.1.10:8000"
+      exit 1
+    fi
+    CERT_OUT=$(dirname "$CONFIG")/server.crt
+    echo "Fetching TLS certificate from $2 ..."
+    if ! curl -sSk "$2/api/tls/cert" -o "$CERT_OUT"; then echo "Could not reach $2" >&2; exit 1; fi
+    chown "$SVC_USER":staff "$CERT_OUT"; chmod 644 "$CERT_OUT"
+    echo "Certificate saved to $CERT_OUT"
+    echo "Uncomment ca_cert in $CONFIG to enable it."
+    ;;
+
+  grant-read)
+    # The agent runs as an unprivileged account. Give it read access to one log file
+    # (and the right to look inside its folders) without changing the file's owner.
+    need_root grant-read
+    if [ -z "$2" ] || [ ! -e "$2" ]; then echo "Usage: sudo veritas-agent grant-read <file>" >&2; exit 1; fi
+    TARGET=$(cd "$(dirname "$2")" && pwd)/$(basename "$2")
+    chmod +a "user:$SVC_USER allow read,readattr,readextattr,readsecurity" "$TARGET" || exit 1
+    # let the account traverse each folder on the way (execute/search only)
+    DIR=$(dirname "$TARGET")
+    while [ "$DIR" != "/" ]; do
+      if ! sudo -u "$SVC_USER" test -x "$DIR" 2>/dev/null; then
+        chmod +a "user:$SVC_USER allow search" "$DIR" 2>/dev/null || true
+      fi
+      DIR=$(dirname "$DIR")
+    done
+    if sudo -u "$SVC_USER" test -r "$TARGET"; then echo "$SVC_USER can now read $TARGET"
+    else echo "Access was granted but $SVC_USER still cannot read $TARGET (the folder may be protected by macOS privacy rules)." >&2; exit 1; fi
+    ;;
+
+  uninstall)
+    need_root uninstall
+    PURGE=no
+    if [ "$2" = "--purge-data" ]; then PURGE=yes; fi
+    stop_service
+    rm -f "$PLIST"
+    pkgutil --forget com.veritas.agent.pkg >/dev/null 2>&1 || true
+    rm -rf /opt/veritas-agent
+    if [ "$PURGE" = yes ]; then
+      rm -rf "$STATE_DIR" /etc/veritas-agent /var/log/veritas-agent
+      dscl . -delete "/Users/$SVC_USER" 2>/dev/null || true
+      echo "Veritas Agent and its identity, configuration and logs were removed."
+    else
+      echo "Veritas Agent was removed. Its identity and configuration are kept."
+      echo "To delete those too: sudo veritas-agent uninstall --purge-data"
+    fi
+    rm -f /usr/local/bin/veritas-agent
+    ;;
+
+  version) echo "Veritas Agent $VERSION" ;;
+  *)
+    echo "Veritas Agent v$VERSION: DPDPA telemetry forwarder"
+    echo ""
+    echo "Usage: veritas-agent <command>"
+    echo ""
+    echo "  start | stop | restart   Control the agent service"
+    echo "  status                   Show the service state"
+    echo "  logs                     Stream agent logs (Ctrl+C to stop)"
+    echo "  fetch-cert <url>         Download the server's TLS certificate to pin it"
+    echo "  grant-read <file>        Let the agent account read a log file"
+    echo "  uninstall [--purge-data] Remove the agent (identity and config are kept unless --purge-data)"
+    echo "  version                  Print version"
+    echo ""
+    echo "Config: $CONFIG"
+    ;;
+esac
