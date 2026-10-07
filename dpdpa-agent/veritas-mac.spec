@@ -79,7 +79,11 @@ a = Analysis(
         # httpx required by weasel (spaCy CLI dep) at import time
         'httpx', 'httpx._transports', 'httpx._transports.default',
         'httpcore',
-        'anyio', 'anyio._backends._asyncio',
+        'anyio', 'anyio._backends', 'anyio._backends._asyncio',
+        # loaded lazily by name, so PyInstaller cannot see them: without these the packaged
+        # server cannot hash or verify passwords (no administrator, no sign-in) or sign sessions
+        'passlib', 'passlib.handlers', 'passlib.handlers.bcrypt',
+        'jose', 'jose.jwt',
     ],
     hookspath=[],
     runtime_hooks=['pyi_rth_spacy.py', 'pyi_rth_presidio.py'],
