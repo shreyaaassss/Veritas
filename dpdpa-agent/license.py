@@ -175,8 +175,51 @@ def _fingerprint_v2_linux() -> str:
     return FINGERPRINT_V2_PREFIX + hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
+def _macos_ioreg_values() -> dict:
+    """IOPlatformUUID and IOPlatformSerialNumber from ioreg (no root needed), or {}."""
+    try:
+        out = subprocess.check_output(
+            ["/usr/sbin/ioreg", "-rd1", "-c", "IOPlatformExpertDevice"],
+            stderr=subprocess.DEVNULL, timeout=10,
+        ).decode("utf-8", errors="replace")
+    except Exception:
+        return {}
+    values = {}
+    for line in out.splitlines():
+        for key in ("IOPlatformUUID", "IOPlatformSerialNumber"):
+            if f'"{key}"' in line and "=" in line:
+                values[key] = line.split("=", 1)[1].strip().strip('"').strip()
+    return values
+
+
+def _fingerprint_v2_macos() -> str:
+    """
+    macOS fingerprint, version 2.
+
+    Anchored on the hardware UUID (IOPlatformUUID): set by the hardware, it survives macOS
+    reinstalls, network changes and renames. Falls back to the hardware serial number. Hostname
+    and MAC address are deliberately NOT used (they change with networks and Wi-Fi settings).
+
+    Format: "v2:" + sha256("veritas-fp-v2|macos|<kind>|<value>") hex.
+    """
+    values = _macos_ioreg_values()
+    uuid_value = values.get("IOPlatformUUID", "").lower()
+    serial = values.get("IOPlatformSerialNumber", "")
+    if len(uuid_value) >= 32:
+        kind, value = "platform-uuid", uuid_value
+    elif serial:
+        kind, value = "hardware-serial", serial
+    else:
+        raise FingerprintError(
+            "Cannot determine a stable machine identity: ioreg reports neither a hardware UUID "
+            "nor a serial number."
+        )
+    raw = f"veritas-fp-v2|macos|{kind}|{value}"
+    return FINGERPRINT_V2_PREFIX + hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
 def _fingerprint_v1() -> str:
-    """Legacy fingerprint (disk serial + MAC + hostname + OS), still used on macOS/Windows."""
+    """Legacy fingerprint (disk serial + MAC + hostname + OS), still used on Windows."""
     mac      = hex(uuid.getnode())
     hostname = socket.gethostname()
     system   = platform.system()
@@ -190,8 +233,11 @@ def current_fingerprint() -> str:
     Compute this machine's fingerprint. Must match tools/fingerprint.py.
     Raises FingerprintError if no stable machine identity exists.
     """
-    if platform.system() == "Linux":
+    system = platform.system()
+    if system == "Linux":
         return _fingerprint_v2_linux()
+    if system == "Darwin":
+        return _fingerprint_v2_macos()
     return _fingerprint_v1()
 
 
@@ -210,10 +256,11 @@ def check_license_fingerprint(license_fingerprint: str) -> None:
     if license_fingerprint == this_machine:
         return
 
-    if platform.system() == "Linux" and not license_fingerprint.startswith(FINGERPRINT_V2_PREFIX):
+    system = platform.system()
+    if system in ("Linux", "Darwin") and not license_fingerprint.startswith(FINGERPRINT_V2_PREFIX):
         raise LicenseError(
             "Veritas license uses the old machine fingerprint format, which is no "
-            "longer accepted on Linux.\n"
+            f"longer accepted on {'Linux' if system == 'Linux' else 'macOS'}.\n"
             f"This machine's fingerprint is: {this_machine}\n"
             "Send it to support@veritas.io to receive a reissued license."
         )

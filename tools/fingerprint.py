@@ -105,10 +105,27 @@ def linux_machine_id() -> str:
     return ""
 
 
+def macos_ioreg_values() -> dict:
+    """IOPlatformUUID and IOPlatformSerialNumber from ioreg (no root needed), or {}."""
+    try:
+        out = subprocess.check_output(
+            ["/usr/sbin/ioreg", "-rd1", "-c", "IOPlatformExpertDevice"],
+            stderr=subprocess.DEVNULL, timeout=10,
+        ).decode("utf-8", errors="replace")
+    except Exception:
+        return {}
+    values = {}
+    for line in out.splitlines():
+        for key in ("IOPlatformUUID", "IOPlatformSerialNumber"):
+            if f'"{key}"' in line and "=" in line:
+                values[key] = line.split("=", 1)[1].strip().strip('"').strip()
+    return values
+
+
 def machine_fingerprint() -> str:
     """
     Compute the machine fingerprint for this platform.
-    Linux returns "v2:<64 hex>". Other platforms return the legacy 64-hex value.
+    Linux and macOS return "v2:<64 hex>". Windows returns the legacy 64-hex value.
     Raises RuntimeError if no stable machine identity can be determined (Linux).
     """
     system = platform.system()
@@ -128,12 +145,26 @@ def machine_fingerprint() -> str:
         raw = f"veritas-fp-v2|linux|{kind}|{value}"
         return "v2:" + hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
+    if system == "Darwin":
+        values = macos_ioreg_values()
+        uuid_value = values.get("IOPlatformUUID", "").lower()
+        serial = values.get("IOPlatformSerialNumber", "")
+        if len(uuid_value) >= 32:
+            kind, value = "platform-uuid", uuid_value
+        elif serial:
+            kind, value = "hardware-serial", serial
+        else:
+            raise RuntimeError(
+                "Cannot determine a stable machine identity: ioreg reports neither a hardware "
+                "UUID nor a serial number."
+            )
+        raw = f"veritas-fp-v2|macos|{kind}|{value}"
+        return "v2:" + hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
     mac  = hex(uuid.getnode())
     host = socket.gethostname()
     if system == "Windows":
         disk_serial = get_disk_serial_windows()
-    elif system == "Darwin":
-        disk_serial = get_disk_serial_macos()
     else:
         disk_serial = "NO_SERIAL"
     raw = f"{disk_serial}:{mac}:{host}:{system}"

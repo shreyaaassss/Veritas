@@ -1,147 +1,263 @@
 name: Test macOS .pkg Installation
 
+# Builds the macOS runtime and the .pkg from the current commit (the same way the release does,
+# so there is nothing to wait for), installs it on a clean Apple Silicon runner and exercises the
+# whole product: version, fingerprint, license binding, setup code, the dashboard in a browser,
+# a real agent, restart, lost-password reset, a company certificate, reinstall keeping the data,
+# and uninstall.
+
 on:
   push:
     tags: ['v*']
+    branches: [main]
+    paths:
+      - 'dpdpa-agent/**'
+      - 'package/macos/**'
+      - 'veritas-agent/**'
+      - 'tools/**'
+      - '.github/scripts/**'
+      - '.github/workflows/test-macos-install.yml'
   workflow_dispatch:
 
 jobs:
   test-macos-pkg:
-    name: Install & smoke-test veritas .pkg on macOS
+    name: Build, install and exercise the .pkg on macOS (arm64)
     runs-on: macos-latest
+    timeout-minutes: 75
+    env:
+      VERITAS_URL: https://localhost:8000
+      VERITAS_ORG: smoke_org
+      VERITAS_ADMIN_USER: smoke_admin
+      VERITAS_ADMIN_PASSWORD: Violet-Harbor#2468
+      PKG_VERSION: 0.0.0-ci
 
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
         with:
-          fetch-depth: 0   # full history needed so git describe --tags works
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: dpdpa-agent/requirements.txt
 
-      - name: Get latest release tag
-        id: tag
+      # ── Build exactly what the release builds ─────────────────────────────
+      - name: Install build dependencies
+        working-directory: dpdpa-agent
         run: |
-          git fetch --tags --force
-          TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v1.0.5")
-          VER=${TAG#v}
-          echo "Using release: $TAG (binary version $VER)"
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
-          echo "ver=$VER"  >> $GITHUB_OUTPUT
+          pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+          pip install https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl
 
-      - name: Download .pkg from release
+      - name: Build the runtime
+        working-directory: dpdpa-agent
         run: |
-          TAG=${{ steps.tag.outputs.tag }}
-          VER=${{ steps.tag.outputs.ver }}
-          echo "Downloading veritas_${VER}_arm64.pkg ..."
-          curl -L \
-            "https://github.com/shreyaaassss/Veritas/releases/download/${TAG}/veritas_${VER}_arm64.pkg" \
-            -o /tmp/veritas.pkg
-          ls -lh /tmp/veritas.pkg
+          echo "$PKG_VERSION" > VERSION
+          python -m PyInstaller veritas-mac.spec --noconfirm
 
-      - name: Install .pkg
-        run: sudo installer -pkg /tmp/veritas.pkg -target /
+      - name: Build the .pkg
+        run: |
+          bash package/macos/build-pkg.sh dpdpa-agent/dist/veritas-runtime "$PKG_VERSION" arm64
+          ls -lh dist/
 
-      - name: Verify CLI installed
-        run: veritas version
+      # ── Install ──────────────────────────────────────────────────────────
+      - name: Install the .pkg from the command line
+        run: sudo installer -pkg "dist/veritas_${PKG_VERSION}_arm64.pkg" -target /
 
-      - name: Get machine fingerprint
-        run: sudo veritas fingerprint
+      - name: Package layout, version and command
+        run: |
+          if [ "$(veritas version)" != "Veritas $PKG_VERSION" ]; then echo "wrong version: $(veritas version)"; exit 1; fi
+          if [ "$(cat /opt/veritas/VERSION)" != "$PKG_VERSION" ]; then echo "VERSION file wrong"; exit 1; fi
+          for need in /opt/veritas/veritas-runtime /Library/LaunchDaemons/com.veritas.daemon.plist; do
+            if [ ! -e "$need" ]; then echo "missing after install: $need"; exit 1; fi
+          done
+          id _veritas
+          # there is no license yet, so the service must have stopped by itself, once
+          sleep 8
+          STATE=$(sudo launchctl print system/com.veritas.daemon 2>&1 || true)
+          if grep -q "state = running" <<<"$STATE"; then echo "service is running without a license"; echo "$STATE" | head -30; exit 1; fi
+          veritas status || true
+          for cmd in check fingerprint setup-code license reset-password install-cert trust-cert uninstall; do
+            veritas 2>&1 | grep -q "  $cmd" || { echo "veritas help does not list: $cmd"; exit 1; }
+          done
 
-      - name: Generate test license using production key
+      # ── Fingerprint and license binding ──────────────────────────────────
+      - name: Fingerprint is v2, stable and the same in the command and the runtime
+        run: |
+          FP1=$(veritas fingerprint | grep '^v2:')
+          FP2=$(veritas fingerprint | grep '^v2:')
+          RT=$(VERITAS_DATA_DIR=/var/lib/veritas /opt/veritas/veritas-runtime --fingerprint)
+          echo "command: $FP1"; echo "runtime: $RT"
+          if [ -z "$FP1" ] || [ "$FP1" != "$FP2" ] || [ "$FP1" != "$RT" ]; then echo "fingerprints differ or are empty"; exit 1; fi
+          echo "$FP1" > /tmp/ci_fingerprint
+          # hostname changes must not change it
+          ORIG=$(scutil --get HostName 2>/dev/null || hostname)
+          sudo scutil --set HostName "renamed-by-ci.local"
+          AFTER=$(veritas fingerprint | grep '^v2:')
+          if [ -n "$ORIG" ]; then sudo scutil --set HostName "$ORIG"; fi
+          if [ "$AFTER" != "$FP1" ]; then echo "the fingerprint changed with the host name"; exit 1; fi
+
+      - name: Create licenses (one for another machine, one for this machine)
         env:
           VERITAS_PRIVATE_KEY_B64: ${{ secrets.VERITAS_PRIVATE_KEY_B64 }}
         run: |
+          test -n "$VERITAS_PRIVATE_KEY_B64" || { echo "VERITAS_PRIVATE_KEY_B64 secret is not set"; exit 1; }
           python3 -m venv /tmp/licvenv
           /tmp/licvenv/bin/pip install cryptography --quiet
-
-          # Decode production private key from GitHub secret
           echo "$VERITAS_PRIVATE_KEY_B64" | base64 -d > /tmp/ci_private_key.pem
+          chmod 600 /tmp/ci_private_key.pem
+          /tmp/licvenv/bin/python3 tools/generate_license.py --org ci-macos --tier enterprise --expiry 2027-12-31 \
+            --fingerprint "v2:$(printf '%064d' 0)" --key /tmp/ci_private_key.pem --out /tmp/other-machine.vlic
+          /tmp/licvenv/bin/python3 tools/generate_license.py --org ci-macos --tier enterprise --expiry 2027-12-31 \
+            --fingerprint "$(cat /tmp/ci_fingerprint)" --key /tmp/ci_private_key.pem --out /tmp/this-machine.vlic
+          rm -f /tmp/ci_private_key.pem
 
-          # Generate any-machine license (no fingerprint — CI runner changes each run)
-          /tmp/licvenv/bin/python3 tools/generate_license.py \
-            --org "ci-test" \
-            --tier enterprise \
-            --expiry 2027-12-31 \
-            --key /tmp/ci_private_key.pem \
-            --out /tmp/ci-test.vlic
-          echo "License generated."
-
-      - name: Install license and fix ownership BEFORE starting daemon
+      - name: A license for another machine is refused, with the reason
         run: |
-          # Copy license directly (bypass the CLI which chowns incorrectly)
-          sudo cp /tmp/ci-test.vlic /var/lib/veritas/veritas.vlic
-          sudo xattr -c /var/lib/veritas/veritas.vlic 2>/dev/null || true
-          sudo chown _veritas:staff /var/lib/veritas/veritas.vlic
-          sudo chmod 640 /var/lib/veritas/veritas.vlic
-          echo "License installed:"
-          sudo ls -la /var/lib/veritas/veritas.vlic
+          if sudo veritas license /tmp/other-machine.vlic; then echo "a license for another machine was accepted"; exit 1; fi
+          sudo grep -q "not valid for this machine" /var/log/veritas/veritas.log /var/log/veritas/veritas-error.log \
+            || { echo "no clear reason in the logs"; sudo tail -30 /var/log/veritas/veritas.log /var/log/veritas/veritas-error.log; exit 1; }
 
-      - name: Bootstrap daemon
+      - name: The license for this machine starts the service
         run: |
-          sudo launchctl bootout system /Library/LaunchDaemons/com.veritas.daemon.plist 2>/dev/null || true
-          sleep 2
-          sudo launchctl bootstrap system /Library/LaunchDaemons/com.veritas.daemon.plist
-
-      - name: Check daemon status immediately after bootstrap
-        run: |
-          sleep 5
-          echo "=== launchctl status ==="
-          sudo launchctl print system/com.veritas.daemon 2>&1 | grep -E "state|pid|exit|environment|username" || true
-          echo "=== Error log so far ==="
-          sudo cat /var/log/veritas/veritas-error.log 2>/dev/null || echo "(no error log yet)"
-          echo "=== Stdout log so far ==="
-          sudo cat /var/log/veritas/veritas.log 2>/dev/null || echo "(no stdout log yet)"
-
-      - name: Wait for server to start (spaCy takes ~60s on CI)
-        run: |
-          echo "Waiting for server..."
-          for i in $(seq 1 24); do
-            RESP=$(curl -sk https://localhost:8000/health 2>/dev/null || echo "")
-            if echo "$RESP" | grep -q '"status":"ok"'; then
-              echo "Server is UP: $RESP"
-              exit 0
-            fi
-            echo "  attempt $i/24 — not ready yet ($((i*5))s elapsed)"
+          sudo veritas license /tmp/this-machine.vlic
+          for i in $(seq 1 60); do
+            curl -sk --max-time 3 "$VERITAS_URL/health" | grep -q '"status":"ok"' && { echo "up after about $((i*5))s"; exit 0; }
             sleep 5
           done
-          echo "Server did not start in 120s."
-          echo "=== Full error log ==="
-          sudo cat /var/log/veritas/veritas-error.log 2>/dev/null || true
-          echo "=== Stdout log ==="
-          sudo cat /var/log/veritas/veritas.log 2>/dev/null || true
-          echo "=== launchctl final state ==="
-          sudo launchctl print system/com.veritas.daemon 2>&1 || true
-          exit 1
+          echo "server did not start"; sudo tail -40 /var/log/veritas/veritas-error.log /var/log/veritas/veritas.log; exit 1
 
-      - name: Health check
+      - name: Health, status and the check command
         run: |
-          HEALTH=$(curl -sk https://localhost:8000/health)
-          echo "Health: $HEALTH"
-          echo "$HEALTH" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d['status']=='ok', f'Bad health: {d}'"
+          veritas status
+          sudo veritas check || true     # warnings are fine; the report is in the log
+          curl -sk "$VERITAS_URL/api/version"
 
-      - name: Ready endpoint
-        run: curl -sk https://localhost:8000/ready | python3 -m json.tool || true
-
-      - name: Check setup page accessible
+      # ── The dashboard in a real browser (setup, org, key, violation, users...) ─
+      - name: Install the browser driver
         run: |
-          HTTP=$(curl -sk -w "\nHTTP_STATUS:%{http_code}" https://localhost:8000/setup 2>/dev/null || echo "CURL_FAILED")
-          echo "Setup page response: $HTTP"
-          STATUS=$(echo "$HTTP" | grep "HTTP_STATUS:" | cut -d: -f2)
-          echo "Status code: $STATUS"
-          if [[ ! "$STATUS" =~ ^(200|302|303)$ ]]; then
-            echo "=== Server error log (last 40 lines) ==="
-            sudo tail -40 /var/log/veritas/veritas-error.log 2>/dev/null || true
-            echo "=== Files in PyInstaller extraction dir ==="
-            sudo find /var/lib/veritas/tmp -maxdepth 3 -type f 2>/dev/null | sort | head -30 || true
-            echo "=== Binary contains setup.html? ==="
-            unzip -l /opt/veritas/veritas-runtime 2>/dev/null | grep -i "setup\|login\|html" | head -10 || true
-            echo "=== Try /login page ==="
-            curl -sko /dev/null -w "login page: %{http_code}\n" https://localhost:8000/login
-            exit 1
-          fi
+          pip install playwright requests pyyaml
+          python -m playwright install chromium
 
-      - name: Print install summary
+      - name: Drive the dashboard
         run: |
-          echo "================================================"
-          echo "  Veritas macOS Install Test: PASSED"
-          echo "  Server:  https://localhost:8000"
-          echo "  License: CI any-machine enterprise"
-          echo "================================================"
-          sudo launchctl print system/com.veritas.daemon | grep -E "state|pid|exit" || true
+          export VERITAS_SETUP_CODE=$(sudo veritas setup-code | grep -E '^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$')
+          test -n "$VERITAS_SETUP_CODE" || { echo "no setup code"; exit 1; }
+          python .github/scripts/browser_smoke.py
+
+      # ── A real agent ─────────────────────────────────────────────────────
+      - name: A real agent forwards a log line
+        run: |
+          export PYTHONUNBUFFERED=1
+          KEY=$(python .github/scripts/agent_e2e.py issue-key)
+          mkdir -p /tmp/agent-state && touch /tmp/ci-agent.log
+          cat > /tmp/agent-config.yaml <<CFG
+          veritas_address: ${VERITAS_URL}
+          registration_key: "${KEY}"
+          source_label: macos-ci-agent
+          tls:
+            verify: false
+          sources:
+            - type: file
+              path: /tmp/ci-agent.log
+              source_system: kyc-service
+          CFG
+          VERITAS_STATE_DIR=/tmp/agent-state VERITAS_AGENT_VERSION=0.0.0-ci \
+            nohup python veritas-agent/agent.py --config /tmp/agent-config.yaml > /tmp/agent.log 2>&1 &
+          python .github/scripts/agent_e2e.py wait-agent --label macos-ci-agent --version 0.0.0-ci --timeout 120
+          BEFORE=$(python .github/scripts/agent_e2e.py count --source-system kyc-service)
+          echo "DEBUG customer verified with Aadhaar 2345 6789 0124" >> /tmp/ci-agent.log
+          python .github/scripts/agent_e2e.py violations --min $((BEFORE + 1)) --source-system kyc-service --timeout 120
+          python .github/scripts/agent_e2e.py verify-chain
+
+      # ── Restart keeps the data ───────────────────────────────────────────
+      - name: Restart keeps the data and the evidence chain
+        run: |
+          BEFORE=$(python .github/scripts/agent_e2e.py count --source-system kyc-service)
+          sudo veritas restart
+          for i in $(seq 1 60); do
+            curl -sk --max-time 3 "$VERITAS_URL/health" | grep -q '"status":"ok"' && break
+            sleep 5
+          done
+          AFTER=$(python .github/scripts/agent_e2e.py count --source-system kyc-service)
+          [ "$BEFORE" = "$AFTER" ] || { echo "violations before=$BEFORE after=$AFTER"; exit 1; }
+          python .github/scripts/agent_e2e.py verify-chain
+
+      # ── Company certificate ──────────────────────────────────────────────
+      - name: Install a company certificate
+        run: |
+          openssl req -x509 -newkey rsa:2048 -nodes -days 30 -subj "/CN=ci-company-cert" \
+            -addext "subjectAltName=DNS:ci-company-cert,DNS:localhost" -keyout /tmp/t.key -out /tmp/t.crt 2>/dev/null
+          openssl req -x509 -newkey rsa:2048 -nodes -days 30 -subj "/CN=other" -keyout /tmp/o.key -out /tmp/o.crt 2>/dev/null
+          if sudo veritas install-cert /tmp/t.crt /tmp/o.key; then echo "a mismatched key was accepted"; exit 1; fi
+          sudo veritas install-cert /tmp/t.crt /tmp/t.key
+          for i in $(seq 1 60); do
+            curl -sk --max-time 3 "$VERITAS_URL/health" | grep -q '"status":"ok"' && break
+            sleep 5
+          done
+          SUBJECT=$(echo | openssl s_client -connect localhost:8000 2>/dev/null | openssl x509 -noout -subject)
+          echo "$SUBJECT"
+          grep -q "ci-company-cert" <<<"$SUBJECT" || { echo "the new certificate is not being served"; exit 1; }
+          ls /var/lib/veritas/certs | grep -q 'server.crt\.' || { echo "the previous certificate was not kept"; exit 1; }
+
+      - name: "trust-cert (informational, macOS may ask for an interactive approval)"
+        continue-on-error: true
+        run: sudo veritas trust-cert
+
+      # ── Lost administrator password ──────────────────────────────────────
+      - name: Reset a lost administrator password from the command line
+        run: |
+          OUT=$(sudo veritas reset-password "$VERITAS_ADMIN_USER")
+          TEMP=$(sed -n 's/^Temporary password for [^:]*: //p' <<<"$OUT" | awk '{print $1}')
+          test -n "$TEMP" || { echo "no temporary password printed"; echo "$OUT"; exit 1; }
+          # the old password no longer works, the temporary one does and must be changed
+          OLD=$(curl -sk -o /dev/null -w '%{http_code}' -X POST "$VERITAS_URL/api/auth/login" -d "username=$VERITAS_ADMIN_USER" --data-urlencode "password=$VERITAS_ADMIN_PASSWORD")
+          [ "$OLD" = "401" ] || { echo "the old password still works ($OLD)"; exit 1; }
+          curl -sk -X POST "$VERITAS_URL/api/auth/login" -d "username=$VERITAS_ADMIN_USER" --data-urlencode "password=$TEMP" | grep -q '"must_change_password":true' \
+            || { echo "temporary password did not work or does not force a change"; exit 1; }
+
+      # ── Reinstall keeps the data, uninstall removes everything ───────────
+      - name: Uninstall keeps the data, reinstall finds it and starts
+        run: |
+          sudo veritas uninstall
+          for gone in /opt/veritas /Library/LaunchDaemons/com.veritas.daemon.plist /usr/local/bin/veritas; do
+            if [ -e "$gone" ]; then echo "left behind after uninstall: $gone"; exit 1; fi
+          done
+          for kept in /var/lib/veritas/veritas.vlic /var/lib/veritas/evidence.db; do
+            if [ ! -e "$kept" ]; then echo "data was removed by a plain uninstall: $kept"; exit 1; fi
+          done
+          sudo installer -pkg "dist/veritas_${PKG_VERSION}_arm64.pkg" -target /
+          for i in $(seq 1 60); do
+            curl -sk --max-time 3 "$VERITAS_URL/health" | grep -q '"status":"ok"' && { echo "up after reinstall"; exit 0; }
+            sleep 5
+          done
+          echo "no start after reinstall"; sudo tail -40 /var/log/veritas/veritas-error.log; exit 1
+
+      - name: Uninstall with --purge-data removes everything
+        run: |
+          sudo veritas uninstall --purge-data
+          for gone in /opt/veritas /var/lib/veritas /var/log/veritas; do
+            if [ -e "$gone" ]; then echo "left behind after --purge-data: $gone"; exit 1; fi
+          done
+          if id _veritas >/dev/null 2>&1; then echo "service user left behind"; exit 1; fi
+          if curl -sk --max-time 3 "$VERITAS_URL/health" >/dev/null 2>&1; then echo "server still answering"; exit 1; fi
+
+      - name: Attach screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-dashboard-screenshots
+          path: smoke-shots
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Collect diagnostics on failure
+        if: failure()
+        run: |
+          echo "=== launchctl ==="; sudo launchctl print system/com.veritas.daemon 2>&1 | head -40 || true
+          echo "=== error log ==="; sudo tail -80 /var/log/veritas/veritas-error.log 2>/dev/null || true
+          echo "=== log ==="; sudo tail -60 /var/log/veritas/veritas.log 2>/dev/null || true
+          echo "=== agent ==="; tail -40 /tmp/agent.log 2>/dev/null || true
+
+      - name: Remove secrets
+        if: always()
+        run: rm -f /tmp/ci_private_key.pem /tmp/*.vlic

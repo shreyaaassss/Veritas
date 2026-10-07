@@ -156,17 +156,29 @@ Simulation: Phase 0 baseline, then Mode A driver and ground-truth checker, then 
 2. The new Supabase URL and service key when you are ready (step 6). Don't paste them here: put them in the portal's `.env.local` and Vercel, and I'll work from the variable names.
 3. Confirm Milestone 1 as the first thing to build.
 
+## Milestone 5: macOS to the same level as Ubuntu (decided 2026-10-07: Apple Silicon only, unsigned package, installed from the command line)
+
+| # | Task | Status |
+|---|---|---|
+| M1 | **Fingerprint v2 for macOS** | **Done (not yet released).** Anchored on the hardware UUID from `ioreg` (`IOPlatformUUID`, fallback hardware serial); hostname and MAC address are no longer used. `license.py` and `tools/fingerprint.py` agree (tested, and compared on a real Mac). Old-format Mac licenses are refused with a reissue message (none exist for customers). |
+| M2 | **Command and package parity** | **Done (not yet released).** The Mac `veritas` command is now a real file (`package/macos/veritas-cli`), not a heredoc: real version (a `VERSION` file in the package), `fingerprint` calls the runtime (one source of truth), `check`, `reset-password`, `install-cert`, `trust-cert` (adds the certificate to the system keychain), `uninstall [--purge-data]`, `status` with exit code, `license` waits for the service and reports a refused license, HTTPS messages. `postinstall` typo fixed, macOS `._*` metadata kept out of the package. |
+| M3 | **CI that matches Linux** | **Written, not yet run on GitHub.** `test-macos-install.yml` now builds the runtime and the `.pkg` from the current commit (the release method), so it no longer waits for release assets (the old race is gone). It installs on a clean macOS runner and checks: version, service stops by itself without a license, fingerprint v2 stable and equal in command and runtime and unchanged by a hostname change, a license for another machine is refused with the reason, the right license starts the service, the dashboard browser test, a real agent forwarding a log line, restart keeps data and chain, company certificate install (and a mismatched key refused), lost-password reset, uninstall keeps data, reinstall finds it, `--purge-data` removes everything. The redundant `build-mac.yml` (loose dependency versions, different Python) was removed. Expect a few CI iterations. |
+| M4 | **Install on a real Mac** | Open. This development Mac has an old leftover install from Sep 2026 (`/opt/veritas`, `/usr/local/bin/veritas`, user `_veritas`); a clean Mac or VM is better. |
+| M5 | **Signing and notarization** | Parked: needs an Apple Developer account. Until then customers install with `sudo installer -pkg ... -target /` (a double-click shows the unidentified-developer block). |
+| M6 | **Mac agent** | Open. Same as Ubuntu: the agent is a Python script today; a Mac needs Python plus `requests` and PyYAML, or a single-file build. |
+| M7 | **Docs** | Open: macOS install guide, Mac paths in OPERATIONS.md. |
+
+Backlog from this milestone: log rotation for `/var/log/veritas` (launchd keeps the file open, so plain `newsyslog` is not enough); Windows still uses the old fingerprint.
+
 ## Backlog: changes to make later
 
 | Item | Notes |
 |---|---|
 | Support email | No support mailbox exists yet. The product says `support@veritas.io` (license errors in `license.py`, `license.go`, `tools/fingerprint.py`) and the `.deb` control file says `support@veritas.app`. Create the real address, then replace all of them with one value (ideally one constant). |
 | CI signing key | CI tests sign licenses with the production private key stored in the `VERITAS_PRIVATE_KEY_B64` secret. Move to a separate test keypair and a test build that embeds its public key. |
-| macOS and Windows fingerprint | Still the old scheme (disk serial + MAC + hostname). Move to `IOPlatformUUID` / `MachineGuid` anchors, same `v2:` format, once the Linux path is proven. |
 | Reissue of old licenses | Test licenses from before v2 are invalid on Linux by design. No customer licenses exist, so nothing to migrate. |
 | Portal: revocation, renewal/reissue, license id, multi-user login, tier limits | Deferred by decision; see `LICENSE_PORTAL_REVIEW.md`. |
 | Go launcher gofmt | `license.go` and `main_linux.go` already fail `gofmt -l` (comment formatting). Cosmetic. |
-| macOS install test trigger | `test-macos-install.yml` runs at tag push before release assets exist, so it fails every release and passes on re-run. Make it wait for the release or trigger after it. |
 | Docker log source reconnect | `tail_docker` ends silently when the container restarts or the stream drops (the source is now shown as "error: log stream ended" in the dashboard, but it is not re-attached). Add a reconnect loop with backoff. |
 | Agent API org scoping elsewhere | After the agent-management fix, audit the remaining routes that take `org_id` in a query or body rather than the path for the same missing membership check. |
 | Publish the agent image as a public package | The release workflow pushes `ghcr.io/shreyaaassss/veritas-agent` but GitHub creates a new package as private. After the first push, make it public once in GitHub (package settings), or customers cannot pull it. |
@@ -176,7 +188,6 @@ Simulation: Phase 0 baseline, then Mode A driver and ground-truth checker, then 
 | Config upload answers 200 for a rejected config | `POST /v1/orgs/{org}/config` returns HTTP 200 with `{"status":"error"}` when validation fails. Callers must read the body; a 4xx status would be safer for scripts. |
 | ~~Lost administrator password~~ | **Done (2026-10-06, not yet released).** `veritas reset-password <user>` (runtime `--reset-password`) sets a temporary password, forces a change, ends the user's sessions, is audited. |
 | ~~Per-account login lockout~~ | **Done (2026-10-06, not yet released).** 5 failures per account name lock it for 15 minutes from any address, applies to unknown names too (no enumeration), audited as `ACCOUNT_LOCKED`. |
-| macOS `veritas` command lacks `install-cert` | The Linux command has it; the macOS CLI built in `package/macos/build-pkg.sh` does not (the runtime flag works). |
 | Backup restore is CLI-only | Restore needs `python backup.py restore` from the source tree; the packaged runtime has no restore command. Add `veritas restore <file>` (stops the service, verifies, restores, starts). |
 | Browser smoke test: Firefox/Safari | Only Chromium is driven. |
 | Ubuntu test findings (2026-10-07, v1.0.19) | All fixed in the next release: **(1)** the agent retried forever when `veritas_address` still held `<HOST>`; it now exits 78 with the reason (also for a placeholder key); **(2)** an open dashboard page stayed dead after its session ended (password reset, sign-out elsewhere); every refused request now sends the page to sign-in, and a pending forced password change reloads it; **(3)** sign-out was hidden behind the user pill; there is now a Sign out button; **(4)** no feedback on password rules while typing; setup, add-user and change-password now show a strength bar and the rules live; **(5)** `install-cert` accepted a certificate for the name `<HOST>`; it now refuses placeholder names and warns when the certificate does not cover the machine's name; **(6)** `InsecureRequestWarning` flooded the agent log with `tls.verify: false`; the agent now warns once. |

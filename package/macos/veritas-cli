@@ -1,0 +1,233 @@
+#!/bin/bash
+# Veritas CLI for macOS: manage the Veritas compliance service.
+# Installed as /usr/local/bin/veritas. Most commands need sudo.
+PLIST=/Library/LaunchDaemons/com.veritas.daemon.plist
+LABEL=com.veritas.daemon
+RUNTIME=/opt/veritas/veritas-runtime
+DATA_DIR=/var/lib/veritas
+LOG=/var/log/veritas/veritas.log
+ERRLOG=/var/log/veritas/veritas-error.log
+SVC_USER=_veritas
+VERSION=$(cat /opt/veritas/VERSION 2>/dev/null || echo unknown)
+HOST=$(hostname 2>/dev/null || echo localhost)
+URL="https://${HOST}:8000"
+
+need_root() {
+  if [ "$(id -u)" -ne 0 ]; then
+    echo "This command needs administrator rights. Run: sudo veritas $1" >&2
+    exit 1
+  fi
+}
+
+# Run the runtime as the service account (same files, same permissions as the service).
+as_service() {
+  sudo -u "$SVC_USER" env VERITAS_DATA_DIR="$DATA_DIR" TMPDIR="$DATA_DIR/tmp" "$RUNTIME" "$@"
+}
+
+stop_service() {
+  launchctl bootout system "$PLIST" 2>/dev/null || launchctl unload "$PLIST" 2>/dev/null || true
+}
+
+start_service() {
+  launchctl bootstrap system "$PLIST" 2>/dev/null || launchctl load -w "$PLIST" 2>/dev/null
+}
+
+# running | stopped | failed (exit code of the last run) | absent
+service_state() {
+  local out
+  out=$(launchctl print "system/$LABEL" 2>/dev/null) || { echo absent; return; }
+  if grep -q "state = running" <<<"$out"; then echo running; return; fi
+  if grep -Eq "last exit code = [1-9]" <<<"$out"; then echo failed; return; fi
+  echo stopped
+}
+
+wait_until_up() {   # prints up | failed | starting
+  local state
+  for _ in $(seq 1 90); do
+    sleep 1
+    state=$(service_state)
+    if [ "$state" = failed ]; then echo failed; return; fi
+    if curl -sk --max-time 3 "https://localhost:8000/health" 2>/dev/null | grep -q '"status":"ok"'; then
+      echo up; return
+    fi
+  done
+  echo starting
+}
+
+report_start() {
+  case "$(wait_until_up)" in
+    up)
+      echo "  Status: running"
+      echo "  Open:   $URL/setup (self-signed certificate; allow the browser warning,"
+      echo "          or run: sudo veritas trust-cert)"
+      ;;
+    failed)
+      echo "  Status: NOT running. Last log lines:" >&2
+      tail -n 15 "$ERRLOG" "$LOG" 2>/dev/null >&2
+      exit 1
+      ;;
+    *)
+      echo "  Status: still starting (the language model takes up to a minute to load)."
+      echo "          Check with: veritas status / veritas logs"
+      ;;
+  esac
+}
+
+case "$1" in
+  start)
+    need_root start
+    stop_service; sleep 1
+    if start_service; then echo "Veritas starting..."; report_start
+    else echo "Failed to start. Try: sudo launchctl bootstrap system $PLIST" >&2; exit 1; fi
+    ;;
+  stop)
+    need_root stop
+    stop_service
+    echo "Veritas stopped."
+    ;;
+  restart)
+    need_root restart
+    stop_service; sleep 2
+    if start_service; then echo "Veritas restarting..."; report_start
+    else echo "Failed to start. Try: sudo launchctl bootstrap system $PLIST" >&2; exit 1; fi
+    ;;
+  status)
+    state=$(service_state)
+    echo "Veritas $VERSION: $state"
+    if curl -sk --max-time 3 "https://localhost:8000/health" 2>/dev/null | grep -q '"status":"ok"'; then
+      echo "Health: ok ($URL)"
+    fi
+    [ "$state" = running ] || exit 3
+    ;;
+  logs)     tail -n 50 -f "$LOG" "$ERRLOG" ;;
+  check)
+    need_root check
+    as_service --check
+    ;;
+
+  fingerprint)
+    # The runtime is the single source of truth for the fingerprint, so this always matches
+    # what the service checks the license against.
+    if ! FP=$(VERITAS_DATA_DIR="$DATA_DIR" "$RUNTIME" --fingerprint 2>&1); then
+      echo "ERROR: could not determine this machine's fingerprint:" >&2
+      echo "$FP" >&2
+      exit 1
+    fi
+    echo "Veritas Machine Fingerprint"
+    echo "==========================================================================="
+    echo "Send this fingerprint to your Veritas contact to receive your license"
+    echo "file (veritas.vlic):"
+    echo
+    echo "$FP"
+    echo
+    ;;
+
+  setup-code)
+    CODE_FILE="$DATA_DIR/secrets/setup_code"
+    if [ -s "$CODE_FILE" ]; then
+      echo "Setup code (enter it on the setup page at $URL/setup):"; echo; cat "$CODE_FILE"; echo
+    else
+      echo "There is no setup code: setup is already complete, or the service has not started yet." >&2
+      exit 1
+    fi
+    ;;
+
+  license)
+    need_root license
+    if [ -z "$2" ]; then
+      echo "Usage: sudo veritas license <path-to-veritas.vlic>"
+      exit 1
+    fi
+    if [ ! -f "$2" ]; then echo "File not found: $2" >&2; exit 1; fi
+    cp "$2" "$DATA_DIR/veritas.vlic"
+    xattr -c "$DATA_DIR/veritas.vlic" 2>/dev/null || true
+    chown "$SVC_USER":staff "$DATA_DIR/veritas.vlic"
+    chmod 640 "$DATA_DIR/veritas.vlic"
+    stop_service; sleep 2
+    start_service
+    echo "License installed. Veritas is restarting..."
+    report_start
+    ;;
+
+  reset-password)
+    # Lost administrator password: set a temporary one (the user must choose their own at sign-in).
+    need_root reset-password
+    if [ -z "$2" ]; then echo "Usage: sudo veritas reset-password <username>"; exit 1; fi
+    as_service --reset-password "$2"
+    ;;
+
+  install-cert)
+    # Replace the self-signed certificate with one issued by your company (or a public CA).
+    need_root install-cert
+    if [ -z "$2" ] || [ -z "$3" ]; then
+      echo "Usage: sudo veritas install-cert <certificate.pem> <private-key.pem>"
+      echo "       The certificate file may contain the intermediate certificates after the"
+      echo "       server certificate. The key must not be protected by a passphrase."
+      exit 1
+    fi
+    if ! env VERITAS_DATA_DIR="$DATA_DIR" "$RUNTIME" --install-cert "$2" "$3"; then exit 1; fi
+    chown -R "$SVC_USER":staff "$DATA_DIR/certs" 2>/dev/null || true
+    chmod 600 "$DATA_DIR/certs/server.key" 2>/dev/null || true
+    stop_service; sleep 2
+    start_service
+    echo "Veritas is restarting with the new certificate."
+    report_start
+    ;;
+
+  trust-cert)
+    # Make this Mac's browsers trust Veritas's own (self-signed) certificate. Only for the machine
+    # you run it on; other computers still show the browser warning.
+    need_root trust-cert
+    CRT="$DATA_DIR/certs/server.crt"
+    if [ ! -f "$CRT" ]; then echo "No certificate yet: start Veritas once first." >&2; exit 1; fi
+    security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain "$CRT" \
+      && echo "This Mac now trusts the Veritas certificate. Reopen the browser tab."
+    ;;
+
+  uninstall)
+    need_root uninstall
+    PURGE=no
+    if [ "$2" = "--purge-data" ]; then PURGE=yes; fi
+    stop_service
+    rm -f "$PLIST"
+    pkgutil --forget com.veritas.pkg >/dev/null 2>&1 || true
+    rm -rf /opt/veritas
+    if [ "$PURGE" = yes ]; then
+      rm -rf "$DATA_DIR" /var/log/veritas
+      dscl . -delete "/Users/$SVC_USER" 2>/dev/null || true
+      echo "Veritas and all of its data were removed."
+    else
+      echo "Veritas was removed. Its data is kept in $DATA_DIR (the license, databases, evidence)."
+      echo "To delete that too: sudo veritas uninstall --purge-data"
+    fi
+    rm -f /usr/local/bin/veritas
+    ;;
+
+  version)  echo "Veritas $VERSION" ;;
+  *)
+    echo "Veritas DPDPA Compliance Platform v$VERSION"
+    echo ""
+    echo "Usage: veritas <command>"
+    echo ""
+    echo "Commands:"
+    echo "  start         Start the Veritas service"
+    echo "  stop          Stop the Veritas service"
+    echo "  restart       Restart the Veritas service"
+    echo "  status        Show service state and health"
+    echo "  logs          Stream service logs (Ctrl+C to stop)"
+    echo "  check         Run production acceptance checks"
+    echo "  fingerprint   Print machine fingerprint (send to Veritas for license)"
+    echo "  setup-code    Print the one-time code the setup page asks for"
+    echo "  license <f>   Install license file and restart"
+    echo "  reset-password <user>   Set a temporary password (lost administrator password)"
+    echo "  install-cert <cert> <key>   Install a company TLS certificate and restart"
+    echo "  trust-cert    Make this Mac's browsers trust Veritas's own certificate"
+    echo "  uninstall [--purge-data]   Remove Veritas (data is kept unless --purge-data)"
+    echo "  version       Print version"
+    echo ""
+    echo "Getting started:"
+    echo "  1. veritas fingerprint        → send output to your Veritas contact"
+    echo "  2. sudo veritas license /path/to/veritas.vlic"
+    echo "  3. sudo veritas setup-code    → then open $URL/setup and enter the code"
+    ;;
+esac

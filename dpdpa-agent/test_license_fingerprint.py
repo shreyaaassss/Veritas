@@ -123,3 +123,109 @@ class TestCheckLicenseFingerprint:
         with pytest.raises(lic.LicenseError) as e:
             lic.check_license_fingerprint("v2:" + "0" * 64)
         assert "cannot verify" in str(e.value).lower()
+
+
+# ── macOS (version 2) ──────────────────────────────────────────────────────
+HW_UUID = "D2B8E210-9EA8-59D6-ADEF-3DA4CB0A7130"
+HW_SERIAL = "JW7LFQ0JLX"
+
+
+def _ioreg_output(uuid_value=HW_UUID, serial=HW_SERIAL) -> bytes:
+    lines = ["+-o Root  <class IORegistryEntry>", "  {"]
+    if serial:
+        lines.append(f'    "IOPlatformSerialNumber" = "{serial}"')
+    if uuid_value:
+        lines.append(f'    "IOPlatformUUID" = "{uuid_value}"')
+    lines += ['    "manufacturer" = <"Apple Inc.">', "  }"]
+    return "\n".join(lines).encode()
+
+
+def _expected_macos(kind: str, value: str) -> str:
+    return "v2:" + hashlib.sha256(f"veritas-fp-v2|macos|{kind}|{value}".encode()).hexdigest()
+
+
+@pytest.fixture
+def mac(monkeypatch):
+    """Pretend to be a Mac whose ioreg output we control."""
+    state = {"out": _ioreg_output()}
+    monkeypatch.setattr(platform, "system", lambda: "Darwin")
+
+    def fake_check_output(cmd, *a, **kw):
+        if state["out"] is None:
+            raise FileNotFoundError("ioreg")
+        assert cmd[0].endswith("ioreg")
+        return state["out"]
+
+    monkeypatch.setattr(lic.subprocess, "check_output", fake_check_output)
+    return state
+
+
+def _load_tools_for_mac(monkeypatch, state):
+    spec = importlib.util.spec_from_file_location("tools_fingerprint_mac", _TOOLS)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    monkeypatch.setattr(mod.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(mod.subprocess, "check_output", lambda cmd, *a, **kw: state["out"])
+    return mod
+
+
+class TestMacosFingerprintV2:
+    def test_format_and_value(self, mac):
+        fp = lic.current_fingerprint()
+        assert fp == _expected_macos("platform-uuid", HW_UUID.lower())
+        assert fp.startswith("v2:") and len(fp) == 3 + 64
+
+    def test_independent_of_hostname_and_mac_address(self, mac, monkeypatch):
+        before = lic.current_fingerprint()
+        monkeypatch.setattr(socket, "gethostname", lambda: "a-different-name.local")
+        monkeypatch.setattr(uuid, "getnode", lambda: 0xAABBCCDDEEFF)
+        assert lic.current_fingerprint() == before
+
+    def test_uuid_case_does_not_matter_and_machines_differ(self, mac):
+        a = lic.current_fingerprint()
+        mac["out"] = _ioreg_output(uuid_value=HW_UUID.lower())
+        assert lic.current_fingerprint() == a
+        mac["out"] = _ioreg_output(uuid_value="11111111-2222-3333-4444-555555555555")
+        assert lic.current_fingerprint() != a
+
+    def test_falls_back_to_the_hardware_serial(self, mac):
+        mac["out"] = _ioreg_output(uuid_value=None)
+        assert lic.current_fingerprint() == _expected_macos("hardware-serial", HW_SERIAL)
+
+    def test_kinds_never_collide(self, mac):
+        by_uuid = lic.current_fingerprint()
+        mac["out"] = _ioreg_output(uuid_value=None)
+        assert lic.current_fingerprint() != by_uuid
+
+    def test_no_identity_raises_a_clear_error(self, mac):
+        mac["out"] = _ioreg_output(uuid_value=None, serial=None)
+        with pytest.raises(lic.FingerprintError, match="stable machine identity"):
+            lic.current_fingerprint()
+        mac["out"] = None            # ioreg missing altogether
+        with pytest.raises(lic.FingerprintError):
+            lic.current_fingerprint()
+
+    def test_is_different_from_the_linux_value_for_the_same_text(self, mac, monkeypatch):
+        # the platform name is part of the hash
+        assert _expected_macos("platform-uuid", HW_UUID.lower()) != _expected_v2("platform-uuid", HW_UUID.lower())
+
+    def test_tools_fingerprint_equals_the_product_fingerprint(self, mac, monkeypatch):
+        tools = _load_tools_for_mac(monkeypatch, mac)
+        assert tools.machine_fingerprint() == lic.current_fingerprint()
+        mac["out"] = _ioreg_output(uuid_value=None)
+        assert tools.machine_fingerprint() == lic.current_fingerprint()
+        mac["out"] = _ioreg_output(uuid_value=None, serial=None)
+        with pytest.raises(RuntimeError):
+            tools.machine_fingerprint()
+
+    def test_license_for_this_mac_passes_and_old_format_asks_for_reissue(self, mac):
+        lic.check_license_fingerprint(lic.current_fingerprint())
+        old_style = hashlib.sha256(b"SERIAL:0x1:host:Darwin").hexdigest()
+        with pytest.raises(lic.LicenseError, match="old machine fingerprint format.*macOS"):
+            lic.check_license_fingerprint(old_style)
+
+    def test_a_license_for_another_mac_shows_this_macs_fingerprint(self, mac):
+        other = _expected_macos("platform-uuid", "11111111-2222-3333-4444-555555555555")
+        with pytest.raises(lic.LicenseError) as e:
+            lic.check_license_fingerprint(other)
+        assert lic.current_fingerprint() in str(e.value)

@@ -20,7 +20,7 @@ sleep 1
 
 # ── 2. Create _veritas system user ─────────────────────────────────────────
 if ! id "$USER_NAME" &>/dev/null 2>&1; then
-    echo "[Veritas] Creating system user $_veritas..."
+    echo "[Veritas] Creating system user $USER_NAME..."
     # Find unused UID in 300-499 range
     USED=$(dscl . -list /Users UniqueID 2>/dev/null | awk '{print $2}')
     NEW_UID=398
@@ -78,15 +78,14 @@ echo "  Veritas DPDPA Platform installed successfully!"
 echo "================================================"
 echo ""
 echo "Next steps:"
-echo "  1. sudo veritas fingerprint"
+echo "  1. veritas fingerprint"
 echo "     Send output to your Veritas contact for a license."
 echo ""
 echo "  2. sudo veritas license /path/to/veritas.vlic"
-echo "     Install your license file."
+echo "     Install your license file; Veritas starts by itself."
 echo ""
-echo "  3. sudo veritas start"
-echo "     Then open: https://localhost:8000/setup"
-echo "     and enter the code shown by:  sudo veritas setup-code"
+echo "  3. sudo veritas setup-code"
+echo "     Then open: https://localhost:8000/setup and enter the code."
 echo ""
 
 # Always exit 0 — let the user complete setup manually
