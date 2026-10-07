@@ -197,7 +197,7 @@ jobs:
           SUBJECT=$(echo | openssl s_client -connect localhost:8000 2>/dev/null | openssl x509 -noout -subject)
           echo "$SUBJECT"
           grep -q "ci-company-cert" <<<"$SUBJECT" || { echo "the new certificate is not being served"; exit 1; }
-          ls /var/lib/veritas/certs | grep -q 'server.crt\.' || { echo "the previous certificate was not kept"; exit 1; }
+          sudo ls /var/lib/veritas/certs | grep -q 'server.crt\.' || { echo "the previous certificate was not kept"; exit 1; }
 
       - name: "trust-cert (informational, macOS may ask for an interactive approval)"
         continue-on-error: true
