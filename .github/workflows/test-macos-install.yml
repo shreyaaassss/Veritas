@@ -223,7 +223,7 @@ jobs:
             if [ -e "$gone" ]; then echo "left behind after uninstall: $gone"; exit 1; fi
           done
           for kept in /var/lib/veritas/veritas.vlic /var/lib/veritas/evidence.db; do
-            if [ ! -e "$kept" ]; then echo "data was removed by a plain uninstall: $kept"; exit 1; fi
+            if ! sudo test -e "$kept"; then echo "data was removed by a plain uninstall: $kept"; exit 1; fi
           done
           sudo installer -pkg "dist/veritas_${PKG_VERSION}_arm64.pkg" -target /
           for i in $(seq 1 60); do
